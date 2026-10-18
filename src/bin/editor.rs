@@ -30,7 +30,7 @@ use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_and_init_static, terrain_atlas_area, LiquidType, Sprite, SpriteId, TerrainId,
-    WaterOrientation,
+    WallOrientation, WaterOrientation,
 };
 
 const DEFAULT_FILENAME: &str = "ogre_room.json";
@@ -585,7 +585,8 @@ impl Sidebar {
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
-            TerrainId::StoneWallConvexNorthEast,
+            TerrainId::StoneWall(WallOrientation::ConcaveNorthEast),
+            TerrainId::LowWall(WallOrientation::ConvexNorthEast),
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
@@ -622,6 +623,7 @@ impl Sidebar {
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
+            TerrainId::Staircase1,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()

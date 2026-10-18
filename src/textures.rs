@@ -519,6 +519,24 @@ impl LiquidType {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum WallOrientation {
+    Single,
+    ConcaveNorthWest,
+    North,
+    ConcaveNorthEast,
+    West,
+    East,
+    ConcaveSouthWest,
+    South,
+    ConcaveSouthEast,
+    ConvexNorthWest,
+    ConvexNorthEast,
+    ConvexSouthWest,
+    ConvexSouthEast,
+    Inner,
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum TerrainId {
     GroundBorderNorth,
     GroundBorderEast,
@@ -539,21 +557,11 @@ pub enum TerrainId {
     Dirt,
     SpikesSingleCell,
     FireSurfaceSingleCell,
+    StoneWall(WallOrientation),
+    LowWall(WallOrientation),
 
-    StoneWall,
-    StoneWallConcaveNorthWest,
-    StoneWallNorth,
-    StoneWallConcaveNorthEast,
-    StoneWallWest,
-    StoneWallEast,
-    StoneWallConcaveSouthWest,
-    StoneWallSouth,
-    StoneWallConcaveSouthEast,
-    StoneWallConvexNorthWest,
-    StoneWallConvexNorthEast,
-    StoneWallConvexSouthWest,
-    StoneWallConvexSouthEast,
-    StoneWallInner,
+    Staircase1,
+
     Bush,
     WallPlant,
     FloorDrain,
@@ -626,28 +634,16 @@ impl TerrainId {
         }
     }
 
-    pub fn is_stone_wall(&self) -> bool {
+    pub fn is_wall(&self) -> bool {
         match self {
-            TerrainId::StoneWall => true,
-            TerrainId::StoneWallConcaveNorthWest => true,
-            TerrainId::StoneWallNorth => true,
-            TerrainId::StoneWallConcaveNorthEast => true,
-            TerrainId::StoneWallWest => true,
-            TerrainId::StoneWallEast => true,
-            TerrainId::StoneWallConcaveSouthWest => true,
-            TerrainId::StoneWallSouth => true,
-            TerrainId::StoneWallConcaveSouthEast => true,
-            TerrainId::StoneWallConvexNorthWest => true,
-            TerrainId::StoneWallConvexNorthEast => true,
-            TerrainId::StoneWallConvexSouthWest => true,
-            TerrainId::StoneWallConvexSouthEast => true,
-            TerrainId::StoneWallInner => true,
+            TerrainId::StoneWall(..) => true,
+            TerrainId::LowWall(..) => true,
             _ => false,
         }
     }
 
     pub fn terrain_type(&self) -> TerrainType {
-        if self.is_stone_wall() {
+        if self.is_wall() {
             TerrainType::Tall
         } else {
             TerrainType::Low
@@ -776,20 +772,37 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
             }
         }
 
-        TerrainId::StoneWall => (1, 7),
-        TerrainId::StoneWallConcaveNorthWest => (0, 12),
-        TerrainId::StoneWallNorth => (1, 12),
-        TerrainId::StoneWallConcaveNorthEast => (2, 12),
-        TerrainId::StoneWallWest => (0, 13),
-        TerrainId::StoneWallEast => (2, 13),
-        TerrainId::StoneWallConcaveSouthWest => (0, 14),
-        TerrainId::StoneWallSouth => (1, 14),
-        TerrainId::StoneWallConcaveSouthEast => (2, 14),
-        TerrainId::StoneWallConvexNorthWest => (3, 12),
-        TerrainId::StoneWallConvexNorthEast => (5, 12),
-        TerrainId::StoneWallConvexSouthWest => (3, 14),
-        TerrainId::StoneWallConvexSouthEast => (5, 14),
-        TerrainId::StoneWallInner => (4, 13),
+        TerrainId::StoneWall(WallOrientation::Single) => (1, 7),
+        TerrainId::StoneWall(WallOrientation::ConcaveNorthWest) => (0, 12),
+        TerrainId::StoneWall(WallOrientation::North) => (1, 12),
+        TerrainId::StoneWall(WallOrientation::ConcaveNorthEast) => (2, 12),
+        TerrainId::StoneWall(WallOrientation::West) => (0, 13),
+        TerrainId::StoneWall(WallOrientation::East) => (2, 13),
+        TerrainId::StoneWall(WallOrientation::ConcaveSouthWest) => (0, 14),
+        TerrainId::StoneWall(WallOrientation::South) => (1, 14),
+        TerrainId::StoneWall(WallOrientation::ConcaveSouthEast) => (2, 14),
+        TerrainId::StoneWall(WallOrientation::ConvexNorthWest) => (3, 12),
+        TerrainId::StoneWall(WallOrientation::ConvexNorthEast) => (5, 12),
+        TerrainId::StoneWall(WallOrientation::ConvexSouthWest) => (3, 14),
+        TerrainId::StoneWall(WallOrientation::ConvexSouthEast) => (5, 14),
+        TerrainId::StoneWall(WallOrientation::Inner) => (4, 13),
+
+        TerrainId::LowWall(WallOrientation::Single) => (14, 13),
+        TerrainId::LowWall(WallOrientation::ConcaveNorthWest) => (8, 13),
+        TerrainId::LowWall(WallOrientation::North) => (13, 15),
+        TerrainId::LowWall(WallOrientation::ConcaveNorthEast) => (10, 13),
+        TerrainId::LowWall(WallOrientation::West) => (14, 14),
+        TerrainId::LowWall(WallOrientation::East) => (11, 14),
+        TerrainId::LowWall(WallOrientation::ConcaveSouthWest) => (8, 15),
+        TerrainId::LowWall(WallOrientation::South) => (13, 13),
+        TerrainId::LowWall(WallOrientation::ConcaveSouthEast) => (10, 15),
+        TerrainId::LowWall(WallOrientation::ConvexNorthWest) => (11, 13),
+        TerrainId::LowWall(WallOrientation::ConvexNorthEast) => (14, 13),
+        TerrainId::LowWall(WallOrientation::ConvexSouthWest) => (11, 15),
+        TerrainId::LowWall(WallOrientation::ConvexSouthEast) => (14, 15),
+        TerrainId::LowWall(WallOrientation::Inner) => (13, 14),
+
+        TerrainId::Staircase1 => (12, 15),
 
         TerrainId::Bush => (0, 7),
         TerrainId::WallPlant => (0, 8),

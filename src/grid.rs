@@ -65,7 +65,7 @@ use crate::{
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, effect_atlas_rect,
         measure_tiny_font, EffectId, LiquidType, Sprite, SpriteId, StatusId, TerrainId,
-        TinyFontColor, WaterOrientation, EFFECTS_TEXTURE, LIGHTNING_BOLT_FX,
+        TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE, LIGHTNING_BOLT_FX,
     },
     util::{
         are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
@@ -614,8 +614,9 @@ impl GameGrid {
 
     pub fn auto_tile_terrain(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
-        for (pos, mut terrain_id) in self.terrain_objects.iter() {
-            if terrain_id.is_stone_wall() {
+        for (pos, terrain_id) in self.terrain_objects.iter() {
+            let mut terrain_id = *terrain_id;
+            if terrain_id.is_wall() {
                 let mut neighbors = vec![];
                 let neighbor_positions = &[
                     // west
@@ -636,43 +637,49 @@ impl GameGrid {
                     (pos.0 + 3, pos.1 + 3),
                 ];
                 for neighbor_pos in neighbor_positions {
-                    let is_neighbor_stone_wall = self
+                    let is_neighbor_wall = self
                         .terrain_objects
                         .get(neighbor_pos)
-                        .map(|n| n.is_stone_wall())
+                        .map(|n| n.is_wall())
                         .unwrap_or(!self.is_within_grid(*neighbor_pos));
-                    neighbors.push(is_neighbor_stone_wall);
+                    neighbors.push(is_neighbor_wall);
                 }
-                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
                     (true, true, true, true) => {
                         if !neighbors[4] {
-                            &TerrainId::StoneWallConcaveSouthEast
+                            WallOrientation::ConcaveSouthEast
                         } else if !neighbors[5] {
-                            &TerrainId::StoneWallConcaveSouthWest
+                            WallOrientation::ConcaveSouthWest
                         } else if !neighbors[6] {
-                            &TerrainId::StoneWallConcaveNorthEast
+                            WallOrientation::ConcaveNorthEast
                         } else if !neighbors[7] {
-                            &TerrainId::StoneWallConcaveNorthWest
+                            WallOrientation::ConcaveNorthWest
                         } else {
-                            &TerrainId::StoneWallInner
+                            WallOrientation::Inner
                         }
                     }
-                    (false, true, true, true) => &TerrainId::StoneWallEast,
-                    (false, true, false, true) => &TerrainId::StoneWallConvexNorthWest,
-                    (true, true, false, true) => &TerrainId::StoneWallSouth,
-                    (true, false, false, true) => &TerrainId::StoneWallConvexNorthEast,
-                    (true, false, true, true) => &TerrainId::StoneWallWest,
-                    (true, false, true, false) => &TerrainId::StoneWallConvexSouthEast,
-                    (true, true, true, false) => &TerrainId::StoneWallNorth,
-                    (false, true, true, false) => &TerrainId::StoneWallConvexSouthWest,
+                    (false, true, true, true) => WallOrientation::East,
+                    (false, true, false, true) => WallOrientation::ConvexNorthWest,
+                    (true, true, false, true) => WallOrientation::South,
+                    (true, false, false, true) => WallOrientation::ConvexNorthEast,
+                    (true, false, true, true) => WallOrientation::West,
+                    (true, false, true, false) => WallOrientation::ConvexSouthEast,
+                    (true, true, true, false) => WallOrientation::North,
+                    (false, true, true, false) => WallOrientation::ConvexSouthWest,
 
                     neighbors => {
                         println!("WARN: No stonewall tile fits neighbors: {:?}", neighbors);
-                        &TerrainId::StoneWall
+                        WallOrientation::Single
                     }
                 };
+
+                terrain_id = if matches!(terrain_id, TerrainId::StoneWall(..)) {
+                    TerrainId::StoneWall(orientation)
+                } else {
+                    TerrainId::LowWall(orientation)
+                };
             }
-            new_map.insert(*pos, *terrain_id);
+            new_map.insert(*pos, terrain_id);
         }
         self.terrain_objects = new_map;
     }
@@ -687,7 +694,7 @@ impl GameGrid {
     fn is_wall(&self, pos: Position) -> bool {
         self.terrain_objects
             .get(&pos)
-            .map(|t| t.is_stone_wall())
+            .map(|t| t.is_wall())
             .unwrap_or(false)
     }
 

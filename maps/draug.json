@@ -4,316 +4,936 @@
     45
   ],
   "terrain_objects": {
-    "(13, 28)": "StoneWallConvexNorthEast",
-    "(16, 28)": "StoneWallConvexNorthEast",
-    "(4, 28)": "StoneWallConvexNorthEast",
-    "(31, 7)": "StoneWallConvexNorthEast",
-    "(55, 1)": "StoneWallConvexNorthEast",
-    "(58, 1)": "StoneWallConvexNorthEast",
-    "(19, 28)": "StoneWallConvexNorthEast",
-    "(1, 7)": "StoneWallConvexNorthEast",
-    "(1, 4)": "StoneWallConvexNorthEast",
-    "(1, 1)": "StoneWallConvexNorthEast",
-    "(4, 1)": "StoneWallConvexNorthEast",
-    "(7, 1)": "StoneWallConvexNorthEast",
-    "(10, 1)": "StoneWallConvexNorthEast",
-    "(13, 1)": "StoneWallConvexNorthEast",
-    "(16, 1)": "StoneWallConvexNorthEast",
-    "(19, 1)": "StoneWallConvexNorthEast",
-    "(22, 1)": "StoneWallConvexNorthEast",
-    "(25, 1)": "StoneWallConvexNorthEast",
-    "(28, 1)": "StoneWallConvexNorthEast",
-    "(31, 1)": "StoneWallConvexNorthEast",
-    "(34, 1)": "StoneWallConvexNorthEast",
-    "(37, 1)": "StoneWallConvexNorthEast",
-    "(40, 1)": "StoneWallConvexNorthEast",
-    "(43, 1)": "StoneWallConvexNorthEast",
-    "(73, 37)": "StoneWallConvexNorthEast",
-    "(46, 1)": "StoneWallConvexNorthEast",
-    "(49, 1)": "StoneWallConvexNorthEast",
-    "(64, 4)": "StoneWallConvexNorthEast",
-    "(10, 28)": "StoneWallConvexNorthEast",
-    "(7, 28)": "StoneWallConvexNorthEast",
-    "(1, 28)": "StoneWallConvexNorthEast",
-    "(52, 1)": "StoneWallConvexNorthEast",
-    "(34, 28)": "StoneWallConvexNorthEast",
-    "(31, 28)": "StoneWallConvexNorthEast",
-    "(28, 28)": "StoneWallConvexNorthEast",
-    "(76, 37)": "StoneWallConvexNorthEast",
-    "(1, 10)": "StoneWallConvexNorthEast",
-    "(1, 13)": "StoneWallConvexNorthEast",
-    "(1, 16)": "StoneWallConvexNorthEast",
-    "(1, 19)": "StoneWallConvexNorthEast",
-    "(1, 22)": "StoneWallConvexNorthEast",
-    "(1, 25)": "StoneWallConvexNorthEast",
-    "(13, 4)": "StoneWallConvexNorthEast",
-    "(25, 4)": "StoneWallConvexNorthEast",
-    "(7, 4)": "StoneWallConvexNorthEast",
-    "(31, 4)": "StoneWallConvexNorthEast",
-    "(4, 7)": "StoneWallConvexNorthEast",
-    "(19, 7)": "StoneWallConvexNorthEast",
-    "(79, 22)": "StoneWallConvexNorthEast",
-    "(70, 34)": "StoneWallConvexNorthEast",
-    "(70, 7)": "StoneWallConvexNorthEast",
-    "(82, 7)": "StoneWallConvexNorthEast",
-    "(19, 19)": "StoneWallConvexNorthEast",
-    "(19, 22)": "StoneWallConvexNorthEast",
-    "(19, 25)": "StoneWallConvexNorthEast",
-    "(16, 25)": "StoneWallConvexNorthEast",
-    "(16, 22)": "StoneWallConvexNorthEast",
-    "(16, 19)": "StoneWallConvexNorthEast",
-    "(13, 25)": "StoneWallConvexNorthEast",
-    "(13, 22)": "StoneWallConvexNorthEast",
-    "(13, 19)": "StoneWallConvexNorthEast",
-    "(10, 22)": "StoneWallConvexNorthEast",
-    "(10, 25)": "StoneWallConvexNorthEast",
-    "(7, 22)": "StoneWallConvexNorthEast",
-    "(7, 25)": "StoneWallConvexNorthEast",
-    "(7, 19)": "StoneWallConvexNorthEast",
-    "(10, 19)": "StoneWallConvexNorthEast",
-    "(4, 19)": "StoneWallConvexNorthEast",
-    "(4, 22)": "StoneWallConvexNorthEast",
-    "(4, 25)": "StoneWallConvexNorthEast",
-    "(61, 4)": "StoneWallConvexNorthEast",
-    "(43, 28)": "StoneWallConvexNorthEast",
-    "(46, 28)": "StoneWallConvexNorthEast",
-    "(49, 28)": "StoneWallConvexNorthEast",
-    "(52, 43)": "StoneWallConvexNorthEast",
-    "(55, 43)": "StoneWallConvexNorthEast",
-    "(58, 28)": "StoneWallConvexNorthEast",
-    "(10, 7)": "StoneWallConvexNorthEast",
-    "(13, 7)": "StoneWallConvexNorthEast",
-    "(22, 7)": "StoneWallConvexNorthEast",
-    "(10, 4)": "StoneWallConvexNorthEast",
-    "(19, 4)": "StoneWallConvexNorthEast",
-    "(22, 4)": "StoneWallConvexNorthEast",
-    "(25, 7)": "StoneWallConvexNorthEast",
-    "(34, 4)": "StoneWallConvexNorthEast",
-    "(34, 7)": "StoneWallConvexNorthEast",
-    "(67, 4)": "StoneWallConvexNorthEast",
-    "(70, 4)": "StoneWallConvexNorthEast",
-    "(49, 16)": "StoneWallConvexNorthEast",
-    "(82, 4)": "StoneWallConvexNorthEast",
-    "(79, 4)": "StoneWallConvexNorthEast",
-    "(79, 7)": "StoneWallConvexNorthEast",
-    "(7, 7)": "StoneWallConvexNorthEast",
-    "(16, 7)": "StoneWallConvexNorthEast",
-    "(28, 4)": "StoneWallConvexNorthEast",
-    "(16, 4)": "StoneWallConvexNorthEast",
-    "(4, 4)": "StoneWallConvexNorthEast",
-    "(28, 7)": "StoneWallConvexNorthEast",
-    "(73, 10)": "StoneWallConvexNorthEast",
-    "(49, 13)": "StoneWallConvexNorthEast",
-    "(85, 4)": "StoneWallConvexNorthEast",
-    "(73, 7)": "StoneWallConvexNorthEast",
-    "(73, 4)": "StoneWallConvexNorthEast",
-    "(67, 7)": "StoneWallConvexNorthEast",
-    "(61, 28)": "StoneWallConvexNorthEast",
-    "(64, 28)": "StoneWallConvexNorthEast",
-    "(67, 28)": "StoneWallConvexNorthEast",
-    "(70, 28)": "StoneWallConvexNorthEast",
-    "(73, 28)": "StoneWallConvexNorthEast",
-    "(76, 28)": "StoneWallConvexNorthEast",
-    "(79, 28)": "StoneWallConvexNorthEast",
-    "(82, 28)": "StoneWallConvexNorthEast",
-    "(85, 28)": "StoneWallConvexNorthEast",
-    "(85, 25)": "StoneWallConvexNorthEast",
-    "(88, 28)": "StoneWallConvexNorthEast",
-    "(88, 25)": "StoneWallConvexNorthEast",
-    "(88, 22)": "StoneWallConvexNorthEast",
-    "(88, 19)": "StoneWallConvexNorthEast",
-    "(88, 16)": "StoneWallConvexNorthEast",
-    "(88, 13)": "StoneWallConvexNorthEast",
-    "(88, 10)": "StoneWallConvexNorthEast",
-    "(88, 7)": "StoneWallConvexNorthEast",
-    "(88, 4)": "StoneWallConvexNorthEast",
-    "(88, 1)": "StoneWallConvexNorthEast",
-    "(85, 1)": "StoneWallConvexNorthEast",
-    "(82, 1)": "StoneWallConvexNorthEast",
-    "(79, 1)": "StoneWallConvexNorthEast",
-    "(76, 1)": "StoneWallConvexNorthEast",
-    "(73, 1)": "StoneWallConvexNorthEast",
-    "(70, 1)": "StoneWallConvexNorthEast",
-    "(67, 1)": "StoneWallConvexNorthEast",
-    "(85, 43)": "StoneWallConvexNorthEast",
-    "(88, 43)": "StoneWallConvexNorthEast",
-    "(43, 10)": "StoneWallConvexNorthEast",
-    "(46, 10)": "StoneWallConvexNorthEast",
-    "(46, 13)": "StoneWallConvexNorthEast",
-    "(46, 16)": "StoneWallConvexNorthEast",
-    "(49, 10)": "StoneWallConvexNorthEast",
-    "(70, 13)": "StoneWallConvexNorthEast",
-    "(79, 25)": "StoneWallConvexNorthEast",
-    "(82, 25)": "StoneWallConvexNorthEast",
-    "(43, 16)": "StoneWallConvexNorthEast",
-    "(43, 13)": "StoneWallConvexNorthEast",
-    "(82, 22)": "StoneWallConvexNorthEast",
-    "(85, 7)": "StoneWallConvexNorthEast",
-    "(61, 13)": "StoneWallConvexNorthEast",
-    "(85, 22)": "StoneWallConvexNorthEast",
-    "(70, 10)": "StoneWallConvexNorthEast",
-    "(76, 34)": "StoneWallConvexNorthEast",
-    "(73, 34)": "StoneWallConvexNorthEast",
-    "(73, 16)": "StoneWallConvexNorthEast",
-    "(58, 13)": "StoneWallConvexNorthEast",
-    "(58, 10)": "StoneWallConvexNorthEast",
-    "(61, 10)": "StoneWallConvexNorthEast",
-    "(64, 10)": "StoneWallConvexNorthEast",
-    "(64, 13)": "StoneWallConvexNorthEast",
-    "(70, 16)": "StoneWallConvexNorthEast",
-    "(73, 13)": "StoneWallConvexNorthEast",
-    "(85, 34)": "StoneWallConvexNorthEast",
-    "(82, 34)": "StoneWallConvexNorthEast",
-    "(79, 34)": "StoneWallConvexNorthEast",
-    "(43, 19)": "StoneWallConvexNorthEast",
-    "(46, 19)": "StoneWallConvexNorthEast",
-    "(49, 19)": "StoneWallConvexNorthEast",
-    "(85, 19)": "StoneWallConvexNorthEast",
-    "(85, 16)": "StoneWallConvexNorthEast",
-    "(85, 13)": "StoneWallConvexNorthEast",
-    "(85, 10)": "StoneWallConvexNorthEast",
-    "(82, 10)": "StoneWallConvexNorthEast",
-    "(82, 13)": "StoneWallConvexNorthEast",
-    "(82, 16)": "StoneWallConvexNorthEast",
-    "(82, 19)": "StoneWallConvexNorthEast",
-    "(79, 19)": "StoneWallConvexNorthEast",
-    "(79, 16)": "StoneWallConvexNorthEast",
-    "(79, 13)": "StoneWallConvexNorthEast",
-    "(79, 10)": "StoneWallConvexNorthEast",
-    "(67, 22)": "StoneWallConvexNorthEast",
-    "(70, 22)": "StoneWallConvexNorthEast",
-    "(73, 22)": "StoneWallConvexNorthEast",
-    "(76, 22)": "StoneWallConvexNorthEast",
-    "(76, 25)": "StoneWallConvexNorthEast",
-    "(73, 25)": "StoneWallConvexNorthEast",
-    "(70, 25)": "StoneWallConvexNorthEast",
-    "(67, 25)": "StoneWallConvexNorthEast",
-    "(76, 4)": "StoneWallConvexNorthEast",
-    "(76, 7)": "StoneWallConvexNorthEast",
-    "(76, 10)": "StoneWallConvexNorthEast",
-    "(67, 19)": "StoneWallConvexNorthEast",
-    "(70, 19)": "StoneWallConvexNorthEast",
-    "(73, 19)": "StoneWallConvexNorthEast",
-    "(76, 19)": "StoneWallConvexNorthEast",
-    "(76, 16)": "StoneWallConvexNorthEast",
-    "(76, 13)": "StoneWallConvexNorthEast",
-    "(67, 16)": "StoneWallConvexNorthEast",
-    "(67, 13)": "StoneWallConvexNorthEast",
-    "(67, 10)": "StoneWallConvexNorthEast",
-    "(31, 13)": "StoneWallConvexNorthEast",
-    "(34, 13)": "StoneWallConvexNorthEast",
-    "(34, 16)": "StoneWallConvexNorthEast",
-    "(34, 19)": "StoneWallConvexNorthEast",
-    "(31, 19)": "StoneWallConvexNorthEast",
-    "(31, 16)": "StoneWallConvexNorthEast",
-    "(1, 31)": "StoneWallConvexNorthEast",
-    "(1, 34)": "StoneWallConvexNorthEast",
-    "(1, 37)": "StoneWallConvexNorthEast",
-    "(1, 40)": "StoneWallConvexNorthEast",
-    "(4, 40)": "StoneWallConvexNorthEast",
-    "(7, 40)": "StoneWallConvexNorthEast",
-    "(10, 40)": "StoneWallConvexNorthEast",
-    "(13, 40)": "StoneWallConvexNorthEast",
-    "(16, 40)": "StoneWallConvexNorthEast",
-    "(16, 37)": "StoneWallConvexNorthEast",
-    "(19, 37)": "StoneWallConvexNorthEast",
-    "(19, 40)": "StoneWallConvexNorthEast",
-    "(16, 34)": "StoneWallConvexNorthEast",
-    "(19, 31)": "StoneWallConvexNorthEast",
-    "(16, 31)": "StoneWallConvexNorthEast",
-    "(19, 34)": "StoneWallConvexNorthEast",
-    "(13, 31)": "StoneWallConvexNorthEast",
-    "(13, 34)": "StoneWallConvexNorthEast",
-    "(10, 37)": "StoneWallConvexNorthEast",
-    "(13, 37)": "StoneWallConvexNorthEast",
-    "(10, 34)": "StoneWallConvexNorthEast",
-    "(7, 37)": "StoneWallConvexNorthEast",
-    "(7, 34)": "StoneWallConvexNorthEast",
-    "(4, 34)": "StoneWallConvexNorthEast",
-    "(4, 31)": "StoneWallConvexNorthEast",
-    "(4, 37)": "StoneWallConvexNorthEast",
-    "(7, 31)": "StoneWallConvexNorthEast",
-    "(10, 31)": "StoneWallConvexNorthEast",
-    "(70, 37)": "StoneWallConvexNorthEast",
-    "(79, 37)": "StoneWallConvexNorthEast",
-    "(28, 31)": "StoneWallConvexNorthEast",
-    "(31, 31)": "StoneWallConvexNorthEast",
-    "(34, 31)": "StoneWallConvexNorthEast",
-    "(58, 4)": "StoneWallConvexNorthEast",
-    "(58, 7)": "StoneWallConvexNorthEast",
-    "(43, 31)": "StoneWallConvexNorthEast",
-    "(46, 31)": "StoneWallConvexNorthEast",
-    "(49, 31)": "StoneWallConvexNorthEast",
-    "(49, 43)": "StoneWallConvexNorthEast",
-    "(61, 31)": "StoneWallConvexNorthEast",
-    "(58, 31)": "StoneWallConvexNorthEast",
-    "(58, 43)": "StoneWallConvexNorthEast",
-    "(82, 37)": "StoneWallConvexNorthEast",
-    "(16, 43)": "StoneWallConvexNorthEast",
-    "(19, 43)": "StoneWallConvexNorthEast",
-    "(22, 43)": "StoneWallConvexNorthEast",
-    "(25, 43)": "StoneWallConvexNorthEast",
-    "(64, 1)": "StoneWallConvexNorthEast",
-    "(61, 7)": "StoneWallConvexNorthEast",
-    "(43, 34)": "StoneWallConvexNorthEast",
-    "(46, 34)": "StoneWallConvexNorthEast",
-    "(34, 34)": "StoneWallConvexNorthEast",
-    "(31, 34)": "StoneWallConvexNorthEast",
-    "(28, 34)": "StoneWallConvexNorthEast",
-    "(67, 37)": "StoneWallConvexNorthEast",
-    "(1, 43)": "StoneWallConvexNorthEast",
-    "(13, 43)": "StoneWallConvexNorthEast",
-    "(10, 43)": "StoneWallConvexNorthEast",
-    "(7, 43)": "StoneWallConvexNorthEast",
-    "(4, 43)": "StoneWallConvexNorthEast",
-    "(28, 43)": "StoneWallConvexNorthEast",
-    "(31, 43)": "StoneWallConvexNorthEast",
-    "(82, 43)": "StoneWallConvexNorthEast",
-    "(79, 43)": "StoneWallConvexNorthEast",
-    "(76, 43)": "StoneWallConvexNorthEast",
-    "(73, 43)": "StoneWallConvexNorthEast",
-    "(70, 43)": "StoneWallConvexNorthEast",
-    "(67, 43)": "StoneWallConvexNorthEast",
-    "(58, 40)": "StoneWallConvexNorthEast",
-    "(61, 40)": "StoneWallConvexNorthEast",
-    "(64, 40)": "StoneWallConvexNorthEast",
-    "(64, 37)": "StoneWallConvexNorthEast",
-    "(64, 34)": "StoneWallConvexNorthEast",
-    "(61, 34)": "StoneWallConvexNorthEast",
-    "(58, 34)": "StoneWallConvexNorthEast",
-    "(61, 43)": "StoneWallConvexNorthEast",
-    "(46, 43)": "StoneWallConvexNorthEast",
-    "(49, 34)": "StoneWallConvexNorthEast",
-    "(34, 43)": "StoneWallConvexNorthEast",
-    "(61, 1)": "StoneWallConvexNorthEast",
-    "(37, 43)": "StoneWallConvexNorthEast",
-    "(40, 43)": "StoneWallConvexNorthEast",
-    "(43, 43)": "StoneWallConvexNorthEast",
-    "(64, 43)": "StoneWallConvexNorthEast",
-    "(58, 37)": "StoneWallConvexNorthEast",
-    "(61, 37)": "StoneWallConvexNorthEast",
-    "(64, 7)": "StoneWallConvexNorthEast",
-    "(67, 40)": "StoneWallConvexNorthEast",
-    "(70, 40)": "StoneWallConvexNorthEast",
-    "(73, 40)": "StoneWallConvexNorthEast",
-    "(76, 40)": "StoneWallConvexNorthEast",
-    "(79, 40)": "StoneWallConvexNorthEast",
-    "(82, 40)": "StoneWallConvexNorthEast",
-    "(85, 40)": "StoneWallConvexNorthEast",
-    "(85, 37)": "StoneWallConvexNorthEast",
-    "(88, 37)": "StoneWallConvexNorthEast",
-    "(88, 31)": "StoneWallConvexNorthEast",
-    "(88, 34)": "StoneWallConvexNorthEast",
-    "(88, 40)": "StoneWallConvexNorthEast",
-    "(85, 31)": "StoneWallConvexNorthEast",
-    "(82, 31)": "StoneWallConvexNorthEast",
-    "(79, 31)": "StoneWallConvexNorthEast",
-    "(76, 31)": "StoneWallConvexNorthEast",
-    "(73, 31)": "StoneWallConvexNorthEast",
-    "(70, 31)": "StoneWallConvexNorthEast",
-    "(67, 31)": "StoneWallConvexNorthEast",
-    "(64, 31)": "StoneWallConvexNorthEast",
-    "(67, 34)": "StoneWallConvexNorthEast"
+    "(13, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(55, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(40, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(52, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(52, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(55, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(46, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(49, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(40, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(43, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 43)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(58, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(88, 40)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(85, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(82, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(79, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(76, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(73, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(70, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(67, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    }
   },
   "background": {
     "(-4, 3)": "Floor",

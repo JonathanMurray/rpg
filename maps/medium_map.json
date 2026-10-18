@@ -4,82 +4,234 @@
     36
   ],
   "terrain_objects": {
-    "(28, 19)": "StoneWallConvexNorthEast",
-    "(28, 22)": "StoneWallConvexNorthEast",
-    "(1, 22)": "StoneWallConvexNorthEast",
-    "(1, 19)": "StoneWallConvexNorthEast",
-    "(1, 16)": "StoneWallConvexNorthEast",
-    "(1, 13)": "StoneWallConvexNorthEast",
-    "(1, 10)": "StoneWallConvexNorthEast",
-    "(1, 7)": "StoneWallConvexNorthEast",
-    "(1, 4)": "StoneWallConvexNorthEast",
-    "(1, 1)": "StoneWallConvexNorthEast",
-    "(4, 1)": "StoneWallConvexNorthEast",
-    "(7, 1)": "StoneWallConvexNorthEast",
-    "(10, 1)": "StoneWallConvexNorthEast",
-    "(13, 1)": "StoneWallConvexNorthEast",
-    "(16, 1)": "StoneWallConvexNorthEast",
-    "(19, 1)": "StoneWallConvexNorthEast",
-    "(22, 1)": "StoneWallConvexNorthEast",
-    "(28, 16)": "StoneWallConvexNorthEast",
-    "(28, 1)": "StoneWallConvexNorthEast",
-    "(28, 4)": "StoneWallConvexNorthEast",
-    "(28, 7)": "StoneWallConvexNorthEast",
-    "(28, 10)": "StoneWallConvexNorthEast",
-    "(28, 13)": "StoneWallConvexNorthEast",
-    "(1, 25)": "StoneWallConvexNorthEast",
-    "(1, 28)": "StoneWallConvexNorthEast",
-    "(31, 10)": "StoneWallConvexNorthEast",
-    "(31, 13)": "StoneWallConvexNorthEast",
-    "(31, 22)": "StoneWallConvexNorthEast",
-    "(25, 10)": "StoneWallConvexNorthEast",
-    "(31, 25)": "StoneWallConvexNorthEast",
-    "(25, 13)": "StoneWallConvexNorthEast",
-    "(4, 10)": "StoneWallConvexNorthEast",
-    "(11, 26)": "StoneWallConvexNorthEast",
-    "(7, 10)": "StoneWallConvexNorthEast",
-    "(28, 25)": "StoneWallConvexNorthEast",
-    "(25, 1)": "StoneWallConvexNorthEast",
-    "(4, 13)": "StoneWallConvexNorthEast",
-    "(7, 13)": "StoneWallConvexNorthEast",
-    "(10, 13)": "StoneWallConvexNorthEast",
-    "(13, 13)": "StoneWallConvexNorthEast",
-    "(13, 10)": "StoneWallConvexNorthEast",
-    "(10, 10)": "StoneWallConvexNorthEast",
-    "(31, 19)": "StoneWallConvexNorthEast",
-    "(31, 16)": "StoneWallConvexNorthEast",
-    "(1, 31)": "StoneWallConvexNorthEast",
-    "(34, 13)": "StoneWallConvexNorthEast",
-    "(31, 7)": "StoneWallConvexNorthEast",
-    "(31, 1)": "StoneWallConvexNorthEast",
-    "(31, 4)": "StoneWallConvexNorthEast",
-    "(34, 1)": "StoneWallConvexNorthEast",
-    "(34, 4)": "StoneWallConvexNorthEast",
-    "(34, 7)": "StoneWallConvexNorthEast",
-    "(34, 10)": "StoneWallConvexNorthEast",
-    "(14, 26)": "StoneWallConvexNorthEast",
-    "(28, 34)": "StoneWallConvexNorthEast",
-    "(25, 34)": "StoneWallConvexNorthEast",
-    "(22, 34)": "StoneWallConvexNorthEast",
-    "(19, 34)": "StoneWallConvexNorthEast",
-    "(16, 34)": "StoneWallConvexNorthEast",
-    "(13, 34)": "StoneWallConvexNorthEast",
-    "(10, 34)": "StoneWallConvexNorthEast",
-    "(7, 34)": "StoneWallConvexNorthEast",
-    "(4, 34)": "StoneWallConvexNorthEast",
-    "(1, 34)": "StoneWallConvexNorthEast",
-    "(31, 34)": "StoneWallConvexNorthEast",
-    "(34, 34)": "StoneWallConvexNorthEast",
-    "(17, 26)": "StoneWallConvexNorthEast",
-    "(17, 23)": "StoneWallConvexNorthEast",
-    "(14, 23)": "StoneWallConvexNorthEast",
-    "(11, 23)": "StoneWallConvexNorthEast",
-    "(34, 25)": "StoneWallConvexNorthEast",
-    "(34, 22)": "StoneWallConvexNorthEast",
-    "(34, 19)": "StoneWallConvexNorthEast",
-    "(34, 16)": "StoneWallConvexNorthEast",
-    "(34, 31)": "StoneWallConvexNorthEast",
-    "(34, 28)": "StoneWallConvexNorthEast"
+    "(28, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(11, 26)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(14, 26)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(17, 26)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(17, 23)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(14, 23)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(11, 23)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    }
   },
   "background": {
     "(-4, 3)": "Floor",

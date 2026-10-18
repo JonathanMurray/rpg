@@ -133,7 +133,7 @@ impl MapData {
             Ok(map_data) => map_data,
             Err(e) => {
                 println!("File contents: {}", json);
-                panic!("Failed to read from file: {:?}", e);
+                panic!("Failed to read from file {}: {:?}", filepath, e);
             }
         };
 
