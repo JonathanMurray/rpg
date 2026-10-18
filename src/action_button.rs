@@ -1128,7 +1128,7 @@ impl ActionButton {
             bottom_resource_text.push_str(&"|<stamina_small>|".repeat(stamina_points as usize));
         }
         if action.costs_arrow() {
-            bottom_resource_text.push_str("Item");
+            //bottom_resource_text.push_str("Item");
         }
 
         let padding = if ap_circles.is_empty() { 0.0 } else { 4.0 };

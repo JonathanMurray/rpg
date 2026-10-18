@@ -861,7 +861,7 @@ impl GameGrid {
             }
             MovementType::AbilityEngage | MovementType::Regular => {
                 if step_idx % 2 == 0 {
-                    let rotation = if step_idx % 4 == 0 { 0.08 } else { -0.04 };
+                    let rotation = if step_idx % 4 == 0 { 0.1 } else { -0.04 };
                     let mut timelines = vec![(
                         SpriteProperty::CharacterRotation,
                         PropertyTimeline(vec![
@@ -871,7 +871,7 @@ impl GameGrid {
                     )];
                     let walking_through_liquid = surface.map(|s| s.is_liquid()).unwrap_or_default();
                     if !walking_through_liquid {
-                        let jump_height = 0.25;
+                        let jump_height = 0.2;
                         timelines.push((
                             SpriteProperty::CharacterYOffsetCellW { jump: true },
                             PropertyTimeline(vec![
@@ -2510,8 +2510,8 @@ impl GameGrid {
                 } => {
                     let rotation = PI * 0.02;
                     weapon_rotation_modifier = oscillate(0.4, -rotation, rotation);
-                    y -= oscillate(0.25, 0.0, 1.0);
-                    dx = oscillate(0.5, -1.0, 1.0);
+                    y -= oscillate(0.3, 0.0, 1.0);
+                    dx = oscillate(0.6, -1.0, 1.0);
 
                     if let Some(facing_east) = override_facing_east {
                         params.flip_x = facing_east;
@@ -2816,7 +2816,7 @@ impl GameGrid {
         }
 
         let mut pushed_targets = vec![];
-        let mut opportunity_attackers_against_ranged_attack = vec![];
+        let mut opportunity_attackers = vec![];
 
         if let UiState::ConfiguringAction(ConfiguredAction::Attack {
             selected_enhancements,
@@ -2836,7 +2836,7 @@ impl GameGrid {
                     self.acquire_opportunity_attackers_against_ranged_attack(
                         attacker,
                         *target_id,
-                        &mut opportunity_attackers_against_ranged_attack,
+                        &mut opportunity_attackers,
                     );
                 }
             }
@@ -3044,20 +3044,6 @@ impl GameGrid {
                     CHARACTER_DAMAGE_PREVIEW_COLOR,
                     cell_w * 0.25,
                 );
-            }
-        }
-
-        // Then draw character foreground layer
-        for character in self.characters.values() {
-            let anticipation = self.determine_character_anticipation(
-                ui_state,
-                character,
-                &opportunity_attackers_against_ranged_attack,
-            );
-
-            self.draw_character(character, anticipation);
-            if is_key_down(KeyCode::LeftAlt) {
-                detail_labelled_char_ids.insert(character.id());
             }
         }
 
@@ -3627,7 +3613,7 @@ impl GameGrid {
                         active_char_pos,
                         *hovered_route_dst,
                     );
-                    self.draw_player_movement_path(&path.nodes);
+                    self.draw_player_movement_path(&path.nodes, &mut opportunity_attackers);
                     self.characters[&self.active_character_id]
                         .set_facing_toward(*hovered_route_dst);
 
@@ -3856,6 +3842,17 @@ impl GameGrid {
             }
         }
 
+        // Then draw character foreground layer
+        for character in self.characters.values() {
+            let anticipation =
+                self.determine_character_anticipation(ui_state, character, &opportunity_attackers);
+
+            self.draw_character(character, anticipation);
+            if is_key_down(KeyCode::LeftAlt) {
+                detail_labelled_char_ids.insert(character.id());
+            }
+        }
+
         if let Some(id) = self.selected_player_character_id {
             if !matches!(ui_state, UiState::Idle { .. }) {
                 let pos = self.character_screen_pos(&self.characters[&id]);
@@ -3961,7 +3958,7 @@ impl GameGrid {
 
         self.draw_character_animations();
 
-        for character_id in opportunity_attackers_against_ranged_attack {
+        for character_id in opportunity_attackers {
             self.draw_opportunity_attack_warning(character_id);
         }
 
@@ -5636,14 +5633,17 @@ impl GameGrid {
             && (0..self.grid_dimensions.1 as i32).contains(&pos.1)
     }
 
-    fn draw_player_movement_path(&self, path: &[PathNode]) {
+    fn draw_player_movement_path(
+        &self,
+        path: &[PathNode],
+        opportunity_attackers: &mut Vec<CharacterId>,
+    ) {
         let mover = self.characters.get(&self.active_character_id).unwrap();
         let mut ap_cost = 0;
         if mover.remaining_movement.get() < path[0].distance_from_start {
             ap_cost += 1;
         }
         let mut movement_path = vec![(&path[0], false, ap_cost > 0)];
-        let mut opportunity_attackers = vec![];
         for w in path.windows(2) {
             let mut threatened_cell = false;
             for other_char in self.characters.values() {
@@ -5684,10 +5684,6 @@ impl GameGrid {
         );
 
         self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0, true);
-
-        for char_id in opportunity_attackers {
-            self.draw_opportunity_attack_warning(char_id);
-        }
 
         let text_color = LIGHTGRAY;
         let bg_color = Color::new(0.0, 0.0, 0.0, 0.5);
