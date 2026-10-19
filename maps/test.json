@@ -491,8 +491,8 @@
     {
       "type_": "Alice",
       "pos": [
-        18,
-        16
+        10,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -503,7 +503,7 @@
       "type_": "Enslaved",
       "pos": [
         19,
-        26
+        25
       ],
       "health": null,
       "main_hand": null,
@@ -513,8 +513,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        10,
-        16
+        13,
+        25
       ],
       "health": null,
       "main_hand": null,
@@ -522,10 +522,10 @@
       "name": null
     },
     {
-      "type_": "Bob",
+      "type_": "Clara",
       "pos": [
-        16,
-        22
+        25,
+        25
       ],
       "health": null,
       "main_hand": null,

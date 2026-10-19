@@ -577,7 +577,6 @@ impl CoreGame {
                         maybe_ally_reaction
                     };
 
-                    let defender_facing = defender.is_facing_east.get();
                     let target_reaction = if let Some((reactor, reaction)) = reaction {
                         let reactor = self.characters.get(reactor);
                         reactor.set_facing_toward(attacker.pos());
@@ -623,9 +622,6 @@ impl CoreGame {
                     )
                     .await;
                     self.on_non_ability_attack(event.clone()).await;
-
-                    // in case defender turned around to react, restore their original direction
-                    //defender.is_facing_east.set(defender_facing);
 
                     let outcome = ActionOutcome::AttackHit {
                         victim_id: event.target,
@@ -5113,6 +5109,7 @@ pub enum HandType {
 pub enum AbilityAnimation {
     MeleeWeaponAttack,
     ShieldAttack,
+    RangedWeaponAttack,
     SpinAttack,
     CastSpell,
     Throw(Color),
@@ -5841,6 +5838,26 @@ impl Party {
     }
 }
 
+#[derive(Copy, Debug, Clone)]
+pub enum CharacterFacing {
+    East,
+    West,
+}
+
+impl CharacterFacing {
+    pub fn of(char_pos: Position, facing_toward: Position) -> Self {
+        if facing_toward.0 > char_pos.0 {
+            Self::East
+        } else {
+            Self::West
+        }
+    }
+
+    pub fn is_east(&self) -> bool {
+        matches!(self, CharacterFacing::East)
+    }
+}
+
 #[derive(Clone)]
 pub struct Character {
     id: Cell<Option<CharacterId>>,
@@ -5891,7 +5908,7 @@ pub struct Character {
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 
-    pub is_facing_east: Cell<bool>,
+    pub facing: Cell<CharacterFacing>,
     is_being_pushed_in_direction: Cell<Option<(i32, i32)>>,
     pub has_escaped_from_battle: Cell<bool>,
 }
@@ -5979,7 +5996,7 @@ impl Character {
             is_engaged_by: Default::default(),
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
-            is_facing_east: Cell::new(false),
+            facing: Cell::new(CharacterFacing::West),
             is_being_pushed_in_direction: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
         }
@@ -6031,9 +6048,9 @@ impl Character {
     pub fn set_facing_toward(&self, position: Position) {
         let dx = position.0 - self.position.get().0;
         if dx > 0 {
-            self.is_facing_east.set(true);
+            self.facing.set(CharacterFacing::East);
         } else if dx < 0 {
-            self.is_facing_east.set(false);
+            self.facing.set(CharacterFacing::West);
         }
     }
 

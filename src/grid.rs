@@ -47,8 +47,8 @@ use crate::{
         within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction,
-        Character, Condition, Goodness, HitType, MovementType, Position, TargetPrediction,
-        MOVE_DISTANCE_PER_RESOURCE,
+        Character, CharacterFacing, Condition, Goodness, HitType, MovementType, Position,
+        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -56,7 +56,7 @@ use crate::{
     },
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
-    grid::SpriteProperty::WeaponXOffsetCellW,
+    grid::SpriteProperty::{ReplaceHandHeldWithProjectile, WeaponXOffsetCellW},
     pathfind::{
         ChartNode, Occupation, PathNode, PathfindGrid, Surface, TerrainType, TraversalType,
         CELLS_PER_ENTITY,
@@ -130,9 +130,25 @@ pub struct TargetEffectPreview {
 }
 
 #[derive(Debug)]
-enum CharacterActionAnticipation {
+struct CharacterActionAnticipation {
+    kind: AnticipationKind,
+    facing: Option<CharacterFacing>,
+}
+
+impl CharacterActionAnticipation {
+    fn other(facing: Option<CharacterFacing>) -> Self {
+        Self {
+            facing,
+            kind: AnticipationKind::Other,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum AnticipationKind {
     RangedAttack,
-    MeleeAttack { override_facing_east: Option<bool> },
+    MeleeAttack,
+    Throw { color: Color },
     Other,
     Moving,
 }
@@ -199,9 +215,7 @@ enum AnimationDetails {
     CastingSpell {
         color: Color,
     },
-    RangedAttack {
-        toward: Position,
-    },
+
     HealthLost {
         previous: u32,
     },
@@ -921,11 +935,11 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_character_initiating_ability(
+    pub fn animate_initiating_ability(
         &mut self,
         actor: CharacterId,
-        target: Option<CharacterId>,
         ability: &Ability,
+        target: Option<CharacterId>,
         area_at: Option<(AreaShape, Position)>,
     ) -> (f32, f32) {
         let actor = self.characters.get(&actor).unwrap();
@@ -935,6 +949,8 @@ impl GameGrid {
             .or(area_at.map(|(_shape, pos)| pos));
 
         let mut delay = 0.0;
+
+        let actor_pos = actor.pos();
 
         // Don't show preview for player ability; they issued it and it should feel snappy.
         if !actor.player_controlled() {
@@ -975,12 +991,31 @@ impl GameGrid {
             AbilityAnimation::MeleeWeaponAttack => {
                 self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), false);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
-                delay + 0.1
+                0.1
             }
             AbilityAnimation::ShieldAttack => {
                 self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), true);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
-                delay + 0.1
+                0.1
+            }
+            AbilityAnimation::RangedWeaponAttack => {
+                aim_duration = self.animate_initiating_ranged_weapon_attack(
+                    actor.id(),
+                    delay,
+                    target_pos.unwrap(),
+                );
+                let mut effect_duration = 0.0;
+                if let Some((shape, area_pos)) = area_at {
+                    effect_duration = self.animate_ability_area_effect(
+                        actor_pos,
+                        area_pos,
+                        shape,
+                        ability,
+                        delay + aim_duration,
+                    );
+                }
+
+                aim_duration + effect_duration
             }
             AbilityAnimation::Throw(color) => {
                 let target_pos = target_pos.unwrap();
@@ -1028,7 +1063,7 @@ impl GameGrid {
                     },
                 );
 
-                delay + aim_duration + projectile_duration
+                aim_duration + projectile_duration
             }
             AbilityAnimation::SpinAttack => {
                 let duration = 0.4;
@@ -1071,7 +1106,7 @@ impl GameGrid {
                 ));
 
                 // The ability should resolve in the middle of the character's animation
-                delay + duration / 2.0
+                duration / 2.0
             }
 
             AbilityAnimation::CastSpell => {
@@ -1091,14 +1126,14 @@ impl GameGrid {
                 for i in 0..10 {
                     let d = 0.05;
                     let val = if i % 2 == 0 { -d } else { d };
-                    x_offsets.push(PropertyUpdate {
-                        end_time_ratio: i as f32 / 10.0,
-                        interpolation: Some(PropertyInterpolation {
-                            target_value: val,
-                            shape: InterpolateShape::Linear,
-                        }),
-                    });
+                    x_offsets.push(PropertyUpdate::linear(i as f32 / 10.0, val));
                 }
+
+                let weapon_rotation = if actor.has_equipped_melee_weapon() {
+                    PI * 0.3
+                } else {
+                    -PI * 0.3
+                };
 
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
@@ -1107,14 +1142,15 @@ impl GameGrid {
                     AnimationDetails::TransformSprite {
                         timelines: vec![
                             (
+                                SpriteProperty::WeaponRotation,
+                                PropertyTimeline(vec![
+                                    PropertyUpdate::linear(0.2, weapon_rotation),
+                                    PropertyUpdate::linear(1.0, 0.0),
+                                ]),
+                            ),
+                            (
                                 SpriteProperty::CharacterYOffsetCellW { jump: true },
-                                PropertyTimeline(vec![PropertyUpdate {
-                                    end_time_ratio: 1.0,
-                                    interpolation: Some(PropertyInterpolation {
-                                        target_value: -0.2,
-                                        shape: InterpolateShape::Linear,
-                                    }),
-                                }]),
+                                PropertyTimeline(vec![PropertyUpdate::linear(1.0, -0.2)]),
                             ),
                             (
                                 SpriteProperty::CharacterXOffsetCellW,
@@ -1124,80 +1160,96 @@ impl GameGrid {
                     },
                 ));
 
-                let caster_pos = actor.pos();
-
                 if target.is_some() {
                     let target_pos = target_pos.unwrap();
 
-                    let duration = 0.04 * distance_between(caster_pos, target_pos);
+                    let duration = 0.04 * distance_between(actor_pos, target_pos);
 
                     self.add_circle_projectile_effect(
                         delay + casting_duration,
                         duration,
                         animation_color,
-                        caster_pos,
+                        actor_pos,
                         target_pos,
                     );
 
-                    delay + casting_duration + duration
+                    casting_duration + duration
                 } else if let Some((shape, area_pos)) = area_at {
-                    let distance = distance_between(caster_pos, area_pos);
-                    let duration;
-                    match shape {
-                        AreaShape::Circle(..) => {
-                            duration = 0.05 * distance;
-                            self.add_circle_projectile_effect(
-                                delay + casting_duration,
-                                duration,
-                                animation_color,
-                                caster_pos,
-                                area_pos,
-                            );
-                        }
-                        AreaShape::Line => {
-                            let visual_duration;
-                            if ability.id == AbilityId::LightningBolt {
-                                let texture = LIGHTNING_BOLT_FX.get().unwrap();
-                                visual_duration = 0.03 * distance;
-                                self.add_effect(
-                                    caster_pos,
-                                    area_pos,
-                                    Effect {
-                                        start_time: delay + casting_duration,
-                                        end_time: delay + casting_duration + visual_duration,
-                                        variant: EffectVariant::Fx { texture },
-                                    },
-                                );
-                            } else {
-                                visual_duration = 0.03 * distance;
-                                self.add_effect(
-                                    caster_pos,
-                                    area_pos,
-                                    Effect {
-                                        start_time: delay + casting_duration,
-                                        end_time: delay + casting_duration + visual_duration,
-                                        variant: EffectVariant::Line {
-                                            color: animation_color,
-                                            thickness: 10.0,
-                                            end_thickness: None,
-                                            extend_gradually: true,
-                                        },
-                                    },
-                                );
-                            }
-                            // Targets should be affected before the line has travelled from start to end
-                            duration = visual_duration / 2.0;
-                        }
-                    }
-
-                    delay + casting_duration + duration
+                    let duration = self.animate_ability_area_effect(
+                        actor_pos,
+                        area_pos,
+                        shape,
+                        ability,
+                        delay + casting_duration,
+                    );
+                    casting_duration + duration
                 } else {
-                    delay + casting_duration
+                    casting_duration
                 }
             }
         };
 
-        (delay + aim_duration, duration)
+        (delay + aim_duration, delay + duration)
+    }
+
+    fn animate_ability_area_effect(
+        &mut self,
+        caster_pos: Position,
+        area_pos: Position,
+        shape: AreaShape,
+        ability: &Ability,
+        delay: f32,
+    ) -> f32 {
+        let distance = distance_between(caster_pos, area_pos);
+        let duration;
+        match shape {
+            AreaShape::Circle(..) => {
+                duration = 0.05 * distance;
+                self.add_circle_projectile_effect(
+                    delay,
+                    duration,
+                    ability.animation_color,
+                    caster_pos,
+                    area_pos,
+                );
+            }
+            AreaShape::Line => {
+                let visual_duration;
+                if ability.id == AbilityId::LightningBolt {
+                    let texture = LIGHTNING_BOLT_FX.get().unwrap();
+                    visual_duration = 0.03 * distance;
+                    self.add_effect(
+                        caster_pos,
+                        area_pos,
+                        Effect {
+                            start_time: delay,
+                            end_time: delay + visual_duration,
+                            variant: EffectVariant::Fx { texture },
+                        },
+                    );
+                } else {
+                    visual_duration = 0.03 * distance;
+                    self.add_effect(
+                        caster_pos,
+                        area_pos,
+                        Effect {
+                            start_time: delay,
+                            end_time: delay + visual_duration,
+                            variant: EffectVariant::Line {
+                                color: ability.animation_color,
+                                thickness: 10.0,
+                                end_thickness: None,
+                                extend_gradually: true,
+                            },
+                        },
+                    );
+                }
+                // Targets should be affected before the line has travelled from start to end
+                duration = visual_duration / 2.0;
+            }
+        }
+
+        duration
     }
 
     fn add_circle_projectile_effect(
@@ -1340,7 +1392,8 @@ impl GameGrid {
         let duration = if ranged {
             let projectile_duration = (0.02 * distance_between(attacker_pos, target_pos)).max(0.15);
 
-            aim_duration = self.animate_ranged_weapon_attack(attacker.id(), delay, target_pos);
+            aim_duration =
+                self.animate_initiating_ranged_weapon_attack(attacker.id(), delay, target_pos);
 
             if let Some((reactor_id, with_shield)) = target_reaction {
                 self.animate_attack_reaction(
@@ -1492,7 +1545,7 @@ impl GameGrid {
         duration * 0.55
     }
 
-    fn animate_ranged_weapon_attack(
+    fn animate_initiating_ranged_weapon_attack(
         &mut self,
         attacker_id: CharacterId,
         delay: f32,
@@ -2299,7 +2352,7 @@ impl GameGrid {
         let size = self.default_entity_draw_size();
         let mut params = DrawTextureParams {
             dest_size: Some(size.into()),
-            flip_x: character.is_facing_east.get(),
+            flip_x: character.facing.get().is_east(),
             //pivot: Some((size.0 / 2.0, size.1 / 2.0).into()),
             ..Default::default()
         };
@@ -2319,6 +2372,7 @@ impl GameGrid {
         let mut weapon_x_offset = 0.0;
         let mut character_offset = (0.0, 0.0);
         let mut stretch_w = None;
+        let mut stretch_h = None;
 
         let mut character_crop_factor = (1.0, 1.0);
 
@@ -2384,53 +2438,6 @@ impl GameGrid {
                     // This is drawn separately, after all the characters
                 }
                 AnimationDetails::Motion { .. } => {}
-                AnimationDetails::RangedAttack { toward } => {
-                    // t goes from 0 to 1
-                    let t = 1.0 - remaining_ratio;
-
-                    let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - cell_w,
-                        self.grid_y_to_screen(toward.1) - cell_w,
-                    );
-
-                    if t < 0.6 {
-                        let max_displacement = -cell_w * 0.5;
-                        let displacement = if t < 0.1 {
-                            max_displacement * t / 0.1
-                        } else if t < 0.5 {
-                            max_displacement
-                        } else {
-                            (t - 0.5) * t / 0.1
-                        };
-                        let displaced = Vec2::new(x, y).move_towards(toward, displacement);
-                        x = displaced.x;
-                        y = displaced.y;
-                        // The attacker is actually moving (not jumping), so the shadow should follow
-                        shadow_x = x;
-                        shadow_y = y;
-
-                        params.rotation = if character.is_facing_east.get() {
-                            -0.1
-                        } else {
-                            0.1
-                        };
-                    }
-
-                    if t > 0.05 && t < 0.6 {
-                        let max_rot = PI * 0.2;
-                        weapon_rotation_modifier = if t < 0.1 {
-                            max_rot * (t - 0.05) / 0.05
-                        } else if t < 0.5 {
-                            max_rot
-                        } else {
-                            max_rot * 1.0 - (t - 0.5) / 0.1
-                        };
-
-                        if character.has_equipped_ranged_weapon() {
-                            weapon_rotation_modifier *= -1.0;
-                        }
-                    }
-                }
 
                 AnimationDetails::TransformSprite {
                     timelines: interpolations,
@@ -2442,11 +2449,11 @@ impl GameGrid {
                         match property {
                             SpriteProperty::ReplaceHandHeldWithProjectile(color) => {
                                 if value == 1.0 {
-                                    holding_projectile = Some(color);
+                                    holding_projectile = Some(*color);
                                 }
                             }
                             SpriteProperty::CharacterRotation => {
-                                params.rotation = if character.is_facing_east.get() {
+                                params.rotation = if character.facing.get().is_east() {
                                     value
                                 } else {
                                     -value
@@ -2497,33 +2504,39 @@ impl GameGrid {
 
         if let Some(anticipation) = anticipation {
             let dx;
-            match anticipation {
-                CharacterActionAnticipation::RangedAttack => {
+
+            if let Some(facing) = anticipation.facing {
+                params.flip_x = facing.is_east();
+            }
+            match anticipation.kind {
+                AnticipationKind::RangedAttack => {
                     weapon_rotation_modifier = -PI * 0.15;
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
                     dx = 0.0;
                 }
-                CharacterActionAnticipation::MeleeAttack {
-                    override_facing_east,
-                } => {
+                AnticipationKind::MeleeAttack => {
                     let rotation = PI * 0.02;
                     weapon_rotation_modifier = oscillate(0.4, -rotation, rotation);
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
-
-                    if let Some(facing_east) = override_facing_east {
-                        params.flip_x = facing_east;
-                    }
                 }
-                CharacterActionAnticipation::Other => {
+                AnticipationKind::Throw { color } => {
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
                     dx = 0.0;
+                    holding_projectile = Some(color);
                 }
-                CharacterActionAnticipation::Moving => {
+                AnticipationKind::Other => {
+                    let rotation = PI * 0.01;
+                    params.rotation = oscillate(2.5, -rotation, rotation);
+                    //stretch_w = Some(oscillate(0.8, 0.95, 1.0));
+                    stretch_h = Some(oscillate(1.1, 0.95, 1.0));
+                    dx = 0.0;
+                }
+                AnticipationKind::Moving => {
                     y -= oscillate(0.25, 0.0, 2.0);
                     dx = oscillate(0.5, -1.0, 1.0);
                 }
@@ -2578,7 +2591,7 @@ impl GameGrid {
             WHITE,
             DrawTextureParams {
                 dest_size: Some((self.rect_w as f32, self.rect_w as f32).into()),
-                flip_x: character.is_facing_east.get(),
+                flip_x: character.facing.get().is_east(),
                 ..Default::default()
             },
         );
@@ -2603,6 +2616,17 @@ impl GameGrid {
 
             let mut character_params = params.clone();
 
+            if let Some(stretch_h) = stretch_h {
+                // Note: Only character params: equipment should never be stretched vertically
+                // Vertical stretch represents character bending their knees, whereas horizontal
+                // stretch represents rotation in the z axis (which affects equipment)
+                character_params.dest_size.as_mut().unwrap().y *= stretch_h;
+                //x += self.rect_w as f32 * 0.5 * (1.0 - stretch_w);
+                // Note only character y: equipment stays where it is
+                character_offset.1 += self.rect_w as f32 * (1.0 - stretch_h);
+                //weapon_x_offset *= stretch_w;
+            }
+
             character_params.source = Some(Rect::new(
                 0.0,
                 0.0,
@@ -2621,7 +2645,7 @@ impl GameGrid {
             );
 
             if let Some(color) = holding_projectile {
-                draw_circle(x + cell_w, y + 2.0 * cell_w, 6.0, *color);
+                draw_circle(x + cell_w, y + 2.0 * cell_w, 6.0, color);
                 draw_circle_lines(x + cell_w, y + 2.0 * cell_w, 6.0, 3.0, BLACK);
             } else {
                 if !params.flip_x {
@@ -3844,8 +3868,12 @@ impl GameGrid {
 
         // Then draw character foreground layer
         for character in self.characters.values() {
-            let anticipation =
-                self.determine_character_anticipation(ui_state, character, &opportunity_attackers);
+            let anticipation = self.determine_character_anticipation(
+                ui_state,
+                character,
+                &opportunity_attackers,
+                mouse_grid_pos,
+            );
 
             self.draw_character(character, anticipation);
             if is_key_down(KeyCode::LeftAlt) {
@@ -3994,30 +4022,29 @@ impl GameGrid {
         ui_state: &UiState,
         character: &Character,
         opportunity_attackers: &[CharacterId],
+        mouse_grid_pos: Position,
     ) -> Option<CharacterActionAnticipation> {
         let ch_id = character.id();
 
-        // TODO: also make it so that the character is drawn correctly east/west-facing depending on what it's anticipating,
-        // e.g. facing the target it intends to
-
-        let attack_anticipation = |character: &Character, facing_east: Option<bool>| {
-            if character.has_equipped_ranged_weapon() {
-                CharacterActionAnticipation::RangedAttack
+        let attack_anticipation = |character: &Character, facing: Option<CharacterFacing>| {
+            let kind = if character.has_equipped_ranged_weapon() {
+                AnticipationKind::RangedAttack
             } else {
-                CharacterActionAnticipation::MeleeAttack {
-                    override_facing_east: facing_east,
-                }
-            }
+                AnticipationKind::MeleeAttack
+            };
+            CharacterActionAnticipation { facing, kind }
         };
 
         let maybe_attack_anticipation =
             |character: &Character, will_attack: bool, target: CharacterId| {
+                let facing = CharacterFacing::of(
+                    character.pos(),
+                    self.characters.get(&target).unwrap().pos(),
+                );
                 if will_attack {
-                    let facing_east =
-                        self.characters.get(&target).unwrap().pos().0 > character.pos().0;
-                    attack_anticipation(character, Some(facing_east))
+                    attack_anticipation(character, Some(facing))
                 } else {
-                    CharacterActionAnticipation::Other
+                    CharacterActionAnticipation::other(Some(facing))
                 }
             };
 
@@ -4028,16 +4055,34 @@ impl GameGrid {
         match ui_state {
             UiState::ConfiguringAction(a) if ch_id == self.active_character_id => match a {
                 ConfiguredAction::Attack { target, .. } => {
-                    let mut facing_east = None;
-                    if let Some(target_id) = target {
-                        facing_east = Some(
-                            self.characters.get(target_id).unwrap().pos().0 > character.pos().0,
-                        );
+                    let mut facing = None;
+                    if target.is_none() {
+                        facing = Some(CharacterFacing::of(character.pos(), mouse_grid_pos));
                     }
-                    return Some(attack_anticipation(character, facing_east));
+                    return Some(attack_anticipation(character, facing));
                 }
-                ConfiguredAction::Move { .. } => return Some(CharacterActionAnticipation::Moving),
-                _ => return Some(CharacterActionAnticipation::Other),
+                ConfiguredAction::Move { .. } => {
+                    return Some(CharacterActionAnticipation {
+                        kind: AnticipationKind::Moving,
+                        facing: None,
+                    })
+                }
+                ConfiguredAction::UseAbility {
+                    ability, target, ..
+                } => {
+                    let mut facing = None;
+                    if ability.requires_target() && target == &ActionTarget::None {
+                        facing = Some(CharacterFacing::of(character.pos(), mouse_grid_pos));
+                    }
+
+                    let kind = match ability.animation {
+                        AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
+                        AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
+                        _ => AnticipationKind::Other,
+                    };
+                    return Some(CharacterActionAnticipation { kind, facing });
+                }
+                _ => return Some(CharacterActionAnticipation::other(None)),
             },
             UiState::ReactingToAttack {
                 attacker, reactor, ..
@@ -4045,7 +4090,7 @@ impl GameGrid {
                 if ch_id == *attacker {
                     return Some(attack_anticipation(character, None));
                 } else if ch_id == *reactor {
-                    return Some(CharacterActionAnticipation::Other);
+                    return Some(CharacterActionAnticipation::other(None));
                 }
             }
             UiState::ReactingToMovementAttackOpportunity {
@@ -4057,7 +4102,10 @@ impl GameGrid {
                 if ch_id == *reactor {
                     return Some(maybe_attack_anticipation(character, *selected, *target));
                 } else if ch_id == *target {
-                    return Some(CharacterActionAnticipation::Moving);
+                    return Some(CharacterActionAnticipation {
+                        kind: AnticipationKind::Moving,
+                        facing: None,
+                    });
                 }
             }
             UiState::ReactingToRangedAttackOpportunity {

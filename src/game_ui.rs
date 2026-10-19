@@ -34,9 +34,10 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
         AreaEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
-        AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition,
-        CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType, MovementType,
-        OnAttackedReaction, OnHitReaction, Position, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        AttackOutcome, AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId,
+        Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
+        MovementType, OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
+        MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
     drawing::draw_dashed_line_ex,
@@ -1115,21 +1116,11 @@ impl UserInterface {
         });
 
         if let Some(pos) = target_pos {
-            if pos.0 > character.pos().0 {
-                println!("SETTING FACING EAST = true");
-                character.is_facing_east.set(true);
-            } else if pos.0 < character.pos().0 {
-                println!("SETTING FACING EAST = false");
-                character.is_facing_east.set(false);
-            }
+            character.set_facing_toward(pos);
         }
 
         for engager in character.is_engaged_by.borrow().values() {
-            if engager.pos().0 > character.pos().0 {
-                engager.is_facing_east.set(false);
-            } else if engager.pos().0 < character.pos().0 {
-                engager.is_facing_east.set(true);
-            }
+            engager.set_facing_toward(character.pos());
         }
     }
 
@@ -1692,7 +1683,7 @@ impl UserInterface {
             } => {
                 let (delay, duration) = self
                     .game_grid
-                    .animate_character_initiating_ability(actor, target, &ability, area_at);
+                    .animate_initiating_ability(actor, &ability, target, area_at);
 
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.play_delayed(sound_id, delay);

@@ -2377,7 +2377,7 @@ pub const PIERCING_SHOT: Ability = Ability {
         },
     },
     animation_color: YELLOW,
-    animation: AbilityAnimation::CastSpell,
+    animation: AbilityAnimation::RangedWeaponAttack,
     initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: None, //Some(SoundId::HitArrow),
     charge_fx: Some(AbilityChargeFx {
