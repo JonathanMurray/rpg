@@ -13,10 +13,9 @@ use crate::{
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
     core::{
         cond_description_with_populated_stacks, AttackEnhancement, Condition, ConditionInfo,
-        Goodness, OnAttackedReaction,
+        Goodness, OnAttackedReaction, OPPORTUNITY_ATTACK_AP_COST, OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     drawing::draw_rounded_rectangle_lines,
-    game_ui_components::ActionPointsRow,
     textures::{draw_status_icon, StatusId},
     util::screen_size,
 };
@@ -53,7 +52,14 @@ impl Keyword {
                 reaction.name,
                 cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
             ),
-            Keyword::OpportunityAttack => format!("Opportunity attack{}", cost_string(1, 0, 0)),
+            Keyword::OpportunityAttack => format!(
+                "Opportunity attack{}",
+                cost_string(
+                    OPPORTUNITY_ATTACK_AP_COST,
+                    OPPORTUNITY_ATTACK_STAMINA_COST,
+                    0
+                )
+            ),
             Keyword::Advantage => "Advantage / Disadvantage".to_string(),
             Keyword::Pushed => "Pushed".to_string(),
             Keyword::Graze => "Graze".to_string(),
@@ -120,13 +126,13 @@ pub fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     }
     if stamina > 0 {
         if !s.is_empty() {
-            s.push_str(", ");
+            s.push_str(" ");
         }
         s.push_str(&format!("|<faded>{stamina}| |<stamina>|"));
     }
     if mana > 0 {
         if !s.is_empty() {
-            s.push_str(", ");
+            s.push_str(" ");
         }
         s.push_str(&format!("|<faded>{mana}| |<mana>|"));
     }

@@ -473,7 +473,7 @@ pub fn create_character(
             enslaved.health.change_max_value_to(24);
             enslaved.armor_piece.set(Some(CHAIN_MAIL));
             enslaved.set_weapon(HandType::MainHand, ENSLAVED_SWORD);
-            enslaved.learn_passive(PassiveSkill::UnbridledRage);
+            enslaved.learn_passive(PassiveSkill::RisingTemper);
             enslaved.learn_passive(PassiveSkill::SwampDweller);
             enslaved
         }

@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::{self, Ref, RefCell},
     cmp::Ordering,
     collections::{HashMap, HashSet},
     f32::consts::PI,
@@ -149,8 +149,10 @@ enum AnticipationKind {
     RangedAttack,
     MeleeAttack,
     Throw { color: Color },
+    CastSpell { color: Color },
     Other,
-    Moving,
+    Move,
+    Dash,
 }
 
 #[derive(Debug)]
@@ -988,6 +990,9 @@ impl GameGrid {
         let mut aim_duration = 0.0;
 
         let duration = match ability.animation {
+            AbilityAnimation::Dash => {
+                panic!("animate_initiating_ability shouldn't be called for Dash");
+            }
             AbilityAnimation::MeleeWeaponAttack => {
                 self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), false);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
@@ -2365,11 +2370,18 @@ impl GameGrid {
 
         let mut dying = false;
 
-        let mut holding_projectile = None;
+        struct HeldSphere {
+            color: Color,
+            radius: f32,
+            outline: bool,
+            offset: (f32, f32),
+        }
+
+        let mut held_sphere = None;
 
         let mut weapon_rotation_modifier = 0.0;
         let mut shield_offset = (0.0, 0.0);
-        let mut weapon_x_offset = 0.0;
+        let mut weapon_offset = (0.0, 0.0);
         let mut character_offset = (0.0, 0.0);
         let mut stretch_w = None;
         let mut stretch_h = None;
@@ -2449,7 +2461,12 @@ impl GameGrid {
                         match property {
                             SpriteProperty::ReplaceHandHeldWithProjectile(color) => {
                                 if value == 1.0 {
-                                    holding_projectile = Some(*color);
+                                    held_sphere = Some(HeldSphere {
+                                        color: *color,
+                                        outline: true,
+                                        radius: cell_w / 4.0,
+                                        offset: (0.0, 0.0),
+                                    });
                                 }
                             }
                             SpriteProperty::CharacterRotation => {
@@ -2463,7 +2480,7 @@ impl GameGrid {
                                 weapon_rotation_modifier = value;
                             }
                             SpriteProperty::WeaponXOffsetCellW => {
-                                weapon_x_offset += cell_w * value;
+                                weapon_offset.0 += cell_w * value;
                             }
                             SpriteProperty::CharacterXOffsetCellW => {
                                 x += cell_w * value;
@@ -2476,10 +2493,10 @@ impl GameGrid {
                                 }
                             }
                             SpriteProperty::ShieldXOffsetCellW => {
-                                shield_offset = (shield_offset.0 + cell_w * value, shield_offset.1)
+                                shield_offset.0 += cell_w * value;
                             }
                             SpriteProperty::ShieldYOffsetCellW => {
-                                shield_offset = (shield_offset.0, shield_offset.1 + cell_w * value)
+                                shield_offset.1 += cell_w * value;
                             }
                             SpriteProperty::FlipX => {
                                 stretch_w = Some((value - 0.5).abs() / 0.5);
@@ -2522,23 +2539,52 @@ impl GameGrid {
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
                 }
+                AnticipationKind::CastSpell { color } => {
+                    let rotation = PI * 0.01;
+                    params.rotation = oscillate(2.5, -rotation, rotation);
+                    stretch_h = Some(oscillate(0.5, 0.97, 1.0));
+                    let angle = oscillate_loop(0.7, 0.0, PI * 2.0);
+                    let (sin, cos) = angle.sin_cos();
+                    let dist = cell_w * 0.3;
+                    let offset = (cos * dist, sin * dist * 0.5);
+                    held_sphere = Some(HeldSphere {
+                        color: color.with_alpha(0.7),
+                        outline: false,
+                        radius: cell_w / 3.0,
+                        offset,
+                    });
+                    dx = oscillate(0.5, -1.0, 1.0);
+                }
                 AnticipationKind::Throw { color } => {
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
                     dx = 0.0;
-                    holding_projectile = Some(color);
+                    held_sphere = Some(HeldSphere {
+                        color,
+                        outline: true,
+                        radius: cell_w / 4.0,
+                        offset: (0.0, 0.0),
+                    });
                 }
                 AnticipationKind::Other => {
-                    let rotation = PI * 0.01;
+                    let rotation = PI * 0.005;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     //stretch_w = Some(oscillate(0.8, 0.95, 1.0));
-                    stretch_h = Some(oscillate(1.1, 0.95, 1.0));
+                    stretch_h = Some(oscillate(0.9, 0.97, 1.0));
+
                     dx = 0.0;
                 }
-                AnticipationKind::Moving => {
+                AnticipationKind::Move => {
                     y -= oscillate(0.25, 0.0, 2.0);
                     dx = oscillate(0.5, -1.0, 1.0);
+                }
+                AnticipationKind::Dash => {
+                    y -= oscillate(0.25, 0.0, 2.0);
+                    dx = oscillate(0.5, -1.0, 1.0);
+
+                    let rotation = PI * 0.03;
+                    params.rotation = if params.flip_x { rotation } else { -rotation };
                 }
             }
 
@@ -2611,7 +2657,7 @@ impl GameGrid {
             if let Some(stretch_w) = stretch_w {
                 params.dest_size.as_mut().unwrap().x *= stretch_w;
                 x += self.rect_w as f32 * 0.5 * (1.0 - stretch_w);
-                weapon_x_offset *= stretch_w;
+                weapon_offset.0 *= stretch_w;
             }
 
             let mut character_params = params.clone();
@@ -2621,10 +2667,9 @@ impl GameGrid {
                 // Vertical stretch represents character bending their knees, whereas horizontal
                 // stretch represents rotation in the z axis (which affects equipment)
                 character_params.dest_size.as_mut().unwrap().y *= stretch_h;
-                //x += self.rect_w as f32 * 0.5 * (1.0 - stretch_w);
-                // Note only character y: equipment stays where it is
                 character_offset.1 += self.rect_w as f32 * (1.0 - stretch_h);
-                //weapon_x_offset *= stretch_w;
+                weapon_offset.1 += 0.5 * self.rect_w as f32 * (1.0 - stretch_h);
+                shield_offset.1 += 0.5 * self.rect_w as f32 * (1.0 - stretch_h);
             }
 
             character_params.source = Some(Rect::new(
@@ -2644,13 +2689,17 @@ impl GameGrid {
                 character_params,
             );
 
-            if let Some(color) = holding_projectile {
-                draw_circle(x + cell_w, y + 2.0 * cell_w, 6.0, color);
-                draw_circle_lines(x + cell_w, y + 2.0 * cell_w, 6.0, 3.0, BLACK);
+            if let Some(sphere) = held_sphere {
+                let x0 = x + cell_w * 1.5 + sphere.offset.0;
+                let y0 = y + 2.0 * cell_w + sphere.offset.1;
+                draw_circle(x0, y0, sphere.radius, sphere.color);
+                if sphere.outline {
+                    draw_circle_lines(x0, y0, sphere.radius, 3.0, BLACK);
+                }
             } else {
                 if !params.flip_x {
                     weapon_rotation_modifier *= -1.0;
-                    weapon_x_offset *= -1.0;
+                    weapon_offset.0 *= -1.0;
                 }
 
                 if let Some(weapon) = character.weapon(HandType::MainHand) {
@@ -2667,8 +2716,8 @@ impl GameGrid {
                         //weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
                         draw_texture_ex(
                             &self.sprites[&texture].regular,
-                            x + weapon_x_offset,
-                            y + y_offset,
+                            x + weapon_offset.0,
+                            y + weapon_offset.1 + y_offset,
                             WHITE,
                             weapon_params,
                         );
@@ -4063,7 +4112,7 @@ impl GameGrid {
                 }
                 ConfiguredAction::Move { .. } => {
                     return Some(CharacterActionAnticipation {
-                        kind: AnticipationKind::Moving,
+                        kind: AnticipationKind::Move,
                         facing: None,
                     })
                 }
@@ -4078,6 +4127,10 @@ impl GameGrid {
                     let kind = match ability.animation {
                         AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
                         AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
+                        AbilityAnimation::CastSpell => AnticipationKind::CastSpell {
+                            color: ability.animation_color,
+                        },
+                        AbilityAnimation::Dash => AnticipationKind::Dash,
                         _ => AnticipationKind::Other,
                     };
                     return Some(CharacterActionAnticipation { kind, facing });
@@ -4103,7 +4156,7 @@ impl GameGrid {
                     return Some(maybe_attack_anticipation(character, *selected, *target));
                 } else if ch_id == *target {
                     return Some(CharacterActionAnticipation {
-                        kind: AnticipationKind::Moving,
+                        kind: AnticipationKind::Move,
                         facing: None,
                     });
                 }
@@ -4120,7 +4173,16 @@ impl GameGrid {
                     return Some(maybe_attack_anticipation(character, *selected, *attacker));
                 }
             }
+            UiState::Idle { .. } => {
+                // Something is actively happening in the game world; we're not waiting for user input and
+                // there's no anticipation
+                return None;
+            }
             _ => {}
+        }
+
+        if ch_id == self.active_character_id {
+            return Some(CharacterActionAnticipation::other(None));
         }
 
         None

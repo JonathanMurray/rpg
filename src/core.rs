@@ -36,6 +36,9 @@ pub const MOVE_DISTANCE_PER_RESOURCE: u32 = 6;
 
 pub const MOVE_COST_FACTOR_IN_LIQUID: f32 = 2.0;
 
+pub const OPPORTUNITY_ATTACK_AP_COST: u32 = 1;
+pub const OPPORTUNITY_ATTACK_STAMINA_COST: u32 = 1;
+
 #[derive(Debug)]
 enum ActionOutcome {
     AttackHit { victim_id: CharacterId, damage: u32 },
@@ -950,7 +953,11 @@ impl CoreGame {
         })
         .await;
 
-        self.perform_spend_ap(reactor, 1).await;
+        self.perform_spend_ap(reactor, OPPORTUNITY_ATTACK_AP_COST)
+            .await;
+        if reactor.player_controlled() {
+            reactor.stamina.spend(OPPORTUNITY_ATTACK_STAMINA_COST);
+        }
 
         self.ui_handle_event(GameEvent::AttackWasInitiated {
             actor: reactor.id(),
@@ -1974,7 +1981,7 @@ impl CoreGame {
 
         for (i, target_id) in targets.iter().enumerate() {
             let target = mode.characters().get_rc(*target_id);
-            println!("perform ability AoE on target: {}", target.name);
+            //println!("perform ability AoE on target: {}", target.name);
             detail_lines.push("".to_string());
             detail_lines.push(format!("|{}|:", target.name_tag()));
             let outcome = Self::perform_ability_enemy_effect(
@@ -3376,7 +3383,7 @@ impl CoreGame {
             self.log(format!("|{}| lost Arcane surge", name_tag)).await;
         }
 
-        if character.knows_passive(PassiveSkill::UnbridledRage) {
+        if character.knows_passive(PassiveSkill::RisingTemper) {
             self.perform_character_receive_condition(
                 character,
                 ApplyCondition {
@@ -5112,6 +5119,7 @@ pub enum AbilityAnimation {
     RangedWeaponAttack,
     SpinAttack,
     CastSpell,
+    Dash,
     Throw(Color),
 }
 
@@ -6949,7 +6957,9 @@ impl Character {
         }
 
         if let Some(weapon) = self.weapon(HandType::MainHand) {
-            weapon.is_melee() && self.action_points.current() >= 1
+            weapon.is_melee()
+                && self.action_points.current() >= OPPORTUNITY_ATTACK_AP_COST
+                && self.stamina.current() > OPPORTUNITY_ATTACK_STAMINA_COST
         } else {
             false
         }

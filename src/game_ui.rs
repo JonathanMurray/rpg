@@ -1681,6 +1681,7 @@ impl UserInterface {
                 target,
                 area_at,
             } => {
+                println!("Ability was initiated: {}", ability.name);
                 let (delay, duration) = self
                     .game_grid
                     .animate_initiating_ability(actor, &ability, target, area_at);

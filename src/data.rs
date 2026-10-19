@@ -2343,7 +2343,7 @@ pub const DASH: Ability = Ability {
         range: Range::f32(8.0),
     },
     animation_color: RED,
-    animation: AbilityAnimation::CastSpell,
+    animation: AbilityAnimation::Dash,
     initiate_sound: None,
     resolve_sound: None,
     charge_fx: None,
@@ -2886,7 +2886,7 @@ pub enum PassiveSkill {
     ThrillOfBattle,
     Honorless,
     Vigilant,
-    UnbridledRage,
+    RisingTemper,
     SwampDweller,
     Slasher,
 }
@@ -2903,7 +2903,7 @@ impl PassiveSkill {
             ThrillOfBattle => "Thrill of battle",
             Honorless => "Honorless",
             Vigilant => "Vigilant",
-            UnbridledRage => "Unbridled rage",
+            RisingTemper => "Rising temper",
             SwampDweller => "Swamp dweller",
             Slasher => "Slasher",
         }
@@ -2925,7 +2925,7 @@ impl PassiveSkill {
             // TODO: unique icon
             Vigilant => IconId::MeleeAttack,
             // TODO: unique icon
-            UnbridledRage => IconId::Rage,
+            RisingTemper => IconId::Rage,
             SwampDweller => IconId::SwampDweller,
 
             Slasher => IconId::Slashing,
@@ -2943,7 +2943,7 @@ impl PassiveSkill {
             ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
             Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
-            UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
+            RisingTemper => "End of turn: gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
             Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
         }
@@ -2953,7 +2953,7 @@ impl PassiveSkill {
         use PassiveSkill::*;
         match self {
             BloodRage => &[Keyword::Cond(Condition::NearDeath, None)],
-            UnbridledRage => &[Keyword::Cond(Condition::Ferocity, None)],
+            RisingTemper => &[Keyword::Cond(Condition::Ferocity, None)],
             SwampDweller => &[Keyword::Cond(Condition::Poisoned, None)],
             Slasher => &[Keyword::Cond(Condition::Bleeding, None)],
             _ => &[],
