@@ -295,10 +295,10 @@ pub struct CharacterSheetToggle {
 }
 
 impl CharacterSheetToggle {
-    pub fn new(font: Font, sound_player: SoundPlayer) -> Self {
+    pub fn new(font: Font, font_size: u16, sound_player: SoundPlayer) -> Self {
         CharacterSheetToggle {
             shown: Cell::new(false),
-            text_line: TextLine::new("Character sheet (A)", 16, WHITE, Some(font)),
+            text_line: TextLine::new("Character (A)", font_size, WHITE, Some(font)),
             padding: 7.0,
             sound_player,
             is_hovered: Cell::new(false),
@@ -367,7 +367,7 @@ pub struct PlayerPortraits {
     reacting_id: Cell<Option<CharacterId>>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
     sound_player: SoundPlayer,
-    font: Font,
+    tooltip_font: Font,
     pub is_hovering_end_turn: Cell<bool>,
 }
 
@@ -381,7 +381,8 @@ impl PlayerPortraits {
         characters: &Characters,
         selected_id: CharacterId,
         active_id: CharacterId,
-        font: Font,
+        simple_font: Font,
+        big_font: Font,
         sound_player: SoundPlayer,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
@@ -393,7 +394,7 @@ impl PlayerPortraits {
                     character.id(),
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         character,
-                        font.clone(),
+                        big_font.clone(),
                         character.portrait,
                         sound_player.clone(),
                     ))),
@@ -420,7 +421,7 @@ impl PlayerPortraits {
             reacting_id: Cell::new(None),
             portraits,
             sound_player,
-            font,
+            tooltip_font: simple_font,
             is_hovering_end_turn: Cell::new(false),
         };
 
@@ -499,7 +500,7 @@ impl PlayerPortraits {
                 let populated_description = info.populated_description();
                 let content_lines: Vec<&str> = populated_description.split("\n").collect();
                 draw_tooltip(
-                    &self.font,
+                    &self.tooltip_font,
                     TooltipPositionPreference::At((
                         rect.right() + STATUS_ICON_W + 5.0,
                         rect.y + 1.0,
@@ -594,8 +595,8 @@ impl PlayerCharacterPortrait {
         portrait: PortraitId,
         sound_player: SoundPlayer,
     ) -> Self {
-        let mut text = TextLine::new(&character.name, 20, WHITE, Some(font.clone()));
-        text.set_depth(BLACK, 2.0);
+        //let mut text = TextLine::new(&character.name, 20, WHITE, Some(font.clone()));
+        //text.set_depth(BLACK, 2.0);
 
         let mut status_rects = vec![];
         let mut status_elements = vec![];
@@ -624,8 +625,9 @@ impl PlayerCharacterPortrait {
             ..Default::default()
         });
 
-        let done_text = TextLine::new("Done", 16, LIGHTGRAY, Some(font.clone()));
-        let end_turn_text = TextLine::new("End turn", 16, WHITE, Some(font.clone()));
+        let font_size = 12;
+        let done_text = TextLine::new("Done", font_size, LIGHTGRAY, Some(font.clone()));
+        let end_turn_text = TextLine::new("End turn", font_size, WHITE, Some(font.clone()));
 
         let mut self_ = Self {
             character: Rc::clone(character),
@@ -716,8 +718,9 @@ impl Drawable for PlayerCharacterPortrait {
 
         let button_y = y + h + 5.0;
         let has_taken_a_turn = self.character.has_taken_a_turn_this_round.get();
+        let mut btn_rect = Rect::new(x, button_y, w, button_h);
         if has_taken_a_turn {
-            draw_rectangle_lines2(x, button_y, w, button_h, 1.0, GRAY);
+            draw_rectangle_lines2(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 1.0, GRAY);
             self.done_text.draw(
                 x + w / 2.0 - self.done_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,
@@ -735,13 +738,11 @@ impl Drawable for PlayerCharacterPortrait {
             draw_triangle(v1, v2, v3, COL_GOLD);
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
 
-            let mut btn_rect = Rect::new(x, button_y, w, button_h);
-
             let mut highlight_btn = false;
 
+            // Just after the char has ended their turn, and AP/stamina is being animated, the character is "active"
+            // even though we've already pressed "End turn".
             if !has_taken_a_turn {
-                // Just after the char has ended their turn, and AP/stamina is being animated, the character is "active"
-                // even though we've already pressed "End turn".
                 let end_turn_x = x + w / 2.0 - self.end_turn_text.size().0 / 2.0;
                 let end_turn_y = button_y + button_text_vert_pad;
                 self.end_turn_text.draw(end_turn_x, end_turn_y);
@@ -749,11 +750,10 @@ impl Drawable for PlayerCharacterPortrait {
                 let can_end_turn_without_waste = self.character.action_points.current()
                     + self.character.end_of_turn_ap_gain()
                     <= self.character.action_points.max();
-                let should_glow_btn =
-                    self.may_show_end_turn_button.get() && can_end_turn_without_waste;
-                if should_glow_btn {
-                    highlight_btn = true;
-                }
+                highlight_btn = self.may_show_end_turn_button.get() && can_end_turn_without_waste;
+
+                let btn_w = 80.0;
+                btn_rect = Rect::new(x + w / 2.0 - btn_w / 2.0, button_y, btn_w, button_h);
             }
 
             if highlight_btn {
@@ -779,7 +779,15 @@ impl Drawable for PlayerCharacterPortrait {
                     self.sound_player.play(SoundId::HoverButton);
                 }
                 self.is_end_turn_hovered.set(true);
-                draw_rectangle_lines2(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
+                let margin = 2.0;
+                draw_rectangle_lines2(
+                    btn_rect.x + margin,
+                    btn_rect.y + margin,
+                    btn_rect.w - margin * 2.0,
+                    btn_rect.h - margin * 2.0,
+                    1.0,
+                    WHITE,
+                );
                 if is_mouse_button_pressed(MouseButton::Left) {
                     self.has_clicked_end_turn.set(true);
                 }
@@ -814,7 +822,10 @@ impl Drawable for PlayerCharacterPortrait {
         self.is_portrait_hovered.set(portrait_hovered);
 
         if portrait_hovered && !self.is_character_shown.get() {
-            draw_rectangle_lines2(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
+            let m = 1.0;
+            // Highlight the portrait
+
+            draw_rectangle_lines2(x + m, y + m, w - m * 2.0, h - m * 2.0, 1.0, COL_GOLD);
             if is_mouse_button_pressed(MouseButton::Left) {
                 println!(
                     "Set portrait has been clicked mouse={:?}, {},{}",

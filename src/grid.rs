@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::{self, Ref, RefCell},
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -16,7 +17,7 @@ use macroquad::{
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
-    text::{Font, TextParams},
+    text::{measure_multiline_text, Font, TextParams},
     texture::draw_texture,
     time::get_time,
     window::{screen_height, screen_width},
@@ -69,7 +70,7 @@ use crate::{
     },
     util::{
         are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
-        oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_GOLD, COL_GREEN_0,
+        oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_ERROR, COL_GOLD, COL_GREEN_0,
         COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
     },
 };
@@ -85,7 +86,7 @@ const BORDER_OCCUPIED_COLOR: Color = Color::new(0.9, 0.7, 0.7, 0.8);
 
 //const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
-const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
+const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.8);
 //const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
 //const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 
@@ -117,8 +118,12 @@ const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.00, 0.80, 0.00, 0.8); // Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = RED;
 
-const CURSOR_ERROR_COLOR: Color = Color::new(1.0, 0.8, 0.8, 1.0);
-const CURSOR_INFO_COLOR: Color = WHITE;
+#[derive(PartialEq)]
+enum CursorTextColor {
+    Info,
+    Error,
+    Move,
+}
 
 const CROSSHAIR_ARROW_THICK: f32 = 5.0;
 const CROSSHAIR_ARROW_THIN: f32 = 4.0;
@@ -423,6 +428,8 @@ pub struct GameGrid {
     enemys_target: Option<CharacterId>,
 
     sound_player: SoundPlayer,
+
+    movement_path_time_before_draw: f64,
 }
 
 impl GameGrid {
@@ -487,6 +494,7 @@ impl GameGrid {
             surfaces,
             control_points,
             sound_player,
+            movement_path_time_before_draw: 0.0,
         };
 
         // Adjust the camera position, based on the map dimensions
@@ -2886,6 +2894,8 @@ impl GameGrid {
         } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
             self.draw_movement_path_background(self.active_character_id);
             should_highlight_character_occupations = true;
+        } else {
+            self.movement_path_time_before_draw = get_time();
         }
 
         let mut pushed_targets = vec![];
@@ -3441,20 +3451,39 @@ impl GameGrid {
             _ => {}
         }
 
-        let mut front_cursor_text = None;
+        let mut front_cursor_text: Option<(
+            Cow<'static, str>,
+            Option<(i32, i32)>,
+            CursorTextColor,
+        )> = None;
 
         if receptive_to_input {
             let player_action_char_target = match ui_state.players_action_target() {
                 ActionTarget::Character(char_id, _) => Some(char_id),
                 _ => None,
             };
-            let committable_action_name = match ui_state {
+            let committable_action_str = match ui_state {
                 UiState::ConfiguringAction(configured_action) => match configured_action {
-                    ConfiguredAction::Attack { .. } => Some("Attack"),
-                    ConfiguredAction::UseAbility { ability, .. } => Some(ability.name),
-                    ConfiguredAction::ChangeEquipment { .. } => Some("Change equipment"),
+                    ConfiguredAction::Attack { .. } => Some("Attack".to_string()),
+                    ConfiguredAction::UseAbility { ability, .. } => {
+                        let num_targets = self.target_effect_previews.len();
+                        if matches!(ability.target, AbilityTarget::Destination { .. }) {
+                            Some(ability.name.to_owned())
+                        } else {
+                            let target_str = if num_targets == 1 {
+                                let char_id = self.target_effect_previews.keys().next().unwrap();
+                                self.characters[char_id].name.clone()
+                            } else {
+                                format!("{} targets", num_targets)
+                            };
+                            Some(format!("{}\n|<target>|{}", ability.name, target_str))
+                        }
+                    }
+                    ConfiguredAction::ChangeEquipment { .. } => {
+                        Some("Change equipment".to_string())
+                    }
                     ConfiguredAction::SelectConsumableFromInventory { .. } => {
-                        Some("Use consumable")
+                        Some("Use consumable".to_string())
                     }
                     _ => None,
                 },
@@ -3471,7 +3500,7 @@ impl GameGrid {
                         Surface::Spikes => "|<warning>| spikes",
                         Surface::Fire => "|<warning>| fire",
                     };
-                    self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
+                    front_cursor_text = Some((Cow::Borrowed(text), None, CursorTextColor::Info));
                 }
             }
 
@@ -3490,23 +3519,23 @@ impl GameGrid {
                         }
 
                         if is_mouse_pos_out_of_range {
-                            self.draw_cursor_text(
-                                "Out of reach",
+                            front_cursor_text = Some((
+                                Cow::Borrowed("Out of reach"),
                                 Some(mouse_grid_pos),
-                                CURSOR_ERROR_COLOR,
-                            );
+                                CursorTextColor::Error,
+                            ));
                         } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                            self.draw_cursor_text(
-                                "Select enemy",
+                            front_cursor_text = Some((
+                                Cow::Borrowed("Select enemy"),
                                 Some(mouse_grid_pos),
-                                CURSOR_INFO_COLOR,
-                            );
+                                CursorTextColor::Info,
+                            ));
                         } else {
-                            self.draw_cursor_text(
-                                "Select ally",
+                            front_cursor_text = Some((
+                                Cow::Borrowed("Select ally"),
                                 Some(mouse_grid_pos),
-                                CURSOR_INFO_COLOR,
-                            );
+                                CursorTextColor::Info,
+                            ));
                         }
 
                         if is_mouse_pos_out_of_range {
@@ -3567,29 +3596,33 @@ impl GameGrid {
                         match shape {
                             Some(AreaShape::Circle(..)) => {
                                 if is_mouse_pos_out_of_range {
-                                    self.draw_cursor_text(
-                                        "Out of reach",
+                                    front_cursor_text = Some((
+                                        Cow::Borrowed("Out of reach"),
                                         Some(mouse_grid_pos),
-                                        CURSOR_ERROR_COLOR,
-                                    );
+                                        CursorTextColor::Error,
+                                    ));
                                 } else {
-                                    self.draw_cursor_text(
-                                        "Confirm area",
+                                    front_cursor_text = Some((
+                                        Cow::Borrowed("Confirm area"),
                                         Some(mouse_grid_pos),
-                                        CURSOR_INFO_COLOR,
-                                    );
+                                        CursorTextColor::Info,
+                                    ));
                                 }
                             }
                             Some(AreaShape::Line) => {
-                                self.draw_cursor_text("Confirm aim", None, CURSOR_INFO_COLOR);
+                                front_cursor_text = Some((
+                                    Cow::Borrowed("Confirm aim"),
+                                    None,
+                                    CursorTextColor::Info,
+                                ));
                             }
                             None => {
                                 if let Some(text) = mouse_pos_target_problem {
-                                    self.draw_cursor_text(
-                                        text,
+                                    front_cursor_text = Some((
+                                        Cow::Borrowed(text),
                                         Some(mouse_grid_pos),
-                                        CURSOR_ERROR_COLOR,
-                                    );
+                                        CursorTextColor::Error,
+                                    ));
                                 }
                             }
                         };
@@ -3600,11 +3633,11 @@ impl GameGrid {
 
                     if hovered_move_route.is_none() {
                         self.draw_invalid_target_marker(mouse_grid_pos);
-                        self.draw_cursor_text(
-                            "Out of reach",
+                        front_cursor_text = Some((
+                            Cow::Borrowed("Out of reach"),
                             Some(mouse_grid_pos),
-                            CURSOR_ERROR_COLOR,
-                        );
+                            CursorTextColor::Error,
+                        ));
                     }
                 }
                 MouseState::ImplicitTarget => {
@@ -3621,10 +3654,10 @@ impl GameGrid {
                         self.draw_occupation(OccupationFilter::TallTerrain);
                     }
                     let problem = format!("|<warning>| {}", problem.message());
-                    front_cursor_text = Some((problem, CURSOR_ERROR_COLOR));
+                    front_cursor_text = Some((Cow::Owned(problem), None, CursorTextColor::Error));
                 } else {
-                    let text = format!("|<confirm>|{}", committable_action_name.unwrap());
-                    front_cursor_text = Some((text, CURSOR_INFO_COLOR));
+                    let text = format!("|<confirm>|{}", committable_action_str.unwrap());
+                    front_cursor_text = Some((Cow::Owned(text), None, CursorTextColor::Info));
 
                     if pressed_left_mouse {
                         println!("Committed action with left click");
@@ -3634,8 +3667,11 @@ impl GameGrid {
             }
 
             if let Some(reaction_choice) = reaction_choice {
-                front_cursor_text =
-                    Some((format!("|<confirm>|{}", reaction_choice), CURSOR_INFO_COLOR));
+                front_cursor_text = Some((
+                    Cow::Owned(format!("|<confirm>|{}", reaction_choice)),
+                    None,
+                    CursorTextColor::Info,
+                ));
                 if pressed_left_mouse {
                     outcome.committed_action = true;
                 }
@@ -3686,7 +3722,11 @@ impl GameGrid {
                         active_char_pos,
                         *hovered_route_dst,
                     );
-                    self.draw_player_movement_path(&path.nodes, &mut opportunity_attackers);
+                    let (move_text, dest) =
+                        self.draw_player_movement_path(&path.nodes, &mut opportunity_attackers);
+                    front_cursor_text =
+                        Some((Cow::Owned(move_text), Some(dest), CursorTextColor::Move));
+
                     self.characters[&self.active_character_id]
                         .set_facing_toward(*hovered_route_dst);
 
@@ -4043,8 +4083,8 @@ impl GameGrid {
 
         self.draw_effects();
 
-        if let Some((text, color)) = front_cursor_text {
-            self.draw_cursor_text(text, None, color);
+        if let Some((text, mouse_grid_pos, color)) = front_cursor_text {
+            self.draw_cursor_text(text, mouse_grid_pos, color);
         }
 
         let inspect_target = match ui_state.players_action_target() {
@@ -4491,47 +4531,73 @@ impl GameGrid {
         &self,
         text: impl AsRef<str>,
         mouse_grid_pos: Option<(i32, i32)>,
-        color: Color,
+        color: CursorTextColor,
     ) {
         let font_scale = 1.0; //oscillate(1.0, 0.9, 1.1);
-        let font_size = 16;
-        let font = Some(&self.simple_font);
-        let text_dim = measure_text_with_font_tags(text.as_ref(), font, font_size, font_scale);
+
+        let font_size = 12;
+        let font = Some(&self.big_font);
+
+        let lines: Vec<&str> = text.as_ref().split("\n").collect();
+        let mut line_dims = vec![];
+
+        let pad = 2.0;
+        let mut rect_size: (f32, f32) = (0.0, 0.0);
+        let line_margin = 6.0;
+
+        for line in &lines {
+            let dim = measure_text_with_font_tags(line.as_ref(), font, font_size, font_scale);
+            rect_size.0 = rect_size.0.max(dim.width);
+            rect_size.1 += dim.height;
+            line_dims.push(dim);
+        }
+
+        rect_size.0 += pad * 2.0;
+        rect_size.1 += pad * 2.0 + (lines.len() - 1) as f32 * line_margin;
+
         let (x, y) = if let Some(pos) = mouse_grid_pos {
             let snapped_mouse_pos = self.grid_pos_to_screen(pos);
             (
-                snapped_mouse_pos.0 + self.cell_w() / 2.0 - text_dim.width / 2.0,
+                snapped_mouse_pos.0 + self.cell_w() / 2.0,
                 snapped_mouse_pos.1 - 10.0,
             )
         } else {
             let mouse_pos = mouse_position();
-            (mouse_pos.0 - text_dim.width / 2.0, mouse_pos.1 - 3.0)
+            (mouse_pos.0, mouse_pos.1 - rect_size.1 / 2.0 - 2.0)
         };
 
-        if mouse_grid_pos.is_none() {
-            let pad = 3.0;
+        if mouse_grid_pos.is_none() || color != CursorTextColor::Info {
             draw_rectangle(
-                x - pad,
-                y - text_dim.offset_y - pad,
-                text_dim.width + pad * 2.0,
-                text_dim.height + pad * 2.0,
-                Color::new(0.0, 0.0, 0.0, 0.5),
+                x - rect_size.0 / 2.0,
+                y - rect_size.1 / 2.0,
+                rect_size.0,
+                rect_size.1,
+                Color::new(0.0, 0.0, 0.0, 0.7),
             );
         }
 
-        draw_text_with_font_tags(
-            text.as_ref(),
-            x,
-            y,
-            TextParams {
-                font,
-                font_size,
-                font_scale,
-                color,
-                ..Default::default()
-            },
-            true,
-        );
+        let mut y0 = y - rect_size.1 / 2.0 + pad;
+        for (line, dim) in lines.iter().zip(line_dims) {
+            let color = match color {
+                CursorTextColor::Info => WHITE,
+                CursorTextColor::Move => WHITE,
+                CursorTextColor::Error => COL_ERROR,
+            };
+            draw_text_with_font_tags(
+                line,
+                x - dim.width / 2.0,
+                y0 + dim.offset_y,
+                TextParams {
+                    font,
+                    font_size,
+                    font_scale,
+                    color,
+                    ..Default::default()
+                },
+                true,
+            );
+            y0 += dim.height + line_margin;
+        }
     }
 
     fn determine_hovered_route_position(
@@ -5194,11 +5260,11 @@ impl GameGrid {
                 outcome_text = None;
             }
 
-            draw_action(
+            draw_prediction(
                 (x0, y0),
-                &self.simple_font,
+                &self.big_font,
                 &header,
-                &self.simple_font,
+                &self.big_font,
                 &preview.prediction.details,
                 outcome_text,
                 positive,
@@ -5235,8 +5301,8 @@ impl GameGrid {
 
             //let health_text = format!("{}/{}", character.health.current(), character.health.max());
             let health_text = format!("{}", character.health.current());
-            let health_text_font_size = 16;
-            let health_text_font = Some(&self.simple_font);
+            let health_text_font_size = 12;
+            let health_text_font = Some(&self.big_font);
             let text_dim = measure_text(&health_text, health_text_font, health_text_font_size, 1.0);
             let text_x = health_x + health_w / 2.0 - text_dim.width / 2.0;
             let text_y = health_y + health_h / 2.0 - text_dim.height / 2.0 + text_dim.offset_y;
@@ -5645,46 +5711,6 @@ impl GameGrid {
          */
     }
 
-    fn draw_static_text(
-        &self,
-        header: &str,
-        text_color: Color,
-        bg_color: Color,
-        pad: f32,
-        mut x: f32,
-        y: f32,
-    ) {
-        let header_font_size = 14;
-        let params = TextParams {
-            font: Some(&self.big_font),
-            font_size: header_font_size,
-            color: text_color,
-            ..Default::default()
-        };
-
-        let header_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
-        let header_w = header_dimensions.width;
-        let mut header_h = 0.0;
-        if header_dimensions.height.is_finite() {
-            header_h = header_dimensions.height;
-        }
-
-        let w = header_w + 2.0 * pad;
-        let h = header_h + 2.0 * pad;
-
-        if w > self.cell_w() {
-            x -= (w - self.cell_w()) / 2.0;
-        }
-
-        draw_rectangle(x, y - h, w, h, bg_color);
-        draw_text_rounded(
-            header,
-            x + pad,
-            y - h + pad + header_dimensions.offset_y,
-            params.clone(),
-        );
-    }
-
     fn draw_movement_path_background(&self, character_id: CharacterId) {
         let character = &self.characters[&character_id];
         self.draw_move_range_indicator(character);
@@ -5747,7 +5773,7 @@ impl GameGrid {
         &self,
         path: &[PathNode],
         opportunity_attackers: &mut Vec<CharacterId>,
-    ) {
+    ) -> (String, (i32, i32)) {
         let mover = self.characters.get(&self.active_character_id).unwrap();
         let mut ap_cost = 0;
         if mover.remaining_movement.get() < path[0].distance_from_start {
@@ -5786,7 +5812,7 @@ impl GameGrid {
             HOVER_MOVEMENT_ARROW_COLOR,
         );
 
-        let distance = path.last().unwrap().distance_from_start;
+        //let distance = path.last().unwrap().distance_from_start;
         let destination = path.last().unwrap().position;
         let (x, y) = (
             self.grid_x_to_screen(destination.0),
@@ -5795,15 +5821,21 @@ impl GameGrid {
 
         self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0, true);
 
-        let text_color = LIGHTGRAY;
-        let bg_color = Color::new(0.0, 0.0, 0.0, 0.5);
-
-        let text = if distance.round() == distance {
+        /*
+        let mut text = if distance.round() == distance {
             distance.to_string()
         } else {
             format!("{distance:.1}")
         };
-        self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
+         */
+
+        let mut text = "|<confirm>| Move".to_string();
+
+        if ap_cost > 0 {
+            text.push_str(&format!("\n{} |<ap>| AP", ap_cost));
+        }
+
+        (text, destination)
     }
 
     fn draw_movement_path_with_arrow(
@@ -5825,9 +5857,11 @@ impl GameGrid {
                 circle_color = Color::new(1.0, 0.4, 0.4, 0.8);
             }
             if a.ap_cost_breakpoint {
+                /*
                 if !a.dangerous {
                     r = 5.0;
                 }
+                 */
                 circle_color = COL_GOLD;
             }
 
@@ -5872,10 +5906,15 @@ impl GameGrid {
     }
 
     fn draw_move_range_indicator(&self, character: &Character) {
-        let range = character.remaining_movement.get();
-        let extended_range = self.active_char().movement_range();
+        let animated_limit = (get_time() - self.movement_path_time_before_draw) as f32 * 300.0;
+
+        let range = character.remaining_movement.get().min(animated_limit);
+        let extended_range = self.active_char().movement_range().min(animated_limit);
+
         let range_ceil = extended_range.ceil() as i32;
         let origin = character.pos();
+
+        let cell_w = self.cell_w();
 
         let within = |x: i32, y: i32, range| {
             for x0 in x - 1..=x + 1 {
@@ -5900,13 +5939,14 @@ impl GameGrid {
             {
                 if within_inner(x, y) {
                     self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
+                    let thickness = (cell_w / 30.0).ceil();
                     self.draw_borders(
                         (x, y),
                         !within_inner(x - 1, y),
                         !within_inner(x + 1, y),
                         !within_inner(x, y - 1),
                         !within_inner(x, y + 1),
-                        1.0,
+                        thickness,
                         MOVE_RANGE_COLOR,
                         DrawBorder::Line,
                     );
@@ -5918,14 +5958,31 @@ impl GameGrid {
                     let lower_ground_to_north = self.pathfind_grid.is_high_ground((x, y))
                         && !self.pathfind_grid.is_high_ground((x, y - 1));
 
+                    let thickness = (cell_w / 15.0).ceil();
+
+                    let left = !within_outer(x - 1, y);
+                    let right = !within_outer(x + 1, y);
+                    let top = !within_outer(x, y - 1) || lower_ground_to_north;
+                    let bot = !within_outer(x, y + 1);
                     self.draw_borders(
                         (x, y),
-                        !within_outer(x - 1, y),
-                        !within_outer(x + 1, y),
-                        !within_outer(x, y - 1) || lower_ground_to_north,
-                        !within_outer(x, y + 1),
-                        2.0,
+                        left,
+                        right,
+                        top,
+                        bot,
+                        thickness,
                         MOVE_RANGE_EXTENDED_COLOR,
+                        DrawBorder::Line,
+                    );
+
+                    self.draw_borders(
+                        (x, y),
+                        left,
+                        right,
+                        top,
+                        bot,
+                        thickness * 2.0,
+                        MOVE_RANGE_EXTENDED_COLOR.with_alpha(0.3),
                         DrawBorder::Line,
                     );
                 }
@@ -6394,7 +6451,7 @@ fn has_non_empty_movement_path(ui_state: &UiState) -> bool {
     }
 }
 
-pub fn draw_action(
+pub fn draw_prediction(
     mid_pos: (f32, f32),
     header_font: &Font,
     header: &str,
@@ -6405,8 +6462,8 @@ pub fn draw_action(
 ) {
     let (xmid, y) = mid_pos;
 
-    let header_font_size = 16;
-    let detail_font_size = 16;
+    let header_font_size = 12;
+    let detail_font_size = 12;
     let header_params = TextParams {
         font: Some(header_font),
         font_size: header_font_size,
@@ -6431,9 +6488,11 @@ pub fn draw_action(
     if !details.is_empty() {
         let mut details_relative_y_interval = [f32::MAX, f32::MIN];
 
+        dbg!(&details);
+
         for (line, _goodness) in details.iter() {
             let dim = measure_text(line, Some(details_font), detail_font_size, 1.0);
-            details_w += dim.width;
+            details_w += dim.width + detail_pad * 2.0;
             if dim.height.is_finite() {
                 if dim.offset_y > details_max_offset {
                     details_max_offset = dim.offset_y;
@@ -6448,8 +6507,7 @@ pub fn draw_action(
                 }
             }
         }
-        details_w += details.len() as f32 * detail_pad * 2.0
-            + (details.len() - 1) as f32 * detail_hor_margin;
+        details_w += (details.len() - 1) as f32 * detail_hor_margin;
     }
 
     let outcome_w = outcome_text
@@ -6516,36 +6574,15 @@ pub fn draw_action(
             Goodness::Neutral => BLACK,
             Goodness::Bad => Color::new(0.5, 0.0, 0.0, 1.0),
         };
-        draw_rectangle(
-            x0,
-            y0,
-            dim.width + 2.0 * detail_pad,
-            dim.height + 2.0 * detail_pad,
-            bg_color,
-        );
-        draw_rectangle_lines2(
-            x0,
-            y0,
-            dim.width + 2.0 * detail_pad,
-            dim.height + 2.0 * detail_pad,
-            1.0,
-            BLACK,
-        );
+        let rect_size = (dim.width + 2.0 * detail_pad, dim.height + 2.0 * detail_pad);
+        draw_rectangle(x0, y0, rect_size.0, rect_size.1, bg_color);
+        draw_rectangle_lines2(x0, y0, rect_size.0, rect_size.1, 1.0, BLACK);
 
+        let (text_x, text_y) = (x0 + detail_pad, y0 + detail_pad + details_max_offset);
         params.color = BLACK;
-        draw_text_rounded(
-            line,
-            x0 + detail_pad,
-            y0 + detail_pad + details_max_offset,
-            params.clone(),
-        );
-        params.color = WHITE;
-        draw_text_rounded(
-            line,
-            x0 + detail_pad - 1.0,
-            y0 + detail_pad + details_max_offset - 1.0,
-            params,
-        );
+        draw_text_rounded(line, text_x + 1.0, text_y + 1.0, params.clone());
+        params.color = Color::new(0.9, 0.9, 0.9, 1.0);
+        draw_text_rounded(line, text_x, text_y, params);
 
         x0 += dim.width + detail_pad * 2.0 + detail_hor_margin;
     }

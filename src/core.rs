@@ -3656,7 +3656,9 @@ pub fn predict_ability(
                     {
                         details.push((label, contributor.goodness()));
                     }
-                    for (label, contributor) in characters.get(target_id).incoming_ability_bonuses()
+                    for (label, contributor) in characters
+                        .get(target_id)
+                        .incoming_ability_bonus_contributors(ability.main_damage_type())
                     {
                         details.push((label, contributor.goodness()));
                     }
@@ -3666,8 +3668,13 @@ pub fn predict_ability(
                 if let Some(roll_type) = ability.roll {
                     dbg!(ability.name, roll_type);
                     let defender = characters.get(target_id);
-                    let dice_roll_bonus =
-                        ability_roll_bonus(caster, defender, enhancements, roll_type);
+                    let dice_roll_bonus = ability_roll_bonus(
+                        caster,
+                        defender,
+                        enhancements,
+                        roll_type,
+                        ability.main_damage_type(),
+                    );
 
                     dbg!(&dice_roll_bonus);
 
@@ -3886,7 +3893,7 @@ impl RollInstruction {
         }
 
         if let Some((target, defense_type)) = defender {
-            for (label, bonus) in target.incoming_ability_bonuses() {
+            for (label, bonus) in target.incoming_ability_bonus_contributors(None) {
                 advantage += bonus.advantage();
                 flat_bonus += bonus.flat_amount();
                 if bonus.flat_amount() != 0 {
@@ -4247,9 +4254,17 @@ fn ability_roll_bonus(
     defender: &Character,
     enhancements: &[AbilityEnhancement],
     modifier: AbilityRollType,
+    main_damage_type: Option<DamageType>,
 ) -> DiceRollBonus {
-    let (mut bonus, _bonuses) = caster.outgoing_ability_roll_bonus(enhancements, modifier);
-    bonus.advantage += defender.incoming_ability_advantage();
+    let (mut bonus, _contributors) = caster.outgoing_ability_roll_bonus(enhancements, modifier);
+    let bonuses = defender.incoming_ability_bonus_contributors(main_damage_type);
+    for (_label, contributor) in bonuses {
+        match contributor {
+            RollBonusContributor::Advantage(n) => bonus.advantage += n,
+            RollBonusContributor::FlatAmount(n) => bonus.flat_amount += n,
+            _ => {}
+        }
+    }
     bonus
 }
 
@@ -5221,6 +5236,38 @@ impl Ability {
             AbilityTarget::None { .. } => None,
         }
     }
+
+    pub fn main_damage_type(&self) -> Option<DamageType> {
+        let effect = match self.target {
+            AbilityTarget::Enemy {
+                reach,
+                effect,
+                impact_circle,
+                environment_effect,
+            } => Some(effect),
+            AbilityTarget::Ally { range, effect } => None,
+            AbilityTarget::Area { range, area_effect } => match area_effect.effect {
+                AbilityEffect::Negative(ability_negative_effect) => Some(ability_negative_effect),
+                AbilityEffect::Positive(..) => None,
+            },
+            AbilityTarget::Destination { range } => None,
+            AbilityTarget::None {
+                self_area,
+                self_effect,
+                environment_effect,
+            } => match self_area?.effect {
+                AbilityEffect::Negative(e) => Some(e),
+                _ => None,
+            },
+        }?;
+
+        match effect {
+            AbilityNegativeEffect::Spell(spell_negative_effect) => {
+                spell_negative_effect.damage.map(|d| d.damage_type())
+            }
+            AbilityNegativeEffect::PerformAttack(..) => Some(DamageType::Regular),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -5383,6 +5430,15 @@ pub enum DamageType {
 pub enum AbilityDamage {
     Fixed(u32, DamageType),
     Dynamic(u32, DamageType),
+}
+
+impl AbilityDamage {
+    pub fn damage_type(&self) -> DamageType {
+        match self {
+            AbilityDamage::Fixed(_, damage_type) => *damage_type,
+            AbilityDamage::Dynamic(_, damage_type) => *damage_type,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -7557,18 +7613,6 @@ impl Character {
         bonuses
     }
 
-    fn incoming_ability_advantage(&self) -> i32 {
-        let mut advantage = 0;
-        for (_label, bonus) in self.incoming_ability_bonuses() {
-            match bonus {
-                RollBonusContributor::Advantage(n) => advantage += n,
-                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
-                RollBonusContributor::FlatAmount(_) => unreachable!(),
-            }
-        }
-        advantage
-    }
-
     fn incoming_attack_bonus_contributors(
         &self,
         reaction: Option<OnAttackedReaction>,
@@ -7604,7 +7648,10 @@ impl Character {
     }
 
     // TODO: Poisoned should count, but only for abilities that target Toughness!
-    pub fn incoming_ability_bonuses(&self) -> Vec<(&'static str, RollBonusContributor)> {
+    pub fn incoming_ability_bonus_contributors(
+        &self,
+        main_damage_type: Option<DamageType>,
+    ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut terms = vec![];
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Weakened) {
@@ -7615,6 +7662,14 @@ impl Character {
         }
         if conditions.has(&Condition::Exposed) {
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
+        }
+        if main_damage_type == Some(DamageType::Lightning) && conditions.has(&Condition::Wet) {
+            // Increases damage
+            terms.push(("Wet", RollBonusContributor::OtherPositive));
+        }
+        if main_damage_type == Some(DamageType::Fire) && conditions.has(&Condition::Wet) {
+            // Reduces damage
+            terms.push(("Wet", RollBonusContributor::OtherNegative));
         }
         terms
     }

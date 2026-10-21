@@ -975,6 +975,15 @@ fn replace_color(texture: &Texture2D, from: [u8; 4], to: [u8; 4]) {
     texture.update(&img);
 }
 
+fn make_grayscale(texture: &Texture2D) {
+    let mut img = texture.get_texture_data();
+    for pixel in img.get_image_data_mut() {
+        let avg = ((pixel[0] as f32 + pixel[1] as f32 + pixel[2] as f32) / 3.0) as u8;
+        *pixel = [avg, avg, avg, pixel[3]];
+    }
+    texture.update(&img);
+}
+
 pub enum TinyFontColor {
     Green,
     Red,
@@ -1046,6 +1055,10 @@ pub async fn load_and_init_static() {
 
     let icon_atlas = load_and_init_texture("icon.png").await;
     ICONS_TEXTURE.get_or_init(|| icon_atlas);
+
+    let icon_faded_atlas = load_and_init_texture("icon.png").await;
+    make_grayscale(&icon_faded_atlas);
+    ICONS_FADED_TEXTURE.get_or_init(|| icon_faded_atlas);
 
     let eq_icon_atlas = load_and_init_texture("equipment_icons.png").await;
     EQUIPMENT_ICONS_TEXTURE.get_or_init(|| eq_icon_atlas);
@@ -1198,10 +1211,14 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
     }
 }
 
-pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
+pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>, faded: bool) {
     let x = x.floor();
     let y = y.floor();
-    let texture = ICONS_TEXTURE.get().unwrap();
+    let texture = if faded {
+        ICONS_FADED_TEXTURE.get().unwrap()
+    } else {
+        ICONS_TEXTURE.get().unwrap()
+    };
     let (col, row) = icon_cell(icon);
     let icon_w = 30.0;
     let icon_h = 24.0;
@@ -1335,6 +1352,7 @@ async fn load_and_init_font_symbols() {
     RANGE_SYMBOL.get_or_init(|| symbol(6, 3));
     RADIUS_SYMBOL.get_or_init(|| symbol(6, 2));
     CONFIRM_SYMBOL.get_or_init(|| symbol(3, 1));
+    TARGET_SYMBOL.get_or_init(|| symbol(6, 4));
 }
 
 async fn load_and_init_ui_textures() {
@@ -1394,6 +1412,7 @@ pub static MULTI_TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static RANGE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static RADIUS_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static CONFIRM_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
@@ -1401,6 +1420,7 @@ pub static TINY_FONT_BLACK_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static ICONS_FADED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAITS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

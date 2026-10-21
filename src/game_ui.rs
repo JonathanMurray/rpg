@@ -676,11 +676,12 @@ impl UserInterface {
             first_player_character_id,
             active_character_id,
             resources.simple_font.clone(),
+            resources.big_font.clone(),
             sound_player.clone(),
         );
 
         let character_sheet_toggle =
-            CharacterSheetToggle::new(resources.simple_font.clone(), sound_player.clone());
+            CharacterSheetToggle::new(resources.big_font.clone(), 12, sound_player.clone());
 
         let character_portraits = TopCharacterPortraits::new(
             &game.characters,
@@ -2957,6 +2958,7 @@ fn build_character_ui(
         KeyCode::Key4,
         KeyCode::Key5,
     ];
+    let hotkey_font = big_font;
     let ability_hotkeys = [KeyCode::Q, KeyCode::W, KeyCode::E, KeyCode::R, KeyCode::T];
 
     for action in character.known_actions() {
@@ -2970,7 +2972,7 @@ fn build_character_ui(
             BaseAction::Attack { .. } => {
                 *btn.hotkey.borrow_mut() = basic_hotkeys
                     .get(basic_buttons.len())
-                    .map(|key| (*key, simple_font.clone()));
+                    .map(|key| (*key, hotkey_font.clone()));
                 basic_buttons.push(btn);
 
                 let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
@@ -2980,7 +2982,7 @@ fn build_character_ui(
             BaseAction::UseAbility(ability) => {
                 *btn.hotkey.borrow_mut() = ability_hotkeys
                     .get(ability_buttons.len())
-                    .map(|key| (*key, simple_font.clone()));
+                    .map(|key| (*key, hotkey_font.clone()));
                 ability_buttons.push(btn);
 
                 let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
@@ -3010,7 +3012,7 @@ fn build_character_ui(
             BaseAction::Move => {
                 *btn.hotkey.borrow_mut() = basic_hotkeys
                     .get(basic_buttons.len())
-                    .map(|key| (*key, simple_font.clone()));
+                    .map(|key| (*key, hotkey_font.clone()));
                 basic_buttons.push(btn);
             }
             BaseAction::ChangeEquipment => {
@@ -3018,11 +3020,7 @@ fn build_character_ui(
             }
             BaseAction::UseConsumable => {
                 use_consumable_btn = Some(btn);
-            } /*
-              BaseAction::ToggleQuickActions => {
-                  toggle_quick_btn = Some(btn);
-              }
-               */
+            }
         }
     }
 

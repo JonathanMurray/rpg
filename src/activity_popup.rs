@@ -23,7 +23,7 @@ use crate::{
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
-    util::{plus_minus, COL_GOLD, COL_GREEN_0, COL_RED},
+    util::{plus_minus, COL_ERROR, COL_GOLD, COL_GREEN_0, COL_RED},
 };
 
 use crate::action_button::ActionButton;
@@ -386,30 +386,31 @@ impl ActivityPopup {
         }
 
         if let Some(usability_msg) = &self.usability_msg {
-            let font_size = 22;
+            let font_size = 12;
+            let font = &self.big_font;
             let text_dim =
-                measure_text_with_font_tags(&usability_msg.text, Some(&self.font), font_size, 1.0);
+                measure_text_with_font_tags(&usability_msg.text, Some(&font), font_size, 1.0);
             let error_x = x + width - text_dim.width - 7.0;
-            let error_y = y - height - 12.0;
+            let error_y = y - height - 7.0;
             let pad = 2.0;
             draw_rectangle(
                 error_x - pad,
                 error_y - text_dim.offset_y - pad,
                 text_dim.width + pad * 2.0,
                 text_dim.height + pad * 2.0,
-                Color::new(1.0, 1.0, 1.0, 0.7),
+                Color::new(0.0, 0.0, 0.0, 0.7),
             );
             let color = if usability_msg.is_warning {
-                COL_RED
+                COL_ERROR
             } else {
-                BLACK
+                WHITE
             };
             draw_text_with_font_tags(
                 &usability_msg.text,
                 error_x,
                 error_y,
                 TextParams {
-                    font: Some(&self.font),
+                    font: Some(&font),
                     font_size,
                     color,
                     ..Default::default()

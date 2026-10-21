@@ -1,0 +1,695 @@
+{
+  "grid_dimensions": [
+    39,
+    39
+  ],
+  "terrain_objects": {
+    "(28, 16)": {
+      "LowWall": "South"
+    },
+    "(7, 7)": {
+      "LowWall": "South"
+    },
+    "(7, 10)": {
+      "LowWall": "South"
+    },
+    "(7, 13)": {
+      "LowWall": "South"
+    },
+    "(7, 16)": {
+      "LowWall": "South"
+    },
+    "(7, 19)": {
+      "LowWall": "South"
+    },
+    "(10, 19)": {
+      "LowWall": "South"
+    },
+    "(13, 19)": {
+      "LowWall": "South"
+    },
+    "(16, 19)": {
+      "LowWall": "South"
+    },
+    "(19, 19)": {
+      "LowWall": "South"
+    },
+    "(22, 19)": {
+      "LowWall": "South"
+    },
+    "(25, 19)": {
+      "LowWall": "South"
+    },
+    "(28, 19)": {
+      "LowWall": "South"
+    },
+    "(31, 19)": {
+      "LowWall": "South"
+    },
+    "(31, 16)": {
+      "LowWall": "South"
+    },
+    "(31, 13)": {
+      "LowWall": "South"
+    },
+    "(31, 10)": {
+      "LowWall": "South"
+    },
+    "(31, 7)": {
+      "LowWall": "South"
+    },
+    "(13, 13)": {
+      "LowWall": "South"
+    },
+    "(10, 13)": {
+      "LowWall": "South"
+    },
+    "(10, 16)": {
+      "LowWall": "South"
+    },
+    "(13, 16)": {
+      "LowWall": "South"
+    },
+    "(16, 16)": {
+      "LowWall": "South"
+    },
+    "(19, 16)": {
+      "LowWall": "South"
+    },
+    "(22, 16)": {
+      "LowWall": "South"
+    },
+    "(25, 16)": {
+      "LowWall": "South"
+    },
+    "(10, 7)": {
+      "LowWall": "South"
+    },
+    "(13, 7)": {
+      "LowWall": "South"
+    },
+    "(16, 7)": {
+      "LowWall": "South"
+    },
+    "(19, 7)": {
+      "LowWall": "South"
+    },
+    "(22, 7)": {
+      "LowWall": "South"
+    },
+    "(25, 7)": {
+      "LowWall": "South"
+    },
+    "(28, 7)": {
+      "LowWall": "South"
+    },
+    "(28, 10)": {
+      "LowWall": "South"
+    },
+    "(25, 10)": {
+      "LowWall": "South"
+    },
+    "(22, 10)": {
+      "LowWall": "South"
+    },
+    "(19, 10)": {
+      "LowWall": "South"
+    },
+    "(16, 10)": {
+      "LowWall": "South"
+    },
+    "(13, 10)": {
+      "LowWall": "South"
+    },
+    "(10, 10)": {
+      "LowWall": "South"
+    },
+    "(28, 13)": {
+      "LowWall": "South"
+    },
+    "(25, 13)": {
+      "LowWall": "South"
+    },
+    "(22, 13)": {
+      "LowWall": "South"
+    },
+    "(19, 13)": {
+      "LowWall": "South"
+    },
+    "(16, 13)": {
+      "LowWall": "South"
+    },
+    "(1, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 1)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(37, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 4)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 7)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 10)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 13)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 19)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 22)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 25)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 28)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 31)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(1, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(4, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(7, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(10, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(28, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(31, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(34, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(25, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(22, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    }
+  },
+  "background": {
+    "(-2, 4)": "Floor2",
+    "(-2, 7)": "Floor2",
+    "(1, 7)": "Floor2",
+    "(7, 7)": "Floor2",
+    "(10, 7)": "Floor2",
+    "(16, 10)": "Floor2",
+    "(22, 10)": "Floor2",
+    "(25, 10)": "Floor2",
+    "(31, 10)": "Floor2",
+    "(34, 10)": "Floor2",
+    "(40, 10)": "Floor2",
+    "(43, 10)": "Floor2",
+    "(46, 13)": "Floor2",
+    "(49, 13)": "Floor2",
+    "(52, 13)": "Floor2",
+    "(40, 13)": "Floor2",
+    "(34, 13)": "Floor2",
+    "(25, 13)": "Floor2",
+    "(16, 13)": "Floor2",
+    "(7, 13)": "Floor2",
+    "(1, 16)": "Floor2",
+    "(-5, 16)": "Floor2",
+    "(-8, 16)": "Floor2",
+    "(-2, 16)": "Floor2",
+    "(4, 16)": "Floor2",
+    "(10, 16)": "Floor2",
+    "(19, 16)": "Floor2",
+    "(28, 16)": "Floor2",
+    "(37, 16)": "Floor2",
+    "(43, 19)": "Floor2",
+    "(46, 19)": "Floor2",
+    "(40, 19)": "Floor2",
+    "(31, 19)": "Floor2",
+    "(22, 19)": "Floor2",
+    "(13, 19)": "Floor2",
+    "(4, 19)": "Floor2",
+    "(1, 19)": "Floor2",
+    "(-2, 19)": "Floor2",
+    "(7, 19)": "Floor2",
+    "(16, 19)": "Floor2",
+    "(25, 19)": "Floor2",
+    "(34, 19)": "Floor2",
+    "(37, 19)": "Floor2",
+    "(40, 22)": "Floor2",
+    "(37, 22)": "Floor2",
+    "(28, 22)": "Floor10",
+    "(22, 22)": "Floor10",
+    "(13, 22)": "Floor10",
+    "(4, 25)": "Floor10",
+    "(1, 25)": "Floor2",
+    "(-2, 25)": "Floor2",
+    "(-5, 25)": "Floor2",
+    "(-2, 28)": "Floor2",
+    "(1, 28)": "Floor2",
+    "(4, 28)": "Floor10",
+    "(13, 28)": "Floor10",
+    "(22, 28)": "Floor10",
+    "(31, 28)": "Floor2",
+    "(34, 28)": "Floor2",
+    "(37, 28)": "Floor2",
+    "(28, 28)": "Floor10",
+    "(19, 28)": "Floor10",
+    "(10, 28)": "Floor10",
+    "(-5, 28)": "Floor2",
+    "(-11, 31)": "Floor2",
+    "(-8, 31)": "Floor2",
+    "(-2, 31)": "Floor2",
+    "(7, 31)": "Floor10",
+    "(16, 31)": "Floor10",
+    "(25, 31)": "Floor10",
+    "(34, 34)": "Floor2",
+    "(40, 34)": "Floor2",
+    "(34, 37)": "Floor2",
+    "(28, 37)": "Floor2",
+    "(19, 37)": "Floor2",
+    "(10, 37)": "Floor2",
+    "(4, 40)": "Floor2",
+    "(1, 40)": "Floor2",
+    "(1, 43)": "Floor2",
+    "(4, 43)": "Floor2",
+    "(7, 43)": "Floor2",
+    "(13, 43)": "Floor2",
+    "(22, 43)": "Floor2",
+    "(28, 43)": "Floor2",
+    "(34, 43)": "Floor2",
+    "(37, 43)": "Floor2",
+    "(10, 46)": "Floor2",
+    "(7, 46)": "Floor2",
+    "(13, 46)": "Floor2",
+    "(19, 46)": "Floor2",
+    "(28, 46)": "Floor2",
+    "(34, 46)": "Floor2",
+    "(43, 46)": "Floor2",
+    "(49, 46)": "Floor2",
+    "(52, 46)": "Floor2",
+    "(55, 46)": "Floor2",
+    "(46, 46)": "Floor2",
+    "(37, 46)": "Floor2",
+    "(25, 46)": "Floor2",
+    "(16, 43)": "Floor2",
+    "(-2, 43)": "Floor2",
+    "(-8, 43)": "Floor2",
+    "(-5, 43)": "Floor2",
+    "(-2, 40)": "Floor2",
+    "(10, 40)": "Floor2",
+    "(16, 40)": "Floor2",
+    "(25, 40)": "Floor2",
+    "(31, 37)": "Floor2",
+    "(37, 37)": "Floor2",
+    "(40, 37)": "Floor2",
+    "(25, 37)": "Floor2",
+    "(13, 37)": "Floor2",
+    "(7, 37)": "Floor2",
+    "(4, 37)": "Floor2",
+    "(1, 37)": "Floor2",
+    "(-2, 37)": "Floor2",
+    "(-5, 37)": "Floor2",
+    "(22, 37)": "Floor2",
+    "(37, 34)": "Floor2",
+    "(31, 34)": "Floor2",
+    "(28, 34)": "Floor2",
+    "(25, 34)": "Floor2",
+    "(22, 34)": "Floor2",
+    "(19, 34)": "Floor2",
+    "(16, 34)": "Floor2",
+    "(13, 34)": "Floor2",
+    "(13, 31)": "Floor10",
+    "(10, 31)": "Floor10",
+    "(4, 31)": "Floor10",
+    "(1, 31)": "Floor2",
+    "(-5, 31)": "Floor2",
+    "(-2, 34)": "Floor2",
+    "(1, 34)": "Floor2",
+    "(16, 37)": "Floor2",
+    "(22, 40)": "Floor2",
+    "(4, 34)": "Floor2",
+    "(10, 34)": "Floor2",
+    "(7, 34)": "Floor2",
+    "(46, 34)": "Floor2",
+    "(49, 34)": "Floor2",
+    "(43, 34)": "Floor2",
+    "(37, 31)": "Floor2",
+    "(34, 31)": "Floor2",
+    "(28, 31)": "Floor10",
+    "(22, 31)": "Floor10",
+    "(19, 31)": "Floor10",
+    "(31, 31)": "Floor2",
+    "(43, 31)": "Floor2",
+    "(46, 31)": "Floor2",
+    "(49, 31)": "Floor2",
+    "(40, 31)": "Floor2",
+    "(25, 28)": "Floor10",
+    "(7, 28)": "Floor10",
+    "(-8, 28)": "Floor2",
+    "(-11, 28)": "Floor2",
+    "(16, 28)": "Floor10",
+    "(40, 28)": "Floor2",
+    "(40, 25)": "Floor2",
+    "(37, 25)": "Floor2",
+    "(34, 25)": "Floor2",
+    "(31, 25)": "Floor2",
+    "(28, 25)": "Floor10",
+    "(22, 25)": "Floor10",
+    "(19, 25)": "Floor10",
+    "(16, 25)": "Floor10",
+    "(13, 25)": "Floor10",
+    "(10, 25)": "Floor10",
+    "(7, 25)": "Floor10",
+    "(1, 22)": "Floor2",
+    "(4, 22)": "Floor10",
+    "(7, 22)": "Floor10",
+    "(10, 22)": "Floor10",
+    "(16, 22)": "Floor10",
+    "(19, 22)": "Floor10",
+    "(25, 22)": "Floor10",
+    "(25, 25)": "Floor10",
+    "(34, 22)": "Floor2",
+    "(31, 22)": "Floor2",
+    "(43, 22)": "Floor2",
+    "(28, 19)": "Floor2",
+    "(7, 16)": "Floor2",
+    "(19, 19)": "Floor2",
+    "(10, 19)": "Floor2",
+    "(34, 16)": "Floor2",
+    "(31, 16)": "Floor2",
+    "(25, 16)": "Floor2",
+    "(22, 16)": "Floor2",
+    "(16, 16)": "Floor2",
+    "(13, 16)": "Floor2",
+    "(-2, 13)": "Floor2",
+    "(1, 13)": "Floor2",
+    "(1, 10)": "Floor2",
+    "(4, 10)": "Floor2",
+    "(4, 13)": "Floor2",
+    "(10, 13)": "Floor2",
+    "(13, 13)": "Floor2",
+    "(19, 13)": "Floor2",
+    "(22, 13)": "Floor2",
+    "(28, 13)": "Floor2",
+    "(31, 13)": "Floor2",
+    "(37, 13)": "Floor2",
+    "(37, 10)": "Floor2",
+    "(28, 10)": "Floor2",
+    "(19, 10)": "Floor2",
+    "(13, 10)": "Floor2",
+    "(10, 10)": "Floor2",
+    "(7, 10)": "Floor2",
+    "(4, 7)": "Floor2",
+    "(13, 7)": "Floor2",
+    "(16, 7)": "Floor2",
+    "(19, 7)": "Floor2",
+    "(22, 7)": "Floor2",
+    "(25, 7)": "Floor2",
+    "(28, 7)": "Floor2",
+    "(31, 7)": "Floor2",
+    "(37, 7)": "Floor2",
+    "(40, 7)": "Floor2",
+    "(34, 7)": "Floor2",
+    "(31, 4)": "Floor2",
+    "(28, 4)": "Floor2",
+    "(25, 4)": "Floor2",
+    "(34, 4)": "Floor2",
+    "(22, 4)": "Floor2",
+    "(19, 4)": "Floor2",
+    "(16, 4)": "Floor2",
+    "(13, 4)": "Floor2",
+    "(10, 4)": "Floor2",
+    "(7, 4)": "Floor2",
+    "(4, 4)": "Floor2",
+    "(1, 4)": "Floor2",
+    "(-5, 4)": "Floor2",
+    "(-2, 1)": "Floor2",
+    "(1, 1)": "Floor2",
+    "(4, 1)": "Floor2",
+    "(7, 1)": "Floor2",
+    "(13, 1)": "Floor2",
+    "(16, 1)": "Floor2",
+    "(19, 1)": "Floor2",
+    "(22, 1)": "Floor2",
+    "(25, 1)": "Floor2",
+    "(28, 1)": "Floor2",
+    "(31, 1)": "Floor2",
+    "(34, 1)": "Floor2",
+    "(37, 4)": "Floor2",
+    "(40, 4)": "Floor2",
+    "(43, 4)": "Floor2",
+    "(43, 1)": "Floor2",
+    "(40, 1)": "Floor2",
+    "(37, 1)": "Floor2",
+    "(10, 1)": "Floor2",
+    "(1, -2)": "Floor2",
+    "(7, -2)": "Floor2",
+    "(13, -2)": "Floor2",
+    "(19, -2)": "Floor2",
+    "(40, 16)": "Floor2",
+    "(43, 25)": "Floor2",
+    "(43, 28)": "Floor2",
+    "(43, 37)": "Floor2",
+    "(43, 40)": "Floor2",
+    "(40, 40)": "Floor2",
+    "(37, 40)": "Floor2",
+    "(34, 40)": "Floor2",
+    "(31, 40)": "Floor2",
+    "(28, 40)": "Floor2",
+    "(19, 40)": "Floor2"
+  },
+  "decorations": {
+    "(10, 19)": "Staircase",
+    "(28, 19)": "Staircase"
+  },
+  "surfaces": {
+    "(10, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 31)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 31)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 31)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 34)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 34)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
+  },
+  "control_points": {},
+  "characters": [
+    {
+      "type_": "Alice",
+      "pos": [
+        10,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ogre",
+      "pos": [
+        25,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        19,
+        28
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        16,
+        28
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        19,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        13,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    }
+  ]
+}

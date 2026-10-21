@@ -442,7 +442,7 @@ pub async fn run_editor() {
         } else if let State::PlacingSkill(skill) = state {
             let btn_action = skill_to_btn_action(skill);
             let size = (32.0, 32.0);
-            draw_icon(btn_action.icon(None), mouse_x, mouse_y, Some(size));
+            draw_icon(btn_action.icon(None), mouse_x, mouse_y, Some(size), false);
             draw_dashed_rectangle_lines(mouse_x, mouse_y, size.0, size.1, 1.0, WHITE, 5.0);
 
             text = Some(format!("PLACING: {}", btn_action.name()));

@@ -62,7 +62,16 @@ impl SoundPlayer {
             (SoundId::ShootArrow, 1.0, vec!["fl_shoot_arrow.ogg"]),
             //(SoundId::HitArrow, 1.0, vec!["hit_arrow"]),
             (SoundId::HitArrow, 1.0, vec!["fl_thump.ogg"]),
-            (SoundId::Walk, 1.0, vec!["walk3"]),
+            (
+                SoundId::Walk,
+                1.2,
+                vec![
+                    "fl_footsteps_1.ogg",
+                    "fl_footsteps_2.ogg",
+                    "fl_footsteps_3.ogg",
+                    "fl_footsteps_4.ogg",
+                ],
+            ),
             (
                 SoundId::WalkWater,
                 0.6,

@@ -1346,6 +1346,8 @@ impl Drawable for ActionButton {
             self.icon
         };
 
+        let faded_icon = !self.enabled.get();
+
         if let Some(effect_expiration) = self.clicked_effect_until.get() {
             draw_icon(
                 icon,
@@ -1355,12 +1357,19 @@ impl Drawable for ActionButton {
                     self.texture_draw_size.0 - 2.0,
                     self.texture_draw_size.1 - 2.0,
                 )),
+                faded_icon,
             );
             if get_time() > effect_expiration {
                 self.clicked_effect_until.set(None);
             }
         } else {
-            draw_icon(icon, x + 2.0, y + 2.0, Some(self.texture_draw_size));
+            draw_icon(
+                icon,
+                x + 2.0,
+                y + 2.0,
+                Some(self.texture_draw_size),
+                faded_icon,
+            );
         }
 
         // When viewed in the skill tree (editor), we can be so zoomed out that the bottom row doesn't fit well. In that case, don't show it.
@@ -1480,7 +1489,7 @@ impl Drawable for ActionButton {
 
         if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
             let text = hotkey_string(keycode);
-            let font_size = 16;
+            let font_size = 12;
             let text_dim = measure_text(text, Some(font), font_size, 1.0);
             let rect_w = 16.0;
             let rect_h = 16.0;
