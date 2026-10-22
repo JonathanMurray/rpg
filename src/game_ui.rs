@@ -1407,8 +1407,8 @@ impl UserInterface {
     }
 
     fn on_new_state(&mut self) {
-        dbg!(&self.state.borrow());
-        println!("^^^ on_new_state() ^^^");
+        //dbg!(&self.state.borrow());
+        //println!("^^^ on_new_state() ^^^");
 
         self.activity_popup.additional_line = None;
 
@@ -1440,7 +1440,7 @@ impl UserInterface {
 
                 let tooltip = if let ConfiguredAction::UseAbility {
                     ability,
-                    equipment_idx_to_consume: Some(blah),
+                    equipment_idx_to_consume: Some(..),
                     ..
                 } = configured_action
                 {
@@ -1615,7 +1615,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        //dbg!(&event);
+        dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {
@@ -1822,6 +1822,15 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.3);
                 }
             }
+            GameEvent::CharacterBalancedOnEdge {
+                character,
+                direction,
+            } => {
+                let duration = self
+                    .game_grid
+                    .animate_character_balancing_on_edge(character, direction);
+                self.animation_stopwatch.set_to_at_least(duration);
+            }
             GameEvent::Moved {
                 character,
                 from,
@@ -1846,6 +1855,13 @@ impl UserInterface {
                     let dist = distance_between(from, to);
                     // Dash should appear significantly faster than regular movement
                     duration = base_duration * dist * 0.5;
+                } else if movement_type == MovementType::Falling {
+                    // Falling makes an immediate jump between two positions that aren't necessarily adjacent,
+                    let dist = distance_between(from, to);
+                    // Falling in slow motion
+                    duration = base_duration * dist * 1.5;
+                    self.game_grid
+                        .animate_character_speaking(character, 0.0, duration, "Aaahh");
                 } else {
                     if from.0 != to.0 || from.1 != to.1 {
                         // diagonal takes longer
@@ -1874,7 +1890,7 @@ impl UserInterface {
                     step_idx,
                     surface,
                 );
-                if movement_type == MovementType::Dash {
+                if movement_type == MovementType::Dash || movement_type == MovementType::Falling {
                     self.sound_player.play(SoundId::Dash);
                 } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
                     if surface.map(|s| s.is_liquid()).unwrap_or(false) {
@@ -2004,7 +2020,7 @@ impl UserInterface {
 
             if let Some(source) = source {
                 match source {
-                    DamageSource::KnockbackCollision => {
+                    DamageSource::KnockbackCollision | DamageSource::Falling => {
                         self.game_grid.animate_character_shaking(character_id, 0.0);
                         self.game_grid
                             .animate_effect(character_id, 0.5, EffectId::Pow);
@@ -2205,7 +2221,7 @@ impl UserInterface {
         if let Some((target, outcome)) = &target_outcome {
             self.game_grid.animate_character_shaking(*target, 0.0);
             self.add_effect_for_target_outcome(outcome, 0.0, *target, Some(ability));
-            self.animation_stopwatch.set_to_at_least(0.3);
+            self.animation_stopwatch.set_to_at_least(0.15);
         }
 
         if let Some(AbilityAreaOutcome {
@@ -2763,7 +2779,7 @@ impl UserInterface {
         let selected_char_id = self.player_portraits.selected_id();
         if !self.characters.get(selected_char_id).is_dead() {
             self.game_grid
-                .animate_character_speaking(selected_char_id, 0.7, "Can't do that!");
+                .animate_character_speaking(selected_char_id, 0.0, 0.7, "Can't do that!");
         }
     }
 

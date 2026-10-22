@@ -4,26 +4,26 @@
     39
   ],
   "terrain_objects": {
-    "(28, 16)": {
-      "LowWall": "South"
+    "(1, 28)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 7)": {
-      "LowWall": "South"
+    "(16, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 10)": {
-      "LowWall": "South"
+    "(37, 22)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 13)": {
-      "LowWall": "South"
+    "(37, 19)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 16)": {
-      "LowWall": "South"
+    "(37, 25)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 19)": {
-      "LowWall": "South"
+    "(1, 4)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(10, 19)": {
-      "LowWall": "South"
+    "(37, 28)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(13, 19)": {
       "LowWall": "South"
@@ -34,38 +34,38 @@
     "(19, 19)": {
       "LowWall": "South"
     },
-    "(22, 19)": {
-      "LowWall": "South"
+    "(1, 7)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(25, 19)": {
-      "LowWall": "South"
+    "(1, 10)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(28, 19)": {
-      "LowWall": "South"
+    "(1, 31)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 19)": {
-      "LowWall": "South"
+    "(1, 34)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 16)": {
-      "LowWall": "South"
+    "(1, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 13)": {
-      "LowWall": "South"
+    "(4, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 10)": {
-      "LowWall": "South"
+    "(7, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 7)": {
-      "LowWall": "South"
+    "(10, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(13, 13)": {
       "LowWall": "South"
     },
-    "(10, 13)": {
-      "LowWall": "South"
+    "(37, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(10, 16)": {
-      "LowWall": "South"
+    "(37, 31)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(13, 16)": {
       "LowWall": "South"
@@ -76,41 +76,41 @@
     "(19, 16)": {
       "LowWall": "South"
     },
-    "(22, 16)": {
-      "LowWall": "South"
+    "(37, 16)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(25, 16)": {
-      "LowWall": "South"
+    "(1, 13)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(10, 7)": {
-      "LowWall": "South"
+    "(19, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(13, 7)": {
-      "LowWall": "South"
+    "(22, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(16, 7)": {
-      "LowWall": "South"
+    "(25, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 7)": {
-      "LowWall": "South"
+    "(34, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 7)": {
-      "LowWall": "South"
+    "(31, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(25, 7)": {
-      "LowWall": "South"
+    "(28, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(28, 7)": {
-      "LowWall": "South"
+    "(13, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(28, 10)": {
-      "LowWall": "South"
+    "(1, 22)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(25, 10)": {
-      "LowWall": "South"
+    "(1, 19)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 10)": {
-      "LowWall": "South"
+    "(37, 10)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(19, 10)": {
       "LowWall": "South"
@@ -121,17 +121,17 @@
     "(13, 10)": {
       "LowWall": "South"
     },
-    "(10, 10)": {
-      "LowWall": "South"
+    "(37, 34)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(28, 13)": {
-      "LowWall": "South"
+    "(1, 25)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(25, 13)": {
-      "LowWall": "South"
+    "(1, 16)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 13)": {
-      "LowWall": "South"
+    "(37, 13)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(19, 13)": {
       "LowWall": "South"
@@ -184,104 +184,17 @@
     "(37, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(37, 10)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(10, 13)": {
+      "LowWall": "South"
     },
-    "(37, 13)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(10, 10)": {
+      "LowWall": "South"
     },
-    "(37, 16)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(10, 16)": {
+      "LowWall": "South"
     },
-    "(37, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(19, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(16, 37)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(10, 19)": {
+      "LowWall": "South"
     }
   },
   "background": {
@@ -552,8 +465,7 @@
     "(19, 40)": "Floor2"
   },
   "decorations": {
-    "(10, 19)": "Staircase",
-    "(28, 19)": "Staircase"
+    "(16, 19)": "Staircase"
   },
   "surfaces": {
     "(10, 28)": {
@@ -626,21 +538,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Alice",
+      "type_": "Bob",
       "pos": [
-        10,
-        25
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ogre",
-      "pos": [
-        25,
-        10
+        16,
+        13
       ],
       "health": null,
       "main_hand": null,
@@ -650,8 +551,8 @@
     {
       "type_": "Enslaved",
       "pos": [
-        19,
-        28
+        30,
+        17
       ],
       "health": null,
       "main_hand": null,
@@ -659,10 +560,10 @@
       "name": null
     },
     {
-      "type_": "Draug",
+      "type_": "Ghoul2",
       "pos": [
         16,
-        28
+        16
       ],
       "health": null,
       "main_hand": null,
@@ -670,21 +571,43 @@
       "name": null
     },
     {
-      "type_": "Draug",
-      "pos": [
-        19,
-        25
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
+      "type_": "Lootgoblin",
       "pos": [
         13,
-        25
+        4
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Skeleton",
+      "pos": [
+        11,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        16,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        14,
+        27
       ],
       "health": null,
       "main_hand": null,

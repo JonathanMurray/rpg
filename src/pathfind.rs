@@ -811,6 +811,8 @@ impl PathfindGrid {
     pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
         //println!("is free? {:?}", pos);
 
+        // TODO Replace all this with a call to check_collision() ?
+
         let mut seen_high_ground = None;
 
         // A character takes up 9 cells in a square. Check that each cell is free
@@ -864,6 +866,8 @@ impl PathfindGrid {
         // A character takes up 9 cells in a square. Check that each cell is free
         let mut other_chars: HashSet<CharacterId> = Default::default();
         let mut terrain_collision = false;
+        let mut seen_high_ground = None;
+
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
                 if !(0..self.dimensions.0 as i32).contains(&x)
@@ -885,6 +889,15 @@ impl PathfindGrid {
                         terrain_collision = true;
                     }
                     None => {}
+                }
+
+                let high_ground = self.is_high_ground((x, y));
+                if let Some(seen) = seen_high_ground {
+                    if high_ground != seen && !self.is_staircase((x, y)) {
+                        return Some(Collision::Elevation);
+                    }
+                } else {
+                    seen_high_ground = Some(high_ground);
                 }
             }
         }
@@ -959,4 +972,5 @@ impl PathfindGrid {
 pub enum Collision {
     Terrain,
     Characters(HashSet<CharacterId>),
+    Elevation,
 }

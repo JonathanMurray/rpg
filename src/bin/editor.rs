@@ -467,16 +467,19 @@ async fn main() {
                             maybe_id.set(inspect_target);
                         }
                         EditorAction::RemoveCharacter => {
-                            let char_id = game_grid
-                                .characters
-                                .values()
-                                .find(|ch| ch.pos() == pos)
-                                .map(|ch| ch.id());
-                            if let Some(id) = char_id {
-                                game_grid.editor_remove_character(id);
+                            // Game must have at least 1 character at all times
+                            if game_grid.characters.len() > 1 {
+                                let char_id = game_grid
+                                    .characters
+                                    .values()
+                                    .find(|ch| ch.pos() == pos)
+                                    .map(|ch| ch.id());
+                                if let Some(id) = char_id {
+                                    game_grid.editor_remove_character(id);
 
-                                map_data.characters.retain(|ch| ch.pos != pos);
-                                has_unsaved_changes = true;
+                                    map_data.characters.retain(|ch| ch.pos != pos);
+                                    has_unsaved_changes = true;
+                                }
                             }
                         }
                     }

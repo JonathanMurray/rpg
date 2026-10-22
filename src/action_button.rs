@@ -942,7 +942,7 @@ impl ActionTooltip {
                 };
 
                 if self.tooltip_is_based_on_equipped_shield.get() != equipped_shield {
-                    dbg!(&self.tooltip_is_based_on_equipped_shield);
+                    //dbg!(&self.tooltip_is_based_on_equipped_shield);
                     if equipped_shield.is_some() {
                         self.tooltip.borrow_mut().error = None;
                     } else {

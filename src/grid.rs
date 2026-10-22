@@ -235,6 +235,7 @@ enum AnimationDetails {
     TransformSprite {
         timelines: Vec<(SpriteProperty, PropertyTimeline)>,
     },
+    HideLabel,
 }
 
 #[derive(Debug, Clone)]
@@ -314,7 +315,7 @@ enum InterpolateShape {
 
 #[derive(Debug, Clone)]
 enum SpriteProperty {
-    CharacterRotation,
+    CharacterRotateForward,
     CharacterXOffsetCellW,
     CharacterYOffsetCellW { jump: bool },
     FlipX,
@@ -854,40 +855,79 @@ impl GameGrid {
 
         match movement_type {
             MovementType::KnockedBack => {
-                let amount = PI * 0.1;
-
                 self.character_animations.push(CharacterAnimation::new(
                     character_id,
                     0.0,
                     duration,
                     AnimationDetails::TransformSprite {
                         timelines: vec![(
-                            SpriteProperty::CharacterRotation,
-                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, amount)]),
+                            SpriteProperty::CharacterRotateForward,
+                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, PI * 0.1)]),
                         )],
                     },
                 ));
             }
             MovementType::Dash => {
-                let amount = PI * 0.05;
-
+                let jump_height = 1.5;
                 self.character_animations.push(CharacterAnimation::new(
                     character_id,
                     0.0,
                     duration,
                     AnimationDetails::TransformSprite {
-                        timelines: vec![(
-                            SpriteProperty::CharacterRotation,
-                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, amount)]),
-                        )],
+                        timelines: vec![
+                            (
+                                SpriteProperty::CharacterRotateForward,
+                                PropertyTimeline(vec![PropertyUpdate::linear(0.0, PI * 0.05)]),
+                            ),
+                            (
+                                SpriteProperty::CharacterYOffsetCellW { jump: true },
+                                PropertyTimeline(vec![
+                                    // Leave ground quickly
+                                    PropertyUpdate::pow(0.5, -jump_height, 0.5),
+                                    // Start falling back down slowly
+                                    PropertyUpdate::pow(1.0, 0.0, 2.0),
+                                ]),
+                            ),
+                        ],
                     },
+                ));
+            }
+            MovementType::Falling => {
+                let jump_height = 3.2;
+                self.character_animations.push(CharacterAnimation::new(
+                    character_id,
+                    0.0,
+                    duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![
+                            (
+                                SpriteProperty::CharacterRotateForward,
+                                PropertyTimeline(vec![PropertyUpdate::linear(0.7, 0.7 * PI)]),
+                            ),
+                            (
+                                SpriteProperty::CharacterYOffsetCellW { jump: true },
+                                PropertyTimeline(vec![
+                                    // Leave ground quickly
+                                    PropertyUpdate::pow(0.5, -jump_height, 0.5),
+                                    // Start falling back down slowly
+                                    PropertyUpdate::pow(1.0, 0.0, 2.0),
+                                ]),
+                            ),
+                        ],
+                    },
+                ));
+                self.character_animations.push(CharacterAnimation::new(
+                    character_id,
+                    0.0,
+                    duration,
+                    AnimationDetails::HideLabel,
                 ));
             }
             MovementType::AbilityEngage | MovementType::Regular => {
                 if step_idx % 2 == 0 {
                     let rotation = if step_idx % 4 == 0 { 0.1 } else { -0.04 };
                     let mut timelines = vec![(
-                        SpriteProperty::CharacterRotation,
+                        SpriteProperty::CharacterRotateForward,
                         PropertyTimeline(vec![
                             PropertyUpdate::linear(0.5, rotation),
                             PropertyUpdate::linear(1.0, 0.0),
@@ -1097,7 +1137,7 @@ impl GameGrid {
                                 ]),
                             ),
                             (
-                                SpriteProperty::CharacterRotation,
+                                SpriteProperty::CharacterRotateForward,
                                 PropertyTimeline(vec![
                                     PropertyUpdate::linear(0.25, -angle),
                                     PropertyUpdate::linear(0.5, 0.0),
@@ -1329,7 +1369,7 @@ impl GameGrid {
             ),
             (
                 // Lean slightly backwards
-                SpriteProperty::CharacterRotation,
+                SpriteProperty::CharacterRotateForward,
                 PropertyTimeline(vec![
                     PropertyUpdate::pow(0.1, -PI * 0.05, 2.0),
                     PropertyUpdate::fixed(0.9),
@@ -1535,7 +1575,7 @@ impl GameGrid {
                     ),
                     (
                         // Lean backward, and then snap forward to "throw"
-                        SpriteProperty::CharacterRotation,
+                        SpriteProperty::CharacterRotateForward,
                         PropertyTimeline(vec![
                             PropertyUpdate::linear(0.5, -PI * 0.25),
                             PropertyUpdate::linear(0.6, PI * 0.01),
@@ -1601,7 +1641,7 @@ impl GameGrid {
                     ),
                     (
                         // Lean backward
-                        SpriteProperty::CharacterRotation,
+                        SpriteProperty::CharacterRotateForward,
                         PropertyTimeline(vec![
                             PropertyUpdate::fixed(0.2),
                             PropertyUpdate::linear(0.4, -PI * 0.05),
@@ -1673,7 +1713,7 @@ impl GameGrid {
             ),
             (
                 // Lean forward
-                SpriteProperty::CharacterRotation,
+                SpriteProperty::CharacterRotateForward,
                 PropertyTimeline(vec![
                     PropertyUpdate::pow(0.2, PI * 0.08, 2.0),
                     PropertyUpdate::fixed(0.8),
@@ -1735,7 +1775,7 @@ impl GameGrid {
     }
 
     pub fn animate_character_shaking(&mut self, character_id: CharacterId, start: f32) {
-        let duration = 0.3;
+        let duration = 0.4;
         let amount = 0.3;
         self.character_animations.push(CharacterAnimation::new(
             character_id,
@@ -1745,8 +1785,10 @@ impl GameGrid {
                 timelines: vec![(
                     SpriteProperty::CharacterXOffsetCellW,
                     PropertyTimeline(vec![
-                        PropertyUpdate::linear(0.25, amount),
-                        PropertyUpdate::linear(0.75, -amount),
+                        PropertyUpdate::linear(0.125, amount),
+                        PropertyUpdate::linear(0.375, -amount),
+                        PropertyUpdate::linear(0.625, amount * 0.5),
+                        PropertyUpdate::linear(0.875, -amount * 0.5),
                         PropertyUpdate::linear(1.0, 0.0),
                     ]),
                 )],
@@ -1783,15 +1825,78 @@ impl GameGrid {
         ));
     }
 
+    pub fn animate_character_balancing_on_edge(
+        &mut self,
+        character_id: CharacterId,
+        direction: (i32, i32),
+    ) -> f32 {
+        assert!(
+            direction != (0, 0) && (direction.0 == 0 || direction.1 == 0),
+            "Invalid direction: {:?}",
+            direction
+        );
+
+        self.animate_character_speaking(character_id, 0.7, 1.0, "Phew");
+
+        let falling_west = direction.0 < 0;
+        let mut rotation = PI * 0.15;
+        if self.characters[&character_id].facing.get().is_east() == falling_west {
+            rotation *= -1.0;
+        }
+
+        let mut timelines = vec![(
+            SpriteProperty::CharacterRotateForward,
+            PropertyTimeline(vec![
+                PropertyUpdate::linear(0.25, rotation),
+                PropertyUpdate::linear(0.5, rotation * 0.7),
+                PropertyUpdate::linear(0.75, rotation * 0.85),
+                PropertyUpdate::linear(0.9, 0.0),
+                PropertyUpdate::linear(0.95, -rotation * 0.3),
+                PropertyUpdate::linear(1.0, 0.0),
+            ]),
+        )];
+
+        let dist = 1.0;
+        if direction.0 != 0 {
+            timelines.push((
+                SpriteProperty::CharacterXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, dist * direction.0.signum() as f32),
+                    PropertyUpdate::fixed(0.75),
+                    PropertyUpdate::linear(0.9, 0.0),
+                ]),
+            ));
+        } else {
+            timelines.push((
+                SpriteProperty::CharacterYOffsetCellW { jump: false },
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, dist * direction.1.signum() as f32),
+                    PropertyUpdate::fixed(0.75),
+                    PropertyUpdate::linear(0.9, 0.0),
+                ]),
+            ));
+        }
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            0.0,
+            0.8,
+            AnimationDetails::TransformSprite { timelines },
+        ));
+
+        1.3
+    }
+
     pub fn animate_character_speaking(
         &mut self,
         character_id: CharacterId,
+        delay: f32,
         duration: f32,
         text: &'static str,
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
-            0.0,
+            delay,
             duration,
             AnimationDetails::SpeechBubble { text },
         ));
@@ -2397,6 +2502,7 @@ impl GameGrid {
         let mut character_crop_factor = (1.0, 1.0);
 
         let mut show_sprite = true;
+        let mut is_in_motion = false;
         for animation in self
             .character_animations
             .iter()
@@ -2457,7 +2563,10 @@ impl GameGrid {
                 AnimationDetails::CastingSpell { .. } => {
                     // This is drawn separately, after all the characters
                 }
-                AnimationDetails::Motion { .. } => {}
+                AnimationDetails::Motion { .. } => {
+                    is_in_motion = true;
+                }
+                AnimationDetails::HideLabel => {}
 
                 AnimationDetails::TransformSprite {
                     timelines: interpolations,
@@ -2477,7 +2586,7 @@ impl GameGrid {
                                     });
                                 }
                             }
-                            SpriteProperty::CharacterRotation => {
+                            SpriteProperty::CharacterRotateForward => {
                                 params.rotation = if character.facing.get().is_east() {
                                     value
                                 } else {
@@ -2518,7 +2627,7 @@ impl GameGrid {
 
                 AnimationDetails::HealthLost { .. } => {
                     // Blink in and out of existence as a damage effect
-                    show_sprite = (remaining / 0.1).floor() as i32 % 2 == 0;
+                    show_sprite = (remaining / 0.08).floor() as i32 % 4 != 0;
                 }
                 AnimationDetails::SpeechBubble { .. } => {
                     // This is drawn separately, after all the characters
@@ -2649,6 +2758,12 @@ impl GameGrid {
                 ..Default::default()
             },
         );
+
+        if is_in_motion {
+            // Even if character is losing health, we skip blinking sprite effect if they're in motion as
+            // it looks too unclear / messy
+            show_sprite = true;
+        }
 
         if show_sprite {
             let sprite = &self.sprites[&character.sprite];
@@ -5017,8 +5132,12 @@ impl GameGrid {
         let mut ap_lost_animation = None;
         for animation in &self.character_animations {
             if animation.character_id == character.id() {
-                if let AnimationDetails::ApLost { amount } = animation.kind {
-                    ap_lost_animation = Some((animation, amount));
+                match animation.kind {
+                    AnimationDetails::ApLost { amount } => {
+                        ap_lost_animation = Some((animation, amount))
+                    }
+                    AnimationDetails::HideLabel => return,
+                    _ => {}
                 }
             }
         }
