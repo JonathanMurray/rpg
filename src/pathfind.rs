@@ -809,60 +809,14 @@ impl PathfindGrid {
     }
 
     pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
-        //println!("is free? {:?}", pos);
-
-        // TODO Replace all this with a call to check_collision() ?
-
-        let mut seen_high_ground = None;
-
-        // A character takes up 9 cells in a square. Check that each cell is free
-        for x in pos.0 - 1..=pos.0 + 1 {
-            for y in pos.1 - 1..=pos.1 + 1 {
-                if !(0..self.dimensions.0 as i32).contains(&x)
-                    || !(0..self.dimensions.1 as i32).contains(&y)
-                {
-                    // This cell is outside of the grid
-                    return false;
-                }
-
-                match self.occupied.borrow().get(&(x, y)) {
-                    Some(Occupation::Character(id)) => {
-                        match &ignore_character {
-                            Some(ignored_id) => {
-                                if id != ignored_id {
-                                    // This cell is occupied by another character
-                                    return false;
-                                }
-                            }
-                            None => return false,
-                        }
-                    }
-                    Some(Occupation::Terrain(terrain_type)) => {
-                        let valid_staircase =
-                            terrain_type.can_have_staircase() && self.is_staircase((x, y));
-                        //dbg!(terrain_type, valid_staircase);
-                        if !valid_staircase {
-                            // This cell is occupied by terrain
-                            return false;
-                        }
-                    }
-                    None => {}
-                }
-
-                let high_ground = self.is_high_ground((x, y));
-                if let Some(seen) = seen_high_ground {
-                    if high_ground != seen && !self.is_staircase((x, y)) {
-                        return false;
-                    }
-                } else {
-                    seen_high_ground = Some(high_ground);
-                }
-            }
-        }
-        true
+        self.check_collision(ignore_character, pos).is_none()
     }
 
-    pub fn check_collision(&self, character: CharacterId, pos: Position) -> Option<Collision> {
+    pub fn check_collision(
+        &self,
+        ignore_character: Option<CharacterId>,
+        pos: Position,
+    ) -> Option<Collision> {
         // A character takes up 9 cells in a square. Check that each cell is free
         let mut other_chars: HashSet<CharacterId> = Default::default();
         let mut terrain_collision = false;
@@ -879,7 +833,7 @@ impl PathfindGrid {
 
                 match self.occupied.borrow().get(&(x, y)) {
                     Some(Occupation::Character(id)) => {
-                        if *id != character {
+                        if ignore_character != Some(*id) {
                             // This cell is occupied by another character
                             other_chars.insert(*id);
                         }

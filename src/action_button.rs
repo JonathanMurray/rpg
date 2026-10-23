@@ -25,7 +25,7 @@ use crate::{
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, Condition,
         DamageType, DefenseType, EnvironmentEffect, EquipEffect, HandType, OnAttackedReaction,
-        OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
+        OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon, MOVE_DISTANCE_PER_RESOURCE,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -38,18 +38,6 @@ use crate::{
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{oscillate, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
-
-pub const EVASION_STR: &str = "|<evasion>| |<stat>Evasion|";
-const WILL_STR: &str = "|<will>| |<stat>Will|";
-const TOUGHNESS_STR: &str = "|<toughness>||<stat>Toughness|";
-
-fn defense_str(defense_type: DefenseType) -> &'static str {
-    match defense_type {
-        DefenseType::Will => WILL_STR,
-        DefenseType::Evasion => EVASION_STR,
-        DefenseType::Toughness => TOUGHNESS_STR,
-    }
-}
 
 #[derive(Default, Debug)]
 pub struct Tooltip {
@@ -457,11 +445,14 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
-                "Move a limited distance for free every turn. Spend AP to move further.",
+                "Move a limited distance for free every turn. Spend |<ap>| AP to move further.",
             ),
             technical_description: vec![
                 "Free: |<boot>||<stat>Movement| |<range>|".to_string(),
-                "Additional: |<value>4| |<range>| per AP".to_string(),
+                format!(
+                    "Additional: |<value>{}| |<range>| per |<ap>| AP",
+                    MOVE_DISTANCE_PER_RESOURCE
+                ),
             ],
             ..Default::default()
         },
@@ -690,7 +681,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
 
 fn def_suffix(defense_type: Option<DefenseType>) -> String {
     defense_type
-        .map(|d| format!("  |<faded>[|{}|<faded>]|", defense_str(d)))
+        .map(|d| format!("  |<faded>[|{}|<faded>]|", d.text_with_icon()))
         .unwrap_or(String::new())
 }
 

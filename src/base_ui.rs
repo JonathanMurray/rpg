@@ -18,7 +18,6 @@ use std::{
 };
 
 use crate::{
-    action_button::EVASION_STR,
     drawing::draw_rounded_rectangle_lines,
     game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},

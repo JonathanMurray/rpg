@@ -379,7 +379,10 @@ impl CoreGame {
             let mut pos = char_pos;
             for i in 0.. {
                 dbg!(pos);
-                if let Some(collision) = self.pathfind_grid.check_collision(character.id(), pos) {
+                if let Some(collision) = self
+                    .pathfind_grid
+                    .check_collision(Some(character.id()), pos)
+                {
                     dbg!(&collision);
                     match collision {
                         Collision::Characters(chars) => {
@@ -2586,7 +2589,7 @@ impl CoreGame {
             if bonus_armor > 0 {
                 if game.is_some() {
                     detail_lines.push(format!(
-                        "  Armor: {} +{} |<faded>({})| = {}",
+                        "  |<shield>| Armor: {} +{} |<faded>({})| = {}",
                         armor_value,
                         bonus_armor,
                         reaction.name,
@@ -2713,7 +2716,7 @@ impl CoreGame {
         let flanking = is_target_flanked(attacker.pos(), defender);
         let outcome = {
             let mut dmg_weapon_override = None;
-            let mut dmg_str = "  Damage: ".to_string();
+            let mut dmg_str = "  |<sword>| Damage: ".to_string();
             let mut dmg_calculation: i32;
 
             if let Some(e) = ability_attack_effect {
@@ -2783,11 +2786,10 @@ impl CoreGame {
                 dmg_calculation += ferocity as i32;
             }
 
-            if !armor_penetrators.is_empty() {
-                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
-            }
             if armor_value > 0 {
-                dmg_str.push_str(&format!(" -{armor_value} |<faded>(armor)|"));
+                dmg_str.push_str(&format!(
+                    " -{armor_value} |<faded>(|<shield>|<faded>armor)|"
+                ));
                 dmg_calculation -= armor_value as i32;
             }
 
@@ -2888,6 +2890,13 @@ impl CoreGame {
                 let mut visual_effect = None;
 
                 if let Some(game) = game {
+                    if !armor_penetrators.is_empty() {
+                        detail_lines.push(format!(
+                            "  |<shield>| Armor: {} = |<value>{}|",
+                            armor_str, armor_value
+                        ));
+                    }
+
                     dmg_str.push_str(&format!(" = |<value>{damage}|"));
                     detail_lines.push(dmg_str);
                     actual_health_lost = game.character_lose_health(defender, damage);
@@ -3004,9 +3013,8 @@ impl CoreGame {
                                         if let Some(defense_type) = defense_type {
                                             let defense = defender.defense(defense_type);
                                             detail_lines.push(format!(
-                                                "{} vs {}={}",
-                                                roll_result,
-                                                defense_type.name(),
+                                                "{} = |<value>{}|",
+                                                defense_type.text_with_icon(),
                                                 defense
                                             ));
                                             if roll_result < defense as i32 {
@@ -4760,8 +4768,8 @@ impl Condition {
             Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
             Blinded => "The miss chance of attacks and certain abilities is increased to |<value>25%| (from |<value>5%|).\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
-            Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
-            Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
+            Slowed => "|<value>-2| |<ap>| AP per turn..\n|<value>-25%| movement",
+            Hastened => "|<value>+1| |<ap>| AP per turn..\n|<value>+25%| movement",
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
@@ -4774,13 +4782,13 @@ impl Condition {
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<evasion>| |<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
-            NearDeath => "|<value>-1| AP regen.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < 20% health)",
+            NearDeath => "|<value>-1| |<ap>| AP per turn.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < |<value>20%| health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
             BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
-            Adrenalin => "|<value>+1| AP per turn.",
+            Adrenalin => "|<value>+1| |<ap>| AP per turn",
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
             HealthPotionRecovering => "End of turn: heal |<value>2| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
@@ -5865,6 +5873,14 @@ impl DefenseType {
             DefenseType::Will => "will",
             DefenseType::Evasion => "evasion",
             DefenseType::Toughness => "toughness",
+        }
+    }
+
+    pub fn text_with_icon(&self) -> &'static str {
+        match self {
+            DefenseType::Will => "|<will>| |<stat>Will|",
+            DefenseType::Evasion => "|<evasion>| |<stat>Evasion|",
+            DefenseType::Toughness => "|<toughness>||<stat>Toughness|",
         }
     }
 }

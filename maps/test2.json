@@ -571,17 +571,6 @@
       "name": null
     },
     {
-      "type_": "Lootgoblin",
-      "pos": [
-        13,
-        4
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Skeleton",
       "pos": [
         11,
@@ -593,21 +582,10 @@
       "name": null
     },
     {
-      "type_": "Lootgoblin",
+      "type_": "Alice",
       "pos": [
-        16,
+        22,
         22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Lootgoblin",
-      "pos": [
-        14,
-        27
       ],
       "health": null,
       "main_hand": null,

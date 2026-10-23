@@ -6607,8 +6607,6 @@ pub fn draw_prediction(
     if !details.is_empty() {
         let mut details_relative_y_interval = [f32::MAX, f32::MIN];
 
-        dbg!(&details);
-
         for (line, _goodness) in details.iter() {
             let dim = measure_text(line, Some(details_font), detail_font_size, 1.0);
             details_w += dim.width + detail_pad * 2.0;
