@@ -35,9 +35,9 @@ use crate::{
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
         AreaEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
         AttackOutcome, AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId,
-        Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
-        MovementType, OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
-        MOVE_COST_FACTOR_IN_LIQUID,
+        Characters, Condition, CoreGame, DamageInterval, DamageSource, GameEvent, GameOverType,
+        HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
+        TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
     drawing::draw_dashed_line_ex,
@@ -1181,16 +1181,17 @@ impl UserInterface {
                 );
 
                 self.game_grid.clear_target_effect_previews();
-                for area_target in &prediction.area_targets {
+                for (ch_id, damage) in &prediction.area_targets {
                     self.game_grid
                         .set_target_effect_preview(TargetEffectPreview {
-                            character_id: *area_target,
+                            character_id: *ch_id,
                             prediction: TargetPrediction {
-                                damage: None,
+                                damage: *damage,
                                 is_buff: false,
                                 details: vec![],
                                 // TODO
                                 expected_roll_outcome: None,
+                                effective_armor_value: None,
                             },
                         });
                 }

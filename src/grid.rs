@@ -5448,30 +5448,23 @@ impl GameGrid {
                 },
             );
 
-            let armor = character.protection_from_armor();
+            let mut armor = character.protection_from_armor();
             if armor > 0 {
+                let mut armor_color = TinyFontColor::Black;
+                if let Some(preview) = self.target_effect_previews.get(&character.id()) {
+                    if let Some(effective_armor) = preview.prediction.effective_armor_value {
+                        armor = effective_armor;
+                        // Assume that the armor was reduced, and signal that with red
+                        armor_color = TinyFontColor::Red;
+                    }
+                }
+
                 let armor_str = format!("{}", armor);
                 let pad = 2.0;
                 let armor_x = health_x + health_w + 2.0 + pad;
                 let tiny_font_size = (5.0, 7.0);
                 let rect_w = armor_str.len() as f32 * tiny_font_size.0 + pad * 2.0;
-                /*
-                draw_rectangle(
-                    armor_x - pad,
-                    text_y - tiny_font_size.1 - pad,
-                    rect_w,
-                    tiny_font_size.1 + pad * 2.0,
-                    BLACK,
-                );
-                draw_rectangle_lines2(
-                    armor_x - pad,
-                    text_y - tiny_font_size.1 - pad,
-                    rect_w,
-                    tiny_font_size.1 + pad * 2.0,
-                    1.0,
-                    LIGHTGRAY,
-                );
-                 */
+
                 let shield_text = "|<shield>|";
                 let dim = measure_text_with_font_tags(
                     shield_text,
@@ -5490,7 +5483,7 @@ impl GameGrid {
                     },
                     true,
                 );
-                draw_tiny_font(&armor_str, armor_x, text_y, TinyFontColor::Black);
+                draw_tiny_font(&armor_str, armor_x, text_y, armor_color);
             }
         }
     }

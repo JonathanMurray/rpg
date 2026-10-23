@@ -245,7 +245,7 @@ impl CoreGame {
             let active_character_died = self.active_character().is_dead();
             if active_character_died {
                 println!("ACTIVE CHAR DIED");
-                dbg!(self.active_character_id);
+                //dbg!(self.active_character_id);
                 self.active_character()
                     .has_taken_a_turn_this_round
                     .set(true);
@@ -327,9 +327,9 @@ impl CoreGame {
                 }
 
                 let game_time = self.current_time();
-                println!("UPDATING GAME TIME:");
-                dbg!(game_time);
-                println!("-----------------------------------");
+                //println!("UPDATING GAME TIME:");
+                //dbg!(game_time);
+                //println!("-----------------------------------");
 
                 for character in self.characters.iter() {
                     let expired_conditions = character.set_current_game_time(game_time);
@@ -598,7 +598,7 @@ impl CoreGame {
                                 )
                                 .await?;
 
-                            dbg!(chooses_to_use_opportunity_attack);
+                            //dbg!(chooses_to_use_opportunity_attack);
 
                             if chooses_to_use_opportunity_attack {
                                 // Opportunity attack vs ranged attacker
@@ -1037,7 +1037,9 @@ impl CoreGame {
         self.perform_spend_ap(reactor, OPPORTUNITY_ATTACK_AP_COST)
             .await;
         if reactor.player_controlled() {
-            reactor.stamina.spend(OPPORTUNITY_ATTACK_STAMINA_COST);
+            reactor
+                .stamina
+                .spend(reactor.opportunity_attack_stamina_cost());
         }
 
         self.ui_handle_event(GameEvent::AttackWasInitiated {
@@ -3174,6 +3176,7 @@ impl CoreGame {
             outcome,
             detail_lines,
             area_outcomes,
+            effective_armor_value: armor_value,
         }
     }
 
@@ -3655,8 +3658,9 @@ pub struct AttackPrediction {
     pub max_damage: u32,
     pub avg_damage: f32,
     pub details: Vec<(&'static str, Goodness)>,
-    pub area_targets: Vec<CharacterId>,
+    pub area_targets: Vec<(CharacterId, Option<DamageInterval>)>,
     pub expected_roll_outcome: f32,
+    pub effective_armor_value: u32,
 }
 
 pub struct AbilityPrediction {
@@ -3669,6 +3673,7 @@ pub struct TargetPrediction {
     pub is_buff: bool,
     pub details: Vec<(&'static str, Goodness)>,
     pub expected_roll_outcome: Option<f32>,
+    pub effective_armor_value: Option<u32>,
 }
 
 impl From<AttackPrediction> for TargetPrediction {
@@ -3681,6 +3686,7 @@ impl From<AttackPrediction> for TargetPrediction {
             is_buff: false,
             details: value.details,
             expected_roll_outcome: Some(value.expected_roll_outcome),
+            effective_armor_value: Some(value.effective_armor_value),
         }
     }
 }
@@ -3754,6 +3760,7 @@ pub fn predict_ability(
                 }
 
                 let mut expected_roll_outcome = None;
+                // dbg!(ability.roll);
                 if let Some(roll_type) = ability.roll {
                     //dbg!(ability.name, roll_type);
                     let defender = characters.get(target_id);
@@ -3785,7 +3792,7 @@ pub fn predict_ability(
                     }
                 }
 
-                //dbg!(expected_roll_outcome);
+                // dbg!(expected_roll_outcome);
 
                 targets.insert(
                     target_id,
@@ -3797,6 +3804,7 @@ pub fn predict_ability(
                         is_buff: result.is_buff,
                         details,
                         expected_roll_outcome,
+                        effective_armor_value: None,
                     },
                 );
             } else if unmodified_roll == 19 {
@@ -3851,6 +3859,8 @@ pub fn predict_attack(
 
     let mut area_targets = vec![];
 
+    let mut effective_armor_value = None;
+
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
     // (like checking wall collisions for ranged attacks?)
@@ -3868,14 +3878,17 @@ pub fn predict_attack(
             None,
         ));
 
+        effective_armor_value = Some(event.effective_armor_value);
+
         let AttackOutcome {
             damage, hit_type, ..
         } = event.outcome;
 
         if area_targets.is_empty() {
-            if let Some((shape, outcomes)) = &event.area_outcomes {
-                for (target_id, _) in outcomes {
-                    area_targets.push(*target_id);
+            if let Some((_shape, outcomes)) = &event.area_outcomes {
+                for (target_id, outcome) in outcomes {
+                    let damage = outcome.damage().map(|d| DamageInterval { min: d, max: d });
+                    area_targets.push((*target_id, damage));
                 }
             }
         }
@@ -3919,6 +3932,7 @@ pub fn predict_attack(
         details,
         area_targets,
         expected_roll_outcome,
+        effective_armor_value: effective_armor_value.unwrap(),
     }
 }
 
@@ -4252,6 +4266,7 @@ pub struct AttackedEvent {
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
     pub area_outcomes: Option<(AreaShape, Vec<(CharacterId, Box<AbilityTargetOutcome>)>)>,
+    effective_armor_value: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -5327,8 +5342,9 @@ impl Ability {
                 AbilityEffect::Positive(..) => None,
             },
             AbilityTarget::Destination { .. } => None,
-            // TODO what about untargetted aggressive AoE:s
-            AbilityTarget::None { .. } => None,
+            AbilityTarget::None { self_area, .. } => {
+                self_area.map(|a| a.effect.defense_type()).flatten()
+            }
         }
     }
 
@@ -6188,7 +6204,7 @@ impl Character {
     pub fn toggle_quick_actions(&self) {
         let quick = self.enabled_quick_actions.get();
         self.enabled_quick_actions.set(!quick);
-        dbg!(self.enabled_quick_actions.get());
+        //dbg!(self.enabled_quick_actions.get());
     }
 
     pub fn name_tag(&self) -> String {
@@ -6743,7 +6759,7 @@ impl Character {
     }
 
     pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
-        dbg!(entry, slot_role);
+        //dbg!(entry, slot_role);
         match slot_role {
             EquipmentSlotRole::MainHand => match entry {
                 Some(EquipmentEntry::Weapon(weapon)) => {
@@ -7118,9 +7134,17 @@ impl Character {
         if let Some(weapon) = self.weapon(HandType::MainHand) {
             weapon.is_melee()
                 && self.action_points.current() >= OPPORTUNITY_ATTACK_AP_COST
-                && self.stamina.current() > OPPORTUNITY_ATTACK_STAMINA_COST
+                && self.stamina.current() > self.opportunity_attack_stamina_cost()
         } else {
             false
+        }
+    }
+
+    fn opportunity_attack_stamina_cost(&self) -> u32 {
+        if self.player_controlled() {
+            OPPORTUNITY_ATTACK_STAMINA_COST
+        } else {
+            0
         }
     }
 

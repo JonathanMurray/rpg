@@ -540,41 +540,8 @@
     {
       "type_": "Bob",
       "pos": [
-        16,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Enslaved",
-      "pos": [
-        30,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        16,
-        16
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Skeleton",
-      "pos": [
-        11,
-        10
+        12,
+        22
       ],
       "health": null,
       "main_hand": null,
@@ -584,8 +551,30 @@
     {
       "type_": "Alice",
       "pos": [
-        22,
+        19,
         22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ogre",
+      "pos": [
+        15,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        16,
+        25
       ],
       "health": null,
       "main_hand": null,

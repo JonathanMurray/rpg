@@ -26,6 +26,7 @@ use crate::{
         AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, Condition,
         DamageType, DefenseType, EnvironmentEffect, EquipEffect, HandType, OnAttackedReaction,
         OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon, MOVE_DISTANCE_PER_RESOURCE,
+        OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -36,7 +37,10 @@ use crate::{
         UI_ACTION_BUTTON_SMALL_TEXTURE, UI_ACTION_BUTTON_TEXTURE,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
+    util::{
+        oscillate, oscillate_loop, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3,
+        COL_RED,
+    },
 };
 
 #[derive(Default, Debug)]
@@ -1389,43 +1393,6 @@ impl Drawable for ActionButton {
 
         self.style.draw_foreground(x, y, self.size);
 
-        match self.selected.get() {
-            ButtonSelected::Yes => {
-                let margin = -2.0;
-                let mut outer = None;
-                if !matches!(self.action_tooltip.action, ButtonAction::Action(..)) {
-                    if let Some(color) = self.parent_bg_color {
-                        outer = Some((color, 5.0));
-                    }
-                }
-                //draw_rectangle(x, y, w, h, Color::new(1.0, 1.0, 1.0, 0.15));
-                let thickness = oscillate(1.0, 5.0, 8.0);
-                draw_rounded_rectangle_lines(
-                    x - margin,
-                    y - margin,
-                    w + margin * 2.0,
-                    h + margin * 2.0,
-                    thickness,
-                    COL_GREEN_3,
-                    7.0,
-                    outer,
-                );
-            }
-            ButtonSelected::Partially => {
-                let margin = -0.0;
-                draw_dashed_rectangle_lines(
-                    x - margin,
-                    y - margin,
-                    w + margin * 2.0,
-                    h + margin * 2.0,
-                    4.0,
-                    COL_GREEN_3,
-                    6.4,
-                );
-            }
-            ButtonSelected::No => {}
-        }
-
         if self.activated.get().unwrap_or(false) {
             draw_dashed_rectangle_lines(x, y, w, h, 4.0, ORANGE, 6.4);
         }
@@ -1477,6 +1444,36 @@ impl Drawable for ActionButton {
         };
 
         draw_texture(border_texture.get().unwrap(), x - 1.0, y - 1.0, WHITE);
+
+        match self.selected.get() {
+            ButtonSelected::Yes => {
+                let duration = 0.8;
+                let thickness = oscillate_loop(duration, 4.0, 6.0);
+                let margin = oscillate_loop(duration, 0.0, 2.0);
+                let alpha = oscillate_loop(duration, 1.0, 0.6);
+                draw_rectangle_lines2(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    thickness,
+                    COL_GREEN_3.with_alpha(alpha),
+                );
+            }
+            ButtonSelected::Partially => {
+                let margin = 0.0;
+                draw_dashed_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    2.0,
+                    COL_GREEN_3,
+                    6.4,
+                );
+            }
+            ButtonSelected::No => {}
+        }
 
         if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
             let text = hotkey_string(keycode);
@@ -1659,7 +1656,7 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::AbilityEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::Proceed => 0,
-            ButtonAction::OpportunityAttack => 0,
+            ButtonAction::OpportunityAttack => OPPORTUNITY_ATTACK_STAMINA_COST,
             ButtonAction::Passive(..) => 0,
         }
     }
