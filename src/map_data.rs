@@ -1,7 +1,7 @@
 use core::f32;
 use std::{cell::Cell, collections::HashMap, fs, rc::Rc};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
         WAR_AXE, WAR_HAMMER, ZERO_BOW,
     },
     grid::{ControlPoint, GameGrid},
-    pathfind::{Occupation, PathfindGrid, Surface},
+    pathfind::{Elevation, Occupation, PathfindGrid, Surface},
     resources::GameResources,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, SpriteId, TerrainId},
@@ -69,6 +69,9 @@ pub fn create_game_grid(
             .borrow_mut()
             .insert(*pos, *control_point);
     }
+    for (pos, _elevation) in &map_data.highground {
+        pathfind_grid.set_highground_rect(*pos);
+    }
 
     let characters_map: HashMap<CharacterId, Rc<Character>> = characters
         .iter()
@@ -99,6 +102,7 @@ pub fn create_game_grid(
 #[derive(Debug)]
 pub struct MapData {
     pub grid_dimensions: (u32, u32),
+    pub highground: IndexMap<Position, Elevation>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     pub surfaces: IndexMap<Position, TerrainId>,
@@ -110,12 +114,14 @@ pub struct MapData {
 impl MapData {
     pub fn save_to_file(&self, filepath: &str) {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
+        let highground = keys_pos_to_str(&self.highground);
         let background = keys_pos_to_str(&self.background);
         let decorations = keys_pos_to_str(&self.decorations);
         let surfaces = keys_pos_to_str(&self.surfaces);
         let control_points = keys_pos_to_str(&self.control_points);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
+            highground,
             terrain_objects,
             background,
             decorations,
@@ -150,6 +156,7 @@ impl MapData {
 
         Self {
             grid_dimensions: map_data.grid_dimensions,
+            highground: keys_str_to_pos(&map_data.highground),
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),
             background: keys_str_to_pos(&map_data.background),
             decorations: keys_str_to_pos(&map_data.decorations),
@@ -183,6 +190,7 @@ fn deserialise_pos(s: &str) -> Position {
 #[derive(Serialize, Deserialize, Debug)]
 struct SerializableMapData {
     pub grid_dimensions: (u32, u32),
+    pub highground: IndexMap<String, Elevation>,
     pub terrain_objects: IndexMap<String, TerrainId>,
     pub background: IndexMap<String, TerrainId>,
     pub decorations: IndexMap<String, TerrainId>,

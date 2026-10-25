@@ -25,7 +25,7 @@ use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::{ControlPoint, GameGrid};
 use rpg::init_fight_map::GameInitState;
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
-use rpg::pathfind::Occupation;
+use rpg::pathfind::{Elevation, Occupation};
 use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
@@ -181,6 +181,16 @@ async fn main() {
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
                         game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
+                    }
+                    EditorAction::PlaceHighground => {
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            "HighGround",
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
                     }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         draw_rectangle(
@@ -349,6 +359,13 @@ async fn main() {
                             game_grid.background.insert(pos, *terrain_id);
                             map_data.background.insert(pos, *terrain_id);
                             has_unsaved_changes = true;
+                        }
+                        EditorAction::PlaceHighground => {
+                            if game_grid.editor_add_highground(pos) {
+                                assert_eq!(map_data.highground.get(&pos), None);
+                                map_data.highground.insert(pos, Elevation::High);
+                                has_unsaved_changes = true;
+                            }
                         }
                         EditorAction::PlaceTerrain(terrain_id) => {
                             if game_grid.editor_add_terrain(pos, *terrain_id) {
@@ -547,6 +564,7 @@ struct Sidebar {
 #[derive(Clone, PartialEq)]
 enum EditorAction {
     PlaceBackground(TerrainId),
+    PlaceHighground,
     PlaceTerrain(TerrainId),
     PlaceDecoration(TerrainId),
     PlaceSurface(TerrainId),
@@ -588,13 +606,14 @@ impl Sidebar {
             .collect();
         background_actions.push(EditorAction::EraseBackground);
 
+        let highground_actions = vec![EditorAction::PlaceHighground];
+
         let terrain_objects = [
             TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
             TerrainId::StoneWall(WallOrientation::ConcaveNorthEast),
-            TerrainId::LowWall(WallOrientation::South),
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
@@ -634,6 +653,7 @@ impl Sidebar {
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
             TerrainId::Staircase,
+            TerrainId::StaircaseTall,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
@@ -677,6 +697,7 @@ impl Sidebar {
 
         let sections = vec![
             background_actions,
+            highground_actions,
             terrain_actions,
             decoration_actions,
             surface_actions,
@@ -708,7 +729,7 @@ impl Sidebar {
                 }
             }
 
-            let cols = 7;
+            let cols = 8;
             let rows = (actions.len() as f32 / cols as f32).ceil() as u32;
             let margin = 4.0;
             let pad = 10.0;
@@ -751,6 +772,9 @@ impl Sidebar {
                 match action {
                     EditorAction::PlaceBackground(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                    }
+                    EditorAction::PlaceHighground => {
+                        draw_text("HighGround", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);

@@ -10,7 +10,7 @@ use macroquad::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    pathfind::{Surface, SurfaceBrushSize, TerrainType, CELLS_PER_ENTITY},
+    pathfind::{Surface, SurfaceBrushSize, TerrainType, WallType, CELLS_PER_ENTITY},
     util::{COL_GREEN_3, COL_RED, COL_RED_BRIGHT},
 };
 
@@ -561,6 +561,7 @@ pub enum TerrainId {
     LowWall(WallOrientation),
 
     Staircase,
+    StaircaseTall,
 
     Bush,
     WallPlant,
@@ -641,6 +642,14 @@ impl TerrainId {
             TerrainId::StoneWall(..) => true,
             TerrainId::LowWall(..) => true,
             _ => false,
+        }
+    }
+
+    pub fn wall_type(&self) -> Option<WallType> {
+        match self {
+            TerrainId::StoneWall(..) => Some(WallType::Tall),
+            TerrainId::LowWall(..) => Some(WallType::Low),
+            _ => None,
         }
     }
 
@@ -805,6 +814,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::LowWall(WallOrientation::Inner) => (13, 14),
 
         TerrainId::Staircase => (12, 15),
+        TerrainId::StaircaseTall => (7, 13),
 
         TerrainId::Bush => (0, 7),
         TerrainId::WallPlant => (0, 8),

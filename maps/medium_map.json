@@ -3,6 +3,7 @@
     36,
     36
   ],
+  "highground": {},
   "terrain_objects": {
     "(28, 19)": {
       "StoneWall": "ConcaveNorthEast"

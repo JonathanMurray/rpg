@@ -2439,7 +2439,7 @@ pub const FIREBALL: Ability = Ability {
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::Dynamic(4, DamageType::Fire)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Fire)),
             ..SpellNegativeEffect::default()
         }),
         impact_circle: Some((
