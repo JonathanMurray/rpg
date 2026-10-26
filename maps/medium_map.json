@@ -79,15 +79,11 @@
     "(34, 19)": "Wall",
     "(34, 16)": "Wall",
     "(34, 31)": "Wall",
-    "(34, 28)": "Wall",
-    "(16, 14)": "High",
-    "(19, 14)": "High",
-    "(22, 14)": "High",
-    "(22, 11)": "High",
-    "(19, 11)": "High",
-    "(16, 11)": "High"
+    "(34, 28)": "Wall"
   },
-  "terrain_objects": {},
+  "terrain_objects": {
+    "(12, 15)": "ChestsObstacle"
+  },
   "background": {
     "(-4, 3)": "Floor",
     "(-2, 1)": "Floor4",
@@ -280,8 +276,7 @@
     "(4, 5)": "FoodPlate",
     "(6, 4)": "FoodPlate",
     "(28, 28)": "GroundBorderEast",
-    "(23, 29)": "FloorDrain",
-    "(19, 14)": "Staircase"
+    "(23, 29)": "FloorDrain"
   },
   "surfaces": {
     "(16, 30)": "SpikesSingleCell",

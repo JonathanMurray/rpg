@@ -162,13 +162,15 @@ async fn main() {
             })
             .unwrap_or(false);
 
+        let cell_w = game_grid.cell_w();
+
         if !sidebar.hovered && !settings_hovered && !char_editor_hovered {
             if let Some(action) = sidebar.action() {
                 let entity_size = game_grid.default_entity_draw_size();
 
                 let rect = Rect::new(
-                    snapped_mouse_screen_pos.0 - game_grid.cell_w(),
-                    snapped_mouse_screen_pos.1 - game_grid.cell_w(),
+                    snapped_mouse_screen_pos.0 - cell_w,
+                    snapped_mouse_screen_pos.1 - cell_w,
                     entity_size.0,
                     entity_size.1,
                 );
@@ -204,6 +206,15 @@ async fn main() {
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
                         game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
+
+                        let (mut xs, mut ys) = terrain_id.occupied_cells().unwrap();
+                        let left = snapped_mouse_screen_pos.0 + xs.next().unwrap() as f32 * cell_w;
+                        let right = snapped_mouse_screen_pos.0
+                            + (xs.next_back().unwrap() + 1) as f32 * cell_w;
+                        let top = snapped_mouse_screen_pos.1 + ys.next().unwrap() as f32 * cell_w;
+                        let bot = snapped_mouse_screen_pos.1
+                            + (ys.next_back().unwrap() + 1) as f32 * cell_w;
+                        draw_rectangle_lines2(left, top, right - left, bot - top, 4.0, RED);
                     }
 
                     EditorAction::PlaceDecoration(terrain_id) => {
@@ -242,8 +253,8 @@ async fn main() {
                         draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
-                            game_grid.cell_w(),
-                            game_grid.cell_w(),
+                            cell_w,
+                            cell_w,
                             3.0,
                             YELLOW,
                         );
@@ -275,8 +286,8 @@ async fn main() {
                         draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
-                            game_grid.cell_w(),
-                            game_grid.cell_w(),
+                            cell_w,
+                            cell_w,
                             3.0,
                             YELLOW,
                         );
@@ -407,7 +418,7 @@ async fn main() {
                             if let Some(t) = game_grid.terrain_objects.get(&pos) {
                                 game_grid
                                     .pathfind_grid
-                                    .remove_occupied(pos, Occupation::Terrain(t.terrain_type()));
+                                    .remove_occupied(pos, Occupation::Terrain(*t));
                                 game_grid.terrain_objects.swap_remove(&pos);
                                 game_grid.refresh_tiles_and_pathfind_grid();
 
@@ -444,7 +455,10 @@ async fn main() {
                         EditorAction::MoveCharacter(maybe_id) => {
                             if let Some(char_id) = maybe_id.get() {
                                 let char = game_grid.characters.get(&char_id).unwrap();
-                                if game_grid.pathfind_grid.is_free(Some(char.id()), pos) {
+                                if game_grid
+                                    .pathfind_grid
+                                    .is_free(Some(Occupation::Character(char.id())), pos)
+                                {
                                     game_grid.pathfind_grid.remove_occupied(
                                         char.pos(),
                                         Occupation::Character(char.id()),
@@ -610,6 +624,8 @@ impl Sidebar {
             TerrainId::Cauldron2,
             TerrainId::Chest,
             TerrainId::TombStone,
+            TerrainId::SmallObstacle,
+            TerrainId::ChestsObstacle,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_objects
             .iter()

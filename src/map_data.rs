@@ -56,7 +56,7 @@ pub fn create_game_grid(
     }
 
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
-        pathfind_grid.set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
+        pathfind_grid.set_occupied(*pos, Occupation::Terrain(*terrain_id));
     }
     for (pos, terrain_id) in &map_data.surfaces {
         if let Some((surface, size)) = terrain_id.surface() {

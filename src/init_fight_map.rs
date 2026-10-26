@@ -71,7 +71,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     }
 
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
-        pathfind_grid.set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
+        pathfind_grid.set_occupied(*pos, Occupation::Terrain(*terrain_id));
     }
 
     for (pos, control_point) in &map_data.control_points {

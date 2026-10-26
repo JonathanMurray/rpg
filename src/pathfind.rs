@@ -14,7 +14,7 @@ use crate::{
         CENTER_MELEE_RANGE_SQUARED, MOVE_COST_FACTOR_IN_LIQUID,
     },
     grid::ControlPoint,
-    textures::WallOrientation,
+    textures::{TerrainId, WallOrientation},
     util::line_visitor,
 };
 
@@ -24,13 +24,13 @@ pub const CELLS_PER_ENTITY: u32 = 3;
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Occupation {
     Character(CharacterId),
-    Terrain(TerrainType),
+    Terrain(TerrainId),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Elevation {
-    High,
     Wall,
+    High,
 }
 
 impl Occupation {
@@ -38,43 +38,8 @@ impl Occupation {
         &self,
     ) -> Option<(std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>)> {
         let (xs, ys) = match self {
-            Occupation::Terrain(TerrainType::ElevationBorder(elevation, orientation)) => {
-                //println!("(occupied cells) Low wall orientation: {:?}", orientation);
-
-                match orientation {
-                    WallOrientation::Single => (-1..=1, -1..=1),
-                    // left column
-                    WallOrientation::ConvexNorthWest => (-1..=-1, -1..=1),
-                    // right column
-                    WallOrientation::ConvexNorthEast => (1..=1, -1..=1),
-                    // left column
-                    WallOrientation::East => (-1..=-1, -1..=1),
-                    // right column
-                    WallOrientation::West => (1..=1, -1..=1),
-                    WallOrientation::Inner => return None,
-
-                    WallOrientation::North
-                    | WallOrientation::ConvexSouthEast
-                    | WallOrientation::ConvexSouthWest => match elevation {
-                        Elevation::High => {
-                            // two lower rows
-                            (-1..=1, 0..=1)
-                        }
-                        Elevation::Wall => {
-                            // all 9 cells
-                            (-1..=1, -1..=1)
-                        }
-                    },
-                    WallOrientation::South => return None,
-                    WallOrientation::ConcaveSouthWest => return None,
-                    WallOrientation::ConcaveSouthEast => return None,
-                    // left column
-                    WallOrientation::ConcaveNorthEast => (-1..=-1, -1..=1),
-                    // right column
-                    WallOrientation::ConcaveNorthWest => (1..=1, -1..=1),
-                }
-            }
-            _ => (-1..=1, -1..=1),
+            Occupation::Terrain(terrain_id) => terrain_id.occupied_cells()?,
+            Occupation::Character(..) => (-1..=1, -1..=1),
         };
 
         Some((xs, ys))
@@ -92,7 +57,7 @@ impl TerrainType {
         matches!(self, TerrainType::ElevationBorder(..))
     }
 
-    pub fn elevation(elevation: Elevation, orientation: WallOrientation) -> Self {
+    pub fn from_elevation(elevation: Elevation, orientation: WallOrientation) -> Self {
         Self::ElevationBorder(elevation, orientation)
     }
 }
@@ -271,7 +236,7 @@ impl PathfindGrid {
         for (pos, (elevation, orientation)) in self.elevation_borders.borrow().iter() {
             self.remove_occupied(
                 *pos,
-                Occupation::Terrain(TerrainType::elevation(*elevation, *orientation)),
+                Occupation::Terrain(TerrainId::from_elevation(*elevation, *orientation)),
             );
         }
 
@@ -279,7 +244,7 @@ impl PathfindGrid {
             if !self.is_staircase(*pos) {
                 self.set_occupied(
                     *pos,
-                    Occupation::Terrain(TerrainType::elevation(*elevation, *orientation)),
+                    Occupation::Terrain(TerrainId::from_elevation(*elevation, *orientation)),
                 );
             }
         }
@@ -401,7 +366,7 @@ impl PathfindGrid {
     }
 
     pub fn set_occupied(&self, center_pos: Position, occupation: Occupation) {
-        dbg!((center_pos, occupation));
+        //dbg!((center_pos, occupation));
 
         if let Some((xs, ys)) = occupation.occupied_cells() {
             let mut occupied_cells = self.occupied.borrow_mut();
@@ -699,7 +664,7 @@ impl PathfindGrid {
             // order since we push them onto a stack, and therefore want to push the best one last.
             for (neighbor_pos, neighbor_dist) in neighbors.into_iter().rev() {
                 if self.is_within_grid(neighbor_pos)
-                    && self.is_free(Some(character_id), neighbor_pos)
+                    && self.is_free(Some(Occupation::Character(character_id)), neighbor_pos)
                 {
                     let neighbor_node = ChartNode {
                         distance_from_start: neighbor_dist,
@@ -802,31 +767,30 @@ impl PathfindGrid {
         line_visitor(from, to, |x, y| {
             matches!(
                 self.occupied.borrow().get(&(x, y)),
-                Some(Occupation::Terrain(TerrainType::ElevationBorder(
-                    Elevation::Wall,
-                    _
-                )))
+                Some(Occupation::Terrain(TerrainId::StoneWall(..)))
             )
         })
     }
 
-    pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
-        self.check_collision(ignore_character, pos).is_none()
+    pub fn is_free(&self, subject: Option<Occupation>, pos: Position) -> bool {
+        self.check_collision(subject, pos).is_none()
     }
 
-    pub fn check_collision(
-        &self,
-        ignore_character: Option<CharacterId>,
-        pos: Position,
-    ) -> Option<Collision> {
+    pub fn check_collision(&self, subject: Option<Occupation>, pos: Position) -> Option<Collision> {
         // A character takes up 9 cells in a square. Check that each cell is free
         let mut other_chars: HashSet<CharacterId> = Default::default();
         let mut terrain_collision = false;
         let mut elevation_collision = false;
         let mut prev_elevation = None;
 
-        for x in pos.0 - 1..=pos.0 + 1 {
-            for y in pos.1 - 1..=pos.1 + 1 {
+        let (xs, ys) = if let Some(occupation) = subject {
+            occupation.occupied_cells().unwrap()
+        } else {
+            (-1..=1, -1..=1)
+        };
+
+        for x in xs.map(|dx| pos.0 + dx) {
+            for y in ys.clone().map(|dy| pos.1 + dy) {
                 if !self.is_within_grid((x, y)) {
                     // This cell is outside of the grid
                     terrain_collision = true;
@@ -836,16 +800,17 @@ impl PathfindGrid {
 
                 match self.occupied.borrow().get(&(x, y)) {
                     Some(Occupation::Character(id)) => {
-                        if ignore_character != Some(*id) {
+                        if subject != Some(Occupation::Character(*id)) {
                             // This cell is occupied by another character
                             other_chars.insert(*id);
                         }
                     }
-                    Some(Occupation::Terrain(terrain_type)) => {
+                    Some(Occupation::Terrain(terrain_id)) => {
                         if !is_staircase {
-                            match terrain_type {
-                                TerrainType::ElevationBorder(..) => elevation_collision = true,
-                                TerrainType::Other => terrain_collision = true,
+                            if terrain_id.elevation().is_some() {
+                                elevation_collision = true;
+                            } else {
+                                terrain_collision = true;
                             }
                         }
                     }

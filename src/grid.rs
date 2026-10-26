@@ -508,11 +508,15 @@ impl GameGrid {
 
     /// Should only be called from editor; not from in-game!
     pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
-        if self.pathfind_grid.is_free(None, pos) && !self.terrain_objects.contains_key(&pos) {
+        if self
+            .pathfind_grid
+            .is_free(Some(Occupation::Terrain(terrain_id)), pos)
+            && !self.terrain_objects.contains_key(&pos)
+        {
             println!("{:?} was free, for {:?}", pos, terrain_id);
             self.terrain_objects.insert(pos, terrain_id);
             self.pathfind_grid
-                .set_occupied(pos, Occupation::Terrain(terrain_id.terrain_type()));
+                .set_occupied(pos, Occupation::Terrain(terrain_id));
             self.refresh_tiles_and_pathfind_grid();
             true
         } else {
@@ -2367,7 +2371,7 @@ impl GameGrid {
                 let y0 = self.grid_y_to_screen(row);
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    if let Some(control_point) = self.control_points.get(&(col, row)) {
+                    if let Some(_control_point) = self.control_points.get(&(col, row)) {
                         draw_rectangle(x0, y0, cell_w, cell_w, Color::new(1.0, 1.0, 1.0, 0.5));
                         //self.fill_cell((col, row), Color::new(1.0, 1.0, 1.0, 0.5)  , 1.0);
                     }
@@ -2376,61 +2380,54 @@ impl GameGrid {
         }
     }
 
+    fn foreach_cell(&self, f: impl Fn(Position, (f32, f32))) {
+        let max_col = self.grid_dimensions.0 as i32;
+        let max_row = self.grid_dimensions.1 as i32;
+        for col in 0..max_col + 1 {
+            let x0 = self.grid_x_to_screen(col);
+
+            for row in 0..max_row + 1 {
+                let y0 = self.grid_y_to_screen(row);
+
+                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    f((col, row), (x0, y0));
+                }
+            }
+        }
+    }
+
     fn draw_background(&mut self) {
-        for col in 0..self.grid_dimensions.0 as i32 + 1 {
-            let x0 = self.grid_x_to_screen(col);
-
-            for row in 0..self.grid_dimensions.1 as i32 + 1 {
-                let y0 = self.grid_y_to_screen(row);
-
-                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    if let Some(terrain_id) = self.background.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, (x0, y0));
-                    }
-                }
+        self.foreach_cell(|grid_pos, screen_pos| {
+            if let Some(terrain_id) = self.background.get(&grid_pos) {
+                self.draw_terrain(*terrain_id, screen_pos);
             }
-        }
+        });
 
-        for col in 0..self.grid_dimensions.0 as i32 + 1 {
-            let x0 = self.grid_x_to_screen(col);
-
-            for row in 0..self.grid_dimensions.1 as i32 + 1 {
-                let grid_pos = (col, row);
-                let screen_pos = (x0, self.grid_y_to_screen(row));
-
-                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    let elevation_border = self.pathfind_grid.elevation_border(grid_pos);
-                    if let Some((elevation, orientation)) = elevation_border {
-                        let terrain_id = match elevation {
-                            Elevation::High => TerrainId::HighgroundBorder(orientation),
-                            Elevation::Wall => TerrainId::StoneWall(orientation),
-                        };
-                        self.draw_terrain(terrain_id, screen_pos);
-                    }
-
-                    if let Some(terrain_id) = self.terrain_objects.get(&grid_pos) {
-                        self.draw_terrain(*terrain_id, screen_pos);
-                    }
-                }
+        self.foreach_cell(|grid_pos, screen_pos| {
+            let elevation_border = self.pathfind_grid.elevation_border(grid_pos);
+            if let Some((elevation, orientation)) = elevation_border {
+                let terrain_id = match elevation {
+                    Elevation::High => TerrainId::HighgroundBorder(orientation),
+                    Elevation::Wall => TerrainId::StoneWall(orientation),
+                };
+                self.draw_terrain(terrain_id, screen_pos);
             }
-        }
+        });
 
-        for col in 0..self.grid_dimensions.0 as i32 + 1 {
-            let x0 = self.grid_x_to_screen(col);
-
-            for row in 0..self.grid_dimensions.1 as i32 + 1 {
-                let y0 = self.grid_y_to_screen(row);
-
-                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    if let Some(terrain_id) = self.decorations.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, (x0, y0));
-                    }
-                    if let Some(terrain_id) = self.surfaces.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, (x0, y0));
-                    }
-                }
+        self.foreach_cell(|grid_pos, screen_pos| {
+            if let Some(terrain_id) = self.terrain_objects.get(&grid_pos) {
+                self.draw_terrain(*terrain_id, screen_pos);
             }
-        }
+        });
+
+        self.foreach_cell(|grid_pos, screen_pos| {
+            if let Some(terrain_id) = self.decorations.get(&grid_pos) {
+                self.draw_terrain(*terrain_id, screen_pos);
+            }
+            if let Some(terrain_id) = self.surfaces.get(&grid_pos) {
+                self.draw_terrain(*terrain_id, screen_pos);
+            }
+        });
 
         for pos in self.pathfind_grid.occupied_positions().iter() {
             // TODO
@@ -2440,7 +2437,7 @@ impl GameGrid {
         }
     }
 
-    pub fn draw_terrain(&mut self, terrain_id: TerrainId, screen_pos: (f32, f32)) {
+    pub fn draw_terrain(&self, terrain_id: TerrainId, screen_pos: (f32, f32)) {
         draw_terrain(&self.terrain_atlas, terrain_id, self.rect_w, screen_pos);
     }
 
@@ -3387,7 +3384,7 @@ impl GameGrid {
                             snapped_position_target = Some(end);
                             if self
                                 .pathfind_grid
-                                .is_free(Some(self.active_character_id), end)
+                                .is_free(Some(Occupation::Character(self.active_character_id)), end)
                             {
                                 // Highlight the position where you'll end up after the movement
                                 self.draw_cornered_outline(
@@ -4632,10 +4629,7 @@ impl GameGrid {
             }
             matches!(
                 occupation,
-                Some(Occupation::Terrain(TerrainType::ElevationBorder(
-                    Elevation::Wall,
-                    _
-                )))
+                Some(Occupation::Terrain(TerrainId::StoneWall(..)))
             )
         };
 
@@ -5871,10 +5865,7 @@ impl GameGrid {
                 OccupationFilter::TallTerrain => {
                     matches!(
                         occupation,
-                        Some(Occupation::Terrain(TerrainType::ElevationBorder(
-                            Elevation::Wall,
-                            _
-                        )))
+                        Some(Occupation::Terrain(TerrainId::StoneWall(..)))
                     )
                 }
                 OccupationFilter::CharactersExcept(ch_id) => {

@@ -63,7 +63,12 @@
     "(31, 7)": "High",
     "(28, 7)": "High"
   },
-  "terrain_objects": {},
+  "terrain_objects": {
+    "(28, 25)": "ChestsObstacle",
+    "(25, 25)": "ChestsObstacle",
+    "(13, 27)": "ChestsObstacle",
+    "(4, 27)": "TombStone"
+  },
   "background": {
     "(-4, 3)": "Floor",
     "(-2, 1)": "Floor4",
@@ -502,7 +507,7 @@
       "type_": "Clara",
       "pos": [
         31,
-        16
+        23
       ],
       "health": null,
       "main_hand": null,

@@ -16,10 +16,10 @@
     "(25, 22)": "High",
     "(28, 22)": "High",
     "(31, 22)": "High",
-    "(13, 10)": "High",
-    "(16, 10)": "High",
-    "(16, 13)": "High",
-    "(13, 13)": "High",
+    "(19, 37)": "Wall",
+    "(16, 37)": "Wall",
+    "(67, 43)": "Wall",
+    "(13, 37)": "Wall",
     "(4, 28)": "Wall",
     "(31, 7)": "Wall",
     "(55, 1)": "Wall",
@@ -276,16 +276,14 @@
     "(31, 37)": "Wall",
     "(7, 28)": "Wall",
     "(7, 25)": "Wall",
-    "(7, 22)": "Wall",
-    "(19, 37)": "Wall",
-    "(16, 37)": "Wall",
-    "(13, 37)": "Wall",
-    "(67, 43)": "Wall"
+    "(7, 22)": "Wall"
   },
   "terrain_objects": {
-    "(13, 7)": "TombStone",
-    "(7, 7)": "TombStone",
-    "(37, 4)": "Chest"
+    "(13, 6)": "TombStone",
+    "(7, 6)": "TombStone",
+    "(37, 3)": "Chest",
+    "(19, 19)": "ChestsObstacle",
+    "(34, 21)": "ChestsObstacle"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -735,7 +733,7 @@
     "(22, 7)": "WallWindow2",
     "(16, 7)": "Torch",
     "(7, 25)": "WallOpeningWest",
-    "(36, 1)": "WallPlant",
+    "(16, 37)": "WallOpeningNorth",
     "(46, 37)": "FloorDrain",
     "(37, 34)": "GroundBorderNorth",
     "(24, 12)": "SmallStone",
@@ -754,8 +752,8 @@
     "(10, 4)": "WallOpeningNorth",
     "(1, 11)": "WallOpeningWest",
     "(19, 7)": "WallWindow2",
-    "(16, 37)": "WallOpeningNorth",
-    "(14, 13)": "Staircase"
+    "(39, 1)": "WallPlant",
+    "(20, 17)": "SmallStone"
   },
   "surfaces": {
     "(49, 22)": "FireSurfaceSingleCell",
@@ -819,8 +817,8 @@
     {
       "type_": "Bob",
       "pos": [
-        15,
-        23
+        16,
+        22
       ],
       "health": null,
       "main_hand": null,
@@ -896,8 +894,8 @@
     {
       "type_": "Ghoul1",
       "pos": [
-        25,
-        16
+        24,
+        18
       ],
       "health": null,
       "main_hand": null,
@@ -907,8 +905,8 @@
     {
       "type_": "Ghoul1",
       "pos": [
-        28,
-        16
+        27,
+        19
       ],
       "health": null,
       "main_hand": null,

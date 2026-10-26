@@ -381,7 +381,7 @@ impl CoreGame {
                 dbg!(pos);
                 if let Some(collision) = self
                     .pathfind_grid
-                    .check_collision(Some(character.id()), pos)
+                    .check_collision(Some(Occupation::Character(character.id())), pos)
                 {
                     dbg!(&collision);
                     match collision {

@@ -567,6 +567,8 @@ pub enum TerrainId {
     Bush,
     WallPlant,
     FloorDrain,
+    SmallObstacle,
+    ChestsObstacle,
     SmallStone,
     TombStone,
     Boulder2,
@@ -646,11 +648,18 @@ impl TerrainId {
         }
     }
 
-    pub fn elevation(&self) -> Option<Elevation> {
+    pub fn elevation(&self) -> Option<(Elevation, WallOrientation)> {
         match self {
-            TerrainId::StoneWall(..) => Some(Elevation::Wall),
-            TerrainId::HighgroundBorder(..) => Some(Elevation::High),
+            TerrainId::StoneWall(orientation) => Some((Elevation::Wall, *orientation)),
+            TerrainId::HighgroundBorder(orientation) => Some((Elevation::High, *orientation)),
             _ => None,
+        }
+    }
+
+    pub fn from_elevation(elevation: Elevation, orientation: WallOrientation) -> Self {
+        match elevation {
+            Elevation::Wall => TerrainId::StoneWall(orientation),
+            Elevation::High => TerrainId::HighgroundBorder(orientation),
         }
     }
 
@@ -671,6 +680,66 @@ impl TerrainId {
             self,
             TerrainId::Staircase | TerrainId::StaircaseTall | TerrainId::StaircaseLeft
         )
+    }
+
+    pub fn occupied_cells(
+        &self,
+    ) -> Option<(std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>)> {
+        let (xs, ys) = match self.elevation() {
+            Some((elevation, orientation)) => {
+                //println!("(occupied cells) Low wall orientation: {:?}", orientation);
+
+                match orientation {
+                    WallOrientation::Single => (-1..=1, -1..=1),
+                    // left column
+                    WallOrientation::ConvexNorthWest => (-1..=-1, -1..=1),
+                    // right column
+                    WallOrientation::ConvexNorthEast => (1..=1, -1..=1),
+                    // left column
+                    WallOrientation::East => (-1..=-1, -1..=1),
+                    // right column
+                    WallOrientation::West => (1..=1, -1..=1),
+                    WallOrientation::Inner => return None,
+
+                    WallOrientation::North
+                    | WallOrientation::ConvexSouthEast
+                    | WallOrientation::ConvexSouthWest => match elevation {
+                        Elevation::High => {
+                            // two lower rows
+                            (-1..=1, 0..=1)
+                        }
+                        Elevation::Wall => {
+                            // all 9 cells
+                            (-1..=1, -1..=1)
+                        }
+                    },
+                    WallOrientation::South => return None,
+                    WallOrientation::ConcaveSouthWest => return None,
+                    WallOrientation::ConcaveSouthEast => return None,
+                    // part of left column
+                    WallOrientation::ConcaveNorthEast => (-1..=-1, 0..=1),
+                    // part of right column
+                    WallOrientation::ConcaveNorthWest => (1..=1, 0..=1),
+                }
+            }
+            None => {
+                match self {
+                    // two lower rows
+                    TerrainId::SmallObstacle => (-1..=1, 0..=1),
+                    // two lower rows
+                    TerrainId::ChestsObstacle => (-1..=1, 0..=1),
+                    // two lower rows
+                    TerrainId::TombStone => (-1..=1, 0..=1),
+                    // two lower rows
+                    TerrainId::Chest => (-1..=1, 0..=1),
+                    // two lower rows
+                    TerrainId::Cauldron2 => (-1..=1, 0..=1),
+                    _ => (-1..=1, -1..=1),
+                }
+            }
+        };
+
+        Some((xs, ys))
     }
 }
 
@@ -834,6 +903,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::SmallStone => (1, 8),
         TerrainId::TombStone => (2, 8),
         TerrainId::FloorDrain => (0, 9),
+        TerrainId::SmallObstacle => (1, 9),
+        TerrainId::ChestsObstacle => (0, 10),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
         TerrainId::Table => (2, 7),

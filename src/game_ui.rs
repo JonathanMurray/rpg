@@ -56,7 +56,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EffectId, StatusId, UI_BG_TEXTURE},
+    textures::{EffectId, StatusId, TerrainId, UI_BG_TEXTURE},
     tooltip::{
         handle_keyword_tooltip_end_of_frame, Keyword, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
@@ -1295,10 +1295,7 @@ impl UserInterface {
                     line_visitor(from, to, |x, y| {
                         if matches!(
                             self.game_grid.pathfind_grid.occupation(&(x, y)),
-                            Some(Occupation::Terrain(TerrainType::ElevationBorder(
-                                Elevation::Wall,
-                                _
-                            )))
+                            Some(Occupation::Terrain(TerrainId::StoneWall(..)))
                         ) {
                             *pos = prev;
                             true
