@@ -4,19 +4,19 @@
     39
   ],
   "elevation": {
-    "(34, 19)": "Wall",
-    "(34, 22)": "Wall",
-    "(31, 19)": "Wall",
-    "(28, 19)": "Wall",
-    "(28, 22)": "Wall",
-    "(28, 25)": "Wall",
-    "(31, 25)": "Wall",
-    "(31, 22)": "Wall",
-    "(34, 25)": "Wall",
-    "(25, 22)": "Wall",
-    "(25, 19)": "Wall",
-    "(22, 19)": "Wall",
-    "(22, 22)": "Wall",
+    "(4, 4)": "High",
+    "(7, 4)": "High",
+    "(28, 4)": "High",
+    "(31, 4)": "High",
+    "(34, 4)": "High",
+    "(22, 7)": "High",
+    "(13, 4)": "High",
+    "(10, 4)": "High",
+    "(16, 4)": "High",
+    "(7, 7)": "High",
+    "(13, 7)": "High",
+    "(10, 7)": "High",
+    "(25, 7)": "High",
     "(19, 22)": "Wall",
     "(19, 25)": "Wall",
     "(16, 25)": "Wall",
@@ -36,41 +36,32 @@
     "(1, 25)": "Wall",
     "(1, 22)": "Wall",
     "(1, 19)": "Wall",
-    "(1, 16)": "Wall",
-    "(4, 16)": "Wall",
-    "(16, 16)": "Wall",
-    "(19, 16)": "Wall",
-    "(22, 16)": "Wall",
-    "(25, 16)": "Wall",
-    "(13, 16)": "Wall",
-    "(10, 16)": "Wall",
-    "(7, 16)": "Wall",
-    "(28, 16)": "Wall",
-    "(31, 16)": "Wall",
-    "(34, 16)": "Wall",
-    "(34, 13)": "Wall",
-    "(31, 13)": "Wall",
-    "(28, 13)": "Wall",
-    "(25, 13)": "Wall",
-    "(19, 13)": "Wall",
-    "(16, 13)": "Wall",
-    "(10, 13)": "Wall",
-    "(7, 13)": "Wall",
-    "(4, 13)": "Wall",
-    "(1, 13)": "Wall",
-    "(13, 13)": "Wall",
-    "(22, 13)": "Wall",
-    "(37, 25)": "Wall",
-    "(37, 22)": "Wall",
-    "(37, 19)": "Wall",
-    "(37, 16)": "Wall",
-    "(37, 13)": "Wall",
+    "(19, 31)": "High",
+    "(22, 4)": "High",
     "(22, 31)": "High",
+    "(22, 34)": "High",
     "(25, 31)": "High",
     "(25, 34)": "High",
-    "(22, 34)": "High",
+    "(19, 4)": "High",
     "(19, 34)": "High",
-    "(19, 31)": "High"
+    "(25, 4)": "High",
+    "(4, 7)": "High",
+    "(4, 10)": "High",
+    "(7, 10)": "High",
+    "(10, 10)": "High",
+    "(13, 10)": "High",
+    "(16, 10)": "High",
+    "(19, 10)": "High",
+    "(22, 10)": "High",
+    "(25, 10)": "High",
+    "(28, 10)": "High",
+    "(31, 10)": "High",
+    "(34, 10)": "High",
+    "(16, 7)": "High",
+    "(19, 7)": "High",
+    "(34, 7)": "High",
+    "(31, 7)": "High",
+    "(28, 7)": "High"
   },
   "terrain_objects": {},
   "background": {
@@ -122,7 +113,7 @@
     "(1, 4)": "Floor2",
     "(1, 7)": "Floor2",
     "(1, 10)": "Floor2",
-    "(4, 10)": "Floor2",
+    "(4, 10)": "Floor7",
     "(2, 32)": "Floor",
     "(2, 34)": "Floor",
     "(1, 34)": "Floor2",
@@ -139,9 +130,9 @@
     "(1, 40)": "Floor",
     "(13, 28)": "Floor2",
     "(1, 28)": "Floor2",
-    "(4, 7)": "Floor2",
-    "(7, 7)": "Floor2",
-    "(10, 7)": "Floor2",
+    "(4, 7)": "Floor7",
+    "(7, 7)": "Floor7",
+    "(10, 7)": "Floor7",
     "(19, 28)": "Floor2",
     "(22, 28)": "Floor2",
     "(25, 28)": "Floor8",
@@ -157,25 +148,25 @@
     "(28, 19)": "Floor2",
     "(28, 16)": "Floor2",
     "(28, 13)": "Floor2",
-    "(28, 10)": "Floor2",
-    "(28, 7)": "Floor2",
-    "(28, 4)": "Floor2",
+    "(28, 10)": "Floor7",
+    "(28, 7)": "Floor7",
+    "(28, 4)": "Floor7",
     "(28, 1)": "Floor2",
     "(25, 1)": "Floor2",
     "(22, 1)": "Floor2",
     "(19, 1)": "Floor2",
     "(16, 1)": "Floor2",
     "(13, 1)": "Floor2",
-    "(4, 4)": "Floor2",
-    "(7, 4)": "Floor2",
-    "(10, 4)": "Floor2",
-    "(13, 4)": "Floor2",
-    "(16, 4)": "Floor2",
-    "(19, 4)": "Floor2",
-    "(22, 4)": "Floor2",
-    "(25, 4)": "Floor2",
-    "(25, 7)": "Floor9",
-    "(25, 10)": "Floor2",
+    "(4, 4)": "Floor7",
+    "(7, 4)": "Floor7",
+    "(10, 4)": "Floor7",
+    "(13, 4)": "Floor7",
+    "(16, 4)": "Floor7",
+    "(19, 4)": "Floor7",
+    "(22, 4)": "Floor7",
+    "(25, 4)": "Floor7",
+    "(25, 7)": "Floor7",
+    "(25, 10)": "Floor7",
     "(25, 13)": "Floor9",
     "(25, 16)": "Floor9",
     "(25, 19)": "Floor2",
@@ -183,9 +174,9 @@
     "(25, 25)": "Floor7",
     "(22, 25)": "Floor2",
     "(19, 25)": "Floor2",
-    "(19, 7)": "Floor2",
-    "(16, 7)": "Floor2",
-    "(13, 7)": "Floor2",
+    "(19, 7)": "Floor7",
+    "(16, 7)": "Floor7",
+    "(13, 7)": "Floor7",
     "(7, 25)": "Floor2",
     "(4, 25)": "Floor2",
     "(4, 22)": "Floor2",
@@ -216,13 +207,13 @@
     "(10, 13)": "Floor2",
     "(7, 13)": "Floor2",
     "(4, 13)": "Floor2",
-    "(7, 10)": "Floor2",
-    "(10, 10)": "Floor2",
-    "(13, 10)": "Floor2",
-    "(16, 10)": "Floor2",
-    "(19, 10)": "Floor2",
-    "(22, 10)": "Floor2",
-    "(22, 7)": "Floor2",
+    "(7, 10)": "Floor7",
+    "(10, 10)": "Floor7",
+    "(13, 10)": "Floor7",
+    "(16, 10)": "Floor7",
+    "(19, 10)": "Floor7",
+    "(22, 10)": "Floor7",
+    "(22, 7)": "Floor7",
     "(10, 25)": "Floor2",
     "(13, 25)": "Floor2",
     "(16, 25)": "Floor2",
@@ -264,14 +255,14 @@
     "(31, 19)": "Floor2",
     "(31, 16)": "Floor2",
     "(31, 13)": "Floor2",
-    "(31, 10)": "Floor2",
-    "(31, 7)": "Floor2",
-    "(31, 4)": "Floor2",
+    "(31, 10)": "Floor7",
+    "(31, 7)": "Floor7",
+    "(31, 4)": "Floor7",
     "(31, 1)": "Floor2",
     "(34, 1)": "Floor2",
-    "(34, 4)": "Floor2",
-    "(34, 7)": "Floor2",
-    "(34, 10)": "Floor2",
+    "(34, 4)": "Floor7",
+    "(34, 7)": "Floor7",
+    "(34, 10)": "Floor7",
     "(34, 13)": "Floor2",
     "(34, 16)": "Floor2",
     "(34, 19)": "Floor2",
@@ -291,19 +282,198 @@
     "(37, 10)": "Floor2",
     "(37, 7)": "Floor2",
     "(37, 4)": "Floor2",
-    "(37, 1)": "Floor2"
+    "(37, 1)": "Floor2",
+    "(40, 10)": "Floor10"
   },
   "decorations": {
-    "(31, 25)": "StaircaseTall",
+    "(25, 10)": "Staircase",
     "(8, 22)": "WallOpeningNorth",
     "(10, 22)": "Torch",
-    "(24, 22)": "WallOpeningNorth",
-    "(22, 22)": "Torch",
+    "(16, 10)": "Staircase",
+    "(7, 10)": "Staircase",
     "(16, 25)": "StaircaseTall",
     "(1, 25)": "StaircaseTall",
-    "(22, 34)": "Staircase"
+    "(22, 34)": "Staircase",
+    "(31, 10)": "Staircase"
   },
-  "surfaces": {},
+  "surfaces": {
+    "(4, 3)": "FireSurfaceSingleCell",
+    "(4, 8)": "FireSurfaceSingleCell",
+    "(34, 8)": "FireSurfaceSingleCell",
+    "(34, 3)": "FireSurfaceSingleCell",
+    "(10, 8)": "FireSurfaceSingleCell",
+    "(13, 8)": "FireSurfaceSingleCell",
+    "(19, 8)": "FireSurfaceSingleCell",
+    "(22, 8)": "FireSurfaceSingleCell",
+    "(28, 8)": "FireSurfaceSingleCell",
+    "(10, 3)": "FireSurfaceSingleCell",
+    "(13, 3)": "FireSurfaceSingleCell",
+    "(19, 3)": "FireSurfaceSingleCell",
+    "(22, 3)": "FireSurfaceSingleCell",
+    "(28, 3)": "FireSurfaceSingleCell",
+    "(4, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(28, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(34, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(34, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(28, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(34, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(28, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
+  },
   "control_points": {},
   "characters": [
     {
@@ -332,7 +502,7 @@
       "type_": "Clara",
       "pos": [
         31,
-        28
+        16
       ],
       "health": null,
       "main_hand": null,

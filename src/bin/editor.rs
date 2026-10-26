@@ -17,7 +17,9 @@ use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::window::{next_frame, request_new_screen_size, screen_height, set_fullscreen};
 use macroquad::window::{screen_width, Conf};
 
-use rpg::base_ui::{Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine};
+use rpg::base_ui::{
+    draw_text_rounded, Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine,
+};
 use rpg::core::{Character, CharacterId, HandType, Party};
 
 use rpg::game_ui::{draw_rectangle_lines2, UiState};
@@ -540,7 +542,7 @@ struct Sidebar {
     selected_section_idx: usize,
     selected_action_idx: Option<usize>,
     hovered: bool,
-    sections: Vec<Vec<EditorAction>>,
+    sections: Vec<(&'static str, Vec<EditorAction>)>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -562,6 +564,8 @@ enum EditorAction {
     MoveCharacter(Cell<Option<CharacterId>>),
     RemoveCharacter,
 }
+
+const ICON_W: f32 = 64.0;
 
 impl Sidebar {
     fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Sprite>) -> Self {
@@ -588,12 +592,14 @@ impl Sidebar {
             .map(|t| EditorAction::PlaceBackground(*t))
             .collect();
         background_actions.push(EditorAction::EraseBackground);
+        let background_section = ("Background", background_actions);
 
         let elevation_actions = vec![
             EditorAction::PlaceElevation(Elevation::High),
             EditorAction::PlaceElevation(Elevation::Wall),
             EditorAction::EraseElevation,
         ];
+        let elevation_section = ("Elevation", elevation_actions);
 
         let terrain_objects = [
             TerrainId::Bush,
@@ -610,6 +616,7 @@ impl Sidebar {
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
         terrain_actions.push(EditorAction::EraseTerrain);
+        let terrain_section = ("Terrain", terrain_actions);
 
         let decorations = [
             TerrainId::GroundBorderEast,
@@ -647,6 +654,7 @@ impl Sidebar {
             .map(|t| EditorAction::PlaceDecoration(*t))
             .collect();
         decoration_actions.push(EditorAction::EraseDecoration);
+        let decoration_section = ("Decorations", decoration_actions);
 
         let surfaces = [
             TerrainId::SpikesSingleCell,
@@ -658,6 +666,7 @@ impl Sidebar {
             .map(|t| EditorAction::PlaceSurface(*t))
             .collect();
         surface_actions.push(EditorAction::EraseSurface);
+        let surface_section = ("Surface", surface_actions);
 
         let character_actions = vec![
             EditorAction::PlaceCharacter(CharacterType::Bob),
@@ -676,20 +685,22 @@ impl Sidebar {
             EditorAction::MoveCharacter(Cell::new(None)),
             EditorAction::RemoveCharacter,
         ];
+        let character_section = ("Characters", character_actions);
 
         let control_actions = vec![
             EditorAction::PlaceControlPoint(ControlPoint::Exit),
             EditorAction::EraseControlPoint,
         ];
+        let control_section = ("Control points", control_actions);
 
         let sections = vec![
-            background_actions,
-            elevation_actions,
-            terrain_actions,
-            decoration_actions,
-            surface_actions,
-            character_actions,
-            control_actions,
+            background_section,
+            elevation_section,
+            terrain_section,
+            decoration_section,
+            surface_section,
+            character_section,
+            control_section,
         ];
 
         Self {
@@ -704,8 +715,8 @@ impl Sidebar {
 
     fn draw(&mut self) {
         self.hovered = false;
-        let mut section_y = 0.0;
-        for (section_i, actions) in self.sections.iter().enumerate() {
+        let mut section_y = 20.0;
+        for (section_i, (section_label, actions)) in self.sections.iter().enumerate() {
             if let Some(i) = self.selected_action_idx {
                 if is_key_pressed(KeyCode::Left) {
                     self.selected_action_idx =
@@ -720,14 +731,25 @@ impl Sidebar {
             let rows = (actions.len() as f32 / cols as f32).ceil() as u32;
             let margin = 4.0;
             let pad = 10.0;
-            let icon_w = 64.0;
-            let section_w = pad * 2.0 + cols as f32 * icon_w + (cols - 1) as f32 * margin;
-            let section_h = pad * 2.0 + rows as f32 * icon_w + (rows - 1) as f32 * margin;
+
+            let section_w = pad * 2.0 + cols as f32 * ICON_W + (cols - 1) as f32 * margin;
+            let section_h = pad * 2.0 + rows as f32 * ICON_W + (rows - 1) as f32 * margin;
 
             let mouse_pos = mouse_position();
             let section_hovered =
                 Rect::new(0.0, section_y, section_w, section_h).contains(mouse_pos.into());
             self.hovered |= section_hovered;
+
+            draw_text_ex(
+                section_label,
+                0.0,
+                section_y,
+                TextParams {
+                    color: WHITE,
+                    font_size: 16,
+                    ..Default::default()
+                },
+            );
 
             draw_rectangle(
                 0.0,
@@ -739,11 +761,11 @@ impl Sidebar {
 
             for (action_i, action) in actions.iter().enumerate() {
                 let col = action_i % cols;
-                let x = pad + col as f32 * (icon_w + margin);
+                let x = pad + col as f32 * (ICON_W + margin);
                 let row = action_i / cols;
-                let y = section_y + pad + row as f32 * (icon_w + margin);
+                let y = section_y + pad + row as f32 * (ICON_W + margin);
                 if is_mouse_button_pressed(MouseButton::Left)
-                    && Rect::new(x, y, icon_w, icon_w).contains(mouse_pos.into())
+                    && Rect::new(x, y, ICON_W, ICON_W).contains(mouse_pos.into())
                 {
                     self.selected_section_idx = section_i;
                     self.selected_action_idx = Some(action_i);
@@ -755,24 +777,22 @@ impl Sidebar {
                 } else {
                     WHITE
                 };
-                draw_rectangle(x, y, icon_w, icon_w, bg);
+                draw_rectangle(x, y, ICON_W, ICON_W, bg);
                 match action {
-                    EditorAction::PlaceBackground(terrain_id) => {
-                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
-                    }
                     EditorAction::PlaceElevation(elevation) => {
-                        let text = format!("{:?}", elevation);
-                        draw_text(text, x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                        self.draw_icon_text(&format!("{:?}", elevation), (x, y));
+                    }
+                    EditorAction::PlaceBackground(terrain_id) => {
+                        self.draw_terrain_icon(x, y, terrain_id);
                     }
                     EditorAction::PlaceTerrain(terrain_id) => {
-                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                        self.draw_terrain_icon(x, y, terrain_id);
                     }
-
                     EditorAction::PlaceDecoration(terrain_id) => {
-                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                        self.draw_terrain_icon(x, y, terrain_id);
                     }
                     EditorAction::PlaceSurface(terrain_id) => {
-                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                        self.draw_terrain_icon(x, y, terrain_id);
                     }
                     EditorAction::PlaceCharacter(char_type) => {
                         draw_texture_ex(
@@ -781,7 +801,7 @@ impl Sidebar {
                             y,
                             WHITE,
                             DrawTextureParams {
-                                dest_size: Some((icon_w, icon_w).into()),
+                                dest_size: Some((ICON_W, ICON_W).into()),
                                 ..Default::default()
                             },
                         );
@@ -789,16 +809,16 @@ impl Sidebar {
                         let font_size = 16;
                         let text_dim = measure_text(&text, None, font_size, 1.0);
                         draw_rectangle(
-                            x + icon_w / 2.0 - text_dim.width / 2.0,
-                            y + icon_w / 2.0 - text_dim.offset_y,
+                            x + ICON_W / 2.0 - text_dim.width / 2.0,
+                            y + ICON_W / 2.0 - text_dim.offset_y,
                             text_dim.width,
                             text_dim.height,
                             WHITE,
                         );
                         draw_text(
                             &text,
-                            x + icon_w / 2.0 - text_dim.width / 2.0,
-                            y + icon_w / 2.0,
+                            x + ICON_W / 2.0 - text_dim.width / 2.0,
+                            y + ICON_W / 2.0,
                             font_size as f32,
                             BLACK,
                         );
@@ -808,16 +828,16 @@ impl Sidebar {
                         let font_size = 16;
                         let text_dim = measure_text(&text, None, font_size, 1.0);
                         draw_rectangle(
-                            x + icon_w / 2.0 - text_dim.width / 2.0,
-                            y + icon_w / 2.0 - text_dim.offset_y,
+                            x + ICON_W / 2.0 - text_dim.width / 2.0,
+                            y + ICON_W / 2.0 - text_dim.offset_y,
                             text_dim.width,
                             text_dim.height,
                             WHITE,
                         );
                         draw_text(
                             &text,
-                            x + icon_w / 2.0 - text_dim.width / 2.0,
-                            y + icon_w / 2.0,
+                            x + ICON_W / 2.0 - text_dim.width / 2.0,
+                            y + ICON_W / 2.0,
                             font_size as f32,
                             BLACK,
                         );
@@ -828,24 +848,24 @@ impl Sidebar {
                     | EditorAction::EraseDecoration
                     | EditorAction::EraseSurface
                     | EditorAction::EraseControlPoint => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                        self.draw_icon_text("ERASE", (x, y));
                     }
 
                     EditorAction::EditCharacter => {
-                        draw_text("EDIT", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                        self.draw_icon_text("EDIT", (x, y));
                     }
                     EditorAction::MoveCharacter { .. } => {
-                        draw_text("MOVE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                        self.draw_icon_text("MOVE", (x, y));
                     }
                     EditorAction::RemoveCharacter => {
-                        draw_text("REMOVE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                        self.draw_icon_text("REMOVE", (x, y));
                     }
                 }
 
                 if self.selected_section_idx == section_i
                     && self.selected_action_idx == Some(action_i)
                 {
-                    draw_rectangle_lines2(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
+                    draw_rectangle_lines2(x + 1.0, y + 1.0, ICON_W - 2.0, ICON_W - 2.0, 3.0, BLACK);
                 }
             }
 
@@ -853,7 +873,22 @@ impl Sidebar {
         }
     }
 
-    fn draw_terrain_icon(&self, icon_w: f32, x: f32, y: f32, terrain_id: &TerrainId) {
+    fn draw_icon_text(&self, text: &str, icon_pos: (f32, f32)) {
+        let font_size = 16;
+        let text_dim = measure_text(&text, None, font_size, 1.0);
+        draw_text_rounded(
+            text,
+            icon_pos.0 + ICON_W / 2.0 - text_dim.width / 2.0,
+            icon_pos.1 + ICON_W / 2.0 + 4.0,
+            TextParams {
+                font_size,
+                color: BLACK,
+                ..Default::default()
+            },
+        );
+    }
+
+    fn draw_terrain_icon(&self, x: f32, y: f32, terrain_id: &TerrainId) {
         let (rotation, rect) = terrain_atlas_area(*terrain_id, (x, y));
         draw_texture_ex(
             &self.terrain_atlas,
@@ -861,7 +896,7 @@ impl Sidebar {
             y,
             WHITE,
             DrawTextureParams {
-                dest_size: Some((icon_w, icon_w).into()),
+                dest_size: Some((ICON_W, ICON_W).into()),
                 source: Some(rect),
                 rotation,
                 ..Default::default()
@@ -870,7 +905,7 @@ impl Sidebar {
     }
 
     fn action(&self) -> Option<&EditorAction> {
-        let actions = &self.sections[self.selected_section_idx];
+        let (_label, actions) = &self.sections[self.selected_section_idx];
         self.selected_action_idx.map(|i| &actions[i])
     }
 }
