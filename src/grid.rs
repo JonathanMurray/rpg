@@ -59,8 +59,8 @@ use crate::{
     game_ui_components::ActionPointsRow,
     grid::SpriteProperty::{ReplaceHandHeldWithProjectile, WeaponXOffsetCellW},
     pathfind::{
-        ChartNode, Occupation, PathNode, PathfindGrid, Surface, TerrainType, TraversalType,
-        CELLS_PER_ENTITY,
+        ChartNode, Elevation, Occupation, PathNode, PathfindGrid, Surface, TerrainType,
+        TraversalType, CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
@@ -444,6 +444,7 @@ impl GameGrid {
         tiny_font: Font,
         terrain_atlas: Texture2D,
         pathfind_grid: Rc<PathfindGrid>,
+        // TODO take init state instead of all these separately
         background: IndexMap<Position, TerrainId>,
         terrain_objects: IndexMap<Position, TerrainId>,
         decorations: IndexMap<Position, TerrainId>,
@@ -520,8 +521,18 @@ impl GameGrid {
     }
 
     /// Should only be called from editor; not from in-game!
-    pub fn editor_add_highground(&mut self, pos: Position) -> bool {
-        if self.pathfind_grid.set_highground_rect(pos) {
+    pub fn editor_add_elevation(&mut self, pos: Position, elevation: Elevation) -> bool {
+        if self.pathfind_grid.set_elevation_center(pos, elevation) {
+            self.refresh_tiles_and_pathfind_grid();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_remove_elevation(&mut self, pos: Position) -> bool {
+        if self.pathfind_grid.remove_elevation_center(pos) {
             self.refresh_tiles_and_pathfind_grid();
             true
         } else {
@@ -547,7 +558,7 @@ impl GameGrid {
             self.decorations.swap_remove(&pos);
             self.refresh_tiles_and_pathfind_grid();
 
-            if terrain_id == TerrainId::Staircase {
+            if terrain_id.is_staircase() {
                 self.pathfind_grid.set_staircase(pos, false);
             }
 
@@ -653,23 +664,20 @@ impl GameGrid {
     }
 
     pub fn refresh_tiles_and_pathfind_grid(&mut self) {
-        self.auto_tile_terrain_objects();
-        self.auto_tile_surfaces();
-        self.auto_tile_highground();
-
         for (pos, terrain_id) in &self.decorations {
-            if terrain_id == &TerrainId::Staircase {
+            if terrain_id.is_staircase() {
+                println!("Set staircase: {:?}, {:?}", pos, terrain_id);
                 self.pathfind_grid.set_staircase(*pos, true);
-                if let Some(occupation) = self.pathfind_grid.occupation(pos) {
-                    self.pathfind_grid.remove_occupied(*pos, occupation);
-                }
             }
         }
+
+        self.auto_tile_surfaces();
+        self.auto_tile_elevation_borders();
     }
 
-    pub fn auto_tile_highground(&mut self) {
-        let mut new_map: HashMap<Position, WallOrientation> = Default::default();
-        for pos in self.pathfind_grid.highground_centers().iter() {
+    pub fn auto_tile_elevation_borders(&mut self) {
+        let mut new_map: HashMap<Position, (Elevation, WallOrientation)> = Default::default();
+        for (pos, elevation) in self.pathfind_grid.elevation_centers().iter() {
             let mut neighbors = vec![];
             let neighbor_positions = &[
                 // west
@@ -690,8 +698,10 @@ impl GameGrid {
                 (pos.0 + 3, pos.1 + 3),
             ];
             for neighbor_pos in neighbor_positions {
-                let is_neighbor_highground = self.pathfind_grid.is_high_ground(*neighbor_pos);
-                neighbors.push(is_neighbor_highground);
+                let is_neighbor_same = self.pathfind_grid.elevation(*neighbor_pos)
+                    == Some(*elevation)
+                    || !self.pathfind_grid.is_within_grid(*neighbor_pos);
+                neighbors.push(is_neighbor_same);
             }
             let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
                 (true, true, true, true) => {
@@ -722,89 +732,9 @@ impl GameGrid {
                 }
             };
 
-            new_map.insert(*pos, orientation);
+            new_map.insert(*pos, (*elevation, orientation));
         }
-        self.pathfind_grid.set_low_walls(new_map);
-    }
-
-    pub fn auto_tile_terrain_objects(&mut self) {
-        let mut new_map: IndexMap<Position, TerrainId> = Default::default();
-        for (pos, terrain_id) in self.terrain_objects.iter() {
-            let mut terrain_id = *terrain_id;
-
-            if terrain_id.is_wall() {
-                let wall_type = terrain_id.wall_type().unwrap();
-                let mut neighbors = vec![];
-                let neighbor_positions = &[
-                    // west
-                    (pos.0 - 3, pos.1),
-                    // east
-                    (pos.0 + 3, pos.1),
-                    // north
-                    (pos.0, pos.1 - 3),
-                    // south
-                    (pos.0, pos.1 + 3),
-                    // north-west
-                    (pos.0 - 3, pos.1 - 3),
-                    // north-east
-                    (pos.0 + 3, pos.1 - 3),
-                    // south-west
-                    (pos.0 - 3, pos.1 + 3),
-                    // south-east
-                    (pos.0 + 3, pos.1 + 3),
-                ];
-                for neighbor_pos in neighbor_positions {
-                    let is_neighbor_wall = self
-                        .terrain_objects
-                        .get(neighbor_pos)
-                        .map(|n| n.wall_type() == Some(wall_type))
-                        .unwrap_or(!self.is_within_grid(*neighbor_pos));
-                    neighbors.push(is_neighbor_wall);
-                }
-                let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
-                    (true, true, true, true) => {
-                        if !neighbors[4] {
-                            WallOrientation::ConcaveSouthEast
-                        } else if !neighbors[5] {
-                            WallOrientation::ConcaveSouthWest
-                        } else if !neighbors[6] {
-                            WallOrientation::ConcaveNorthEast
-                        } else if !neighbors[7] {
-                            WallOrientation::ConcaveNorthWest
-                        } else {
-                            WallOrientation::Inner
-                        }
-                    }
-                    (false, true, true, true) => WallOrientation::East,
-                    (false, true, false, true) => WallOrientation::ConvexNorthWest,
-                    (true, true, false, true) => WallOrientation::South,
-                    (true, false, false, true) => WallOrientation::ConvexNorthEast,
-                    (true, false, true, true) => WallOrientation::West,
-                    (true, false, true, false) => WallOrientation::ConvexSouthEast,
-                    (true, true, true, false) => WallOrientation::North,
-                    (false, true, true, false) => WallOrientation::ConvexSouthWest,
-
-                    neighbors => {
-                        println!("WARN: No wall tile fits neighbors: {:?}", neighbors);
-                        WallOrientation::Single
-                    }
-                };
-
-                self.pathfind_grid
-                    .remove_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
-                terrain_id = if matches!(terrain_id, TerrainId::StoneWall(..)) {
-                    TerrainId::StoneWall(orientation)
-                } else {
-                    TerrainId::LowWall(orientation)
-                };
-                //dbg!(terrain_id);
-                self.pathfind_grid
-                    .set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
-                //println!("Did set occupation {:?} = {:?}", pos, terrain_id);
-            }
-            new_map.insert(*pos, terrain_id);
-        }
-        self.terrain_objects = new_map;
+        self.pathfind_grid.set_elevation_borders(new_map);
     }
 
     fn is_water(&self, pos: Position) -> bool {
@@ -2469,9 +2399,13 @@ impl GameGrid {
                 let screen_pos = (x0, self.grid_y_to_screen(row));
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    let low_wall_orientation = self.pathfind_grid.low_wall(grid_pos);
-                    if let Some(orientation) = low_wall_orientation {
-                        self.draw_terrain(TerrainId::LowWall(orientation), screen_pos);
+                    let elevation_border = self.pathfind_grid.elevation_border(grid_pos);
+                    if let Some((elevation, orientation)) = elevation_border {
+                        let terrain_id = match elevation {
+                            Elevation::High => TerrainId::HighgroundBorder(orientation),
+                            Elevation::Wall => TerrainId::StoneWall(orientation),
+                        };
+                        self.draw_terrain(terrain_id, screen_pos);
                     }
 
                     if let Some(terrain_id) = self.terrain_objects.get(&grid_pos) {
@@ -4696,7 +4630,13 @@ impl GameGrid {
                     }
                 }
             }
-            matches!(occupation, Some(Occupation::Terrain(TerrainType::TallWall)))
+            matches!(
+                occupation,
+                Some(Occupation::Terrain(TerrainType::ElevationBorder(
+                    Elevation::Wall,
+                    _
+                )))
+            )
         };
 
         line_visitor(from, to, |x, y| {
@@ -5913,7 +5853,7 @@ impl GameGrid {
             let (w, h) = self.pathfind_grid.dimensions();
             for y in 0..(h - 1) as i32 {
                 for x in 0..(w - 1) as i32 {
-                    if self.pathfind_grid.is_high_ground((x, y)) {
+                    if self.pathfind_grid.elevation((x, y)).is_some() {
                         self.fill_cell((x, y), MAGENTA.with_alpha(0.3), 1.0);
                     }
                     if self.pathfind_grid.is_staircase((x, y)) {
@@ -5929,7 +5869,13 @@ impl GameGrid {
             let occupation = self.pathfind_grid.occupation(&(x, y));
             match filter {
                 OccupationFilter::TallTerrain => {
-                    occupation == Some(Occupation::Terrain(TerrainType::TallWall))
+                    matches!(
+                        occupation,
+                        Some(Occupation::Terrain(TerrainType::ElevationBorder(
+                            Elevation::Wall,
+                            _
+                        )))
+                    )
                 }
                 OccupationFilter::CharactersExcept(ch_id) => {
                     matches!(occupation, Some(Occupation::Character(other_id)) if ch_id != other_id)
@@ -6147,8 +6093,8 @@ impl GameGrid {
                     // Hack: since high-ground can have low-ground as a direct north neighbor,
                     // if both positions are reachable (via completely different routes), clarify with
                     // a border that they are not adjacement, movement-wise.
-                    let lower_ground_to_north = self.pathfind_grid.is_high_ground((x, y))
-                        && !self.pathfind_grid.is_high_ground((x, y - 1));
+                    let lower_ground_to_north = self.pathfind_grid.elevation((x, y)).is_some()
+                        && self.pathfind_grid.elevation((x, y - 1)).is_none();
 
                     let thickness = (cell_w / 15.0).ceil();
 

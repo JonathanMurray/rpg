@@ -398,7 +398,7 @@ impl CoreGame {
                         }
                         Collision::Elevation => {
                             if !falling {
-                                if self.pathfind_grid.is_high_ground(char_pos) {
+                                if self.pathfind_grid.elevation(char_pos).is_some() {
                                     let remaining = planned_distance - i;
                                     falling = true;
                                     // The current grounded path is now complete and a new may begin after landing
@@ -4394,8 +4394,8 @@ fn attack_roll_bonus(
     contributors.extend_from_slice(&defender.incoming_attack_bonus_contributors(reaction));
 
     if attacker.has_equipped_ranged_weapon() {
-        let attacker_high_ground = pathfind_grid.is_high_ground(attacker.pos());
-        let defender_high_ground = pathfind_grid.is_high_ground(defender.pos());
+        let attacker_high_ground = pathfind_grid.elevation(attacker.pos()).is_some();
+        let defender_high_ground = pathfind_grid.elevation(defender.pos()).is_some();
         if attacker_high_ground && !defender_high_ground {
             contributors.push(("High-ground", RollBonusContributor::Advantage(1)));
         } else if defender_high_ground && !attacker_high_ground {

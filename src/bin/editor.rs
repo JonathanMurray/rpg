@@ -182,10 +182,11 @@ async fn main() {
                         );
                         game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
                     }
-                    EditorAction::PlaceHighground => {
+                    EditorAction::PlaceElevation(elevation) => {
                         draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        let text = format!("{:?}", elevation);
                         draw_text(
-                            "HighGround",
+                            text,
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                             16.0,
@@ -253,7 +254,11 @@ async fn main() {
                         );
                     }
 
-                    EditorAction::EraseTerrain => {
+                    EditorAction::EraseTerrain
+                    | EditorAction::EraseElevation
+                    | EditorAction::EraseBackground
+                    | EditorAction::EraseDecoration
+                    | EditorAction::EraseSurface => {
                         draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
@@ -263,36 +268,7 @@ async fn main() {
                             WHITE,
                         );
                     }
-                    EditorAction::EraseBackground => {
-                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
-                        draw_text(
-                            "Erase",
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                            16.0,
-                            WHITE,
-                        );
-                    }
-                    EditorAction::EraseDecoration => {
-                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
-                        draw_text(
-                            "Erase",
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                            16.0,
-                            WHITE,
-                        );
-                    }
-                    EditorAction::EraseSurface => {
-                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
-                        draw_text(
-                            "Erase",
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                            16.0,
-                            WHITE,
-                        );
-                    }
+
                     EditorAction::EraseControlPoint => {
                         draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
@@ -360,10 +336,10 @@ async fn main() {
                             map_data.background.insert(pos, *terrain_id);
                             has_unsaved_changes = true;
                         }
-                        EditorAction::PlaceHighground => {
-                            if game_grid.editor_add_highground(pos) {
-                                assert_eq!(map_data.highground.get(&pos), None);
-                                map_data.highground.insert(pos, Elevation::High);
+                        EditorAction::PlaceElevation(elevation) => {
+                            if game_grid.editor_add_elevation(pos, *elevation) {
+                                assert_eq!(map_data.elevation.get(&pos), None);
+                                map_data.elevation.insert(pos, *elevation);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -416,6 +392,12 @@ async fn main() {
                             if game_grid.background.contains_key(&pos) {
                                 game_grid.background.swap_remove(&pos);
                                 map_data.background.swap_remove(&pos);
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::EraseElevation => {
+                            if game_grid.editor_remove_elevation(pos) {
+                                map_data.elevation.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -564,13 +546,14 @@ struct Sidebar {
 #[derive(Clone, PartialEq)]
 enum EditorAction {
     PlaceBackground(TerrainId),
-    PlaceHighground,
+    PlaceElevation(Elevation),
     PlaceTerrain(TerrainId),
     PlaceDecoration(TerrainId),
     PlaceSurface(TerrainId),
     PlaceCharacter(CharacterType),
     PlaceControlPoint(ControlPoint),
     EraseBackground,
+    EraseElevation,
     EraseTerrain,
     EraseDecoration,
     EraseSurface,
@@ -606,14 +589,17 @@ impl Sidebar {
             .collect();
         background_actions.push(EditorAction::EraseBackground);
 
-        let highground_actions = vec![EditorAction::PlaceHighground];
+        let elevation_actions = vec![
+            EditorAction::PlaceElevation(Elevation::High),
+            EditorAction::PlaceElevation(Elevation::Wall),
+            EditorAction::EraseElevation,
+        ];
 
         let terrain_objects = [
             TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
-            TerrainId::StoneWall(WallOrientation::ConcaveNorthEast),
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
@@ -653,6 +639,7 @@ impl Sidebar {
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
             TerrainId::Staircase,
+            TerrainId::StaircaseLeft,
             TerrainId::StaircaseTall,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
@@ -697,7 +684,7 @@ impl Sidebar {
 
         let sections = vec![
             background_actions,
-            highground_actions,
+            elevation_actions,
             terrain_actions,
             decoration_actions,
             surface_actions,
@@ -773,8 +760,9 @@ impl Sidebar {
                     EditorAction::PlaceBackground(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);
                     }
-                    EditorAction::PlaceHighground => {
-                        draw_text("HighGround", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    EditorAction::PlaceElevation(elevation) => {
+                        let text = format!("{:?}", elevation);
+                        draw_text(text, x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);
@@ -834,21 +822,15 @@ impl Sidebar {
                             BLACK,
                         );
                     }
-                    EditorAction::EraseBackground => {
+                    EditorAction::EraseBackground
+                    | EditorAction::EraseElevation
+                    | EditorAction::EraseTerrain
+                    | EditorAction::EraseDecoration
+                    | EditorAction::EraseSurface
+                    | EditorAction::EraseControlPoint => {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
-                    EditorAction::EraseTerrain => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
-                    }
-                    EditorAction::EraseDecoration => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
-                    }
-                    EditorAction::EraseSurface => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
-                    }
-                    EditorAction::EraseControlPoint => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
-                    }
+
                     EditorAction::EditCharacter => {
                         draw_text("EDIT", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }

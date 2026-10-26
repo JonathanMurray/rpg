@@ -30,6 +30,7 @@ pub enum Occupation {
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Elevation {
     High,
+    Wall,
 }
 
 impl Occupation {
@@ -37,7 +38,7 @@ impl Occupation {
         &self,
     ) -> Option<(std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>)> {
         let (xs, ys) = match self {
-            Occupation::Terrain(TerrainType::LowWall(orientation)) => {
+            Occupation::Terrain(TerrainType::ElevationBorder(elevation, orientation)) => {
                 //println!("(occupied cells) Low wall orientation: {:?}", orientation);
 
                 match orientation {
@@ -46,17 +47,24 @@ impl Occupation {
                     WallOrientation::ConvexNorthWest => (-1..=-1, -1..=1),
                     // right column
                     WallOrientation::ConvexNorthEast => (1..=1, -1..=1),
-                    // two upper rows
-                    WallOrientation::ConvexSouthWest => (-1..=1, -1..=0),
-                    // two upper rows
-                    WallOrientation::ConvexSouthEast => (-1..=1, -1..=0),
                     // left column
                     WallOrientation::East => (-1..=-1, -1..=1),
                     // right column
                     WallOrientation::West => (1..=1, -1..=1),
                     WallOrientation::Inner => return None,
-                    // two upper rows
-                    WallOrientation::North => (-1..=1, -1..=0),
+
+                    WallOrientation::North
+                    | WallOrientation::ConvexSouthEast
+                    | WallOrientation::ConvexSouthWest => match elevation {
+                        Elevation::High => {
+                            // two lower rows
+                            (-1..=1, 0..=1)
+                        }
+                        Elevation::Wall => {
+                            // all 9 cells
+                            (-1..=1, -1..=1)
+                        }
+                    },
                     WallOrientation::South => return None,
                     WallOrientation::ConcaveSouthWest => return None,
                     WallOrientation::ConcaveSouthEast => return None,
@@ -75,20 +83,17 @@ impl Occupation {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TerrainType {
-    TallWall,
-    LowWall(WallOrientation),
+    ElevationBorder(Elevation, WallOrientation),
     Other,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum WallType {
-    Tall,
-    Low,
 }
 
 impl TerrainType {
     pub fn can_have_staircase(&self) -> bool {
-        matches!(self, TerrainType::LowWall(..))
+        matches!(self, TerrainType::ElevationBorder(..))
+    }
+
+    pub fn elevation(elevation: Elevation, orientation: WallOrientation) -> Self {
+        Self::ElevationBorder(elevation, orientation)
     }
 }
 
@@ -138,8 +143,8 @@ pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
     surfaces: RefCell<HashMap<Position, Surface>>,
-    high_ground_centers: RefCell<HashSet<Position>>,
-    low_walls: RefCell<HashMap<Position, WallOrientation>>,
+    elevation_centers: RefCell<HashMap<Position, Elevation>>,
+    elevation_borders: RefCell<HashMap<Position, (Elevation, WallOrientation)>>,
     staircases: RefCell<HashSet<Position>>,
     pub control_points: RefCell<HashMap<Position, ControlPoint>>,
     cache_key: Cell<CacheKey>,
@@ -205,8 +210,8 @@ impl PathfindGrid {
             dimensions,
             occupied: Default::default(),
             surfaces: Default::default(),
-            high_ground_centers: Default::default(),
-            low_walls: Default::default(),
+            elevation_centers: Default::default(),
+            elevation_borders: Default::default(),
             staircases: Default::default(),
             control_points: Default::default(),
             cache_key: Default::default(),
@@ -258,47 +263,54 @@ impl PathfindGrid {
         self.occupied.borrow().get(&pos).copied()
     }
 
-    pub fn low_wall(&self, pos: Position) -> Option<WallOrientation> {
-        self.low_walls.borrow().get(&pos).copied()
+    pub fn elevation_border(&self, pos: Position) -> Option<(Elevation, WallOrientation)> {
+        self.elevation_borders.borrow().get(&pos).copied()
     }
 
-    pub fn set_low_walls(&self, low_walls: HashMap<Position, WallOrientation>) {
-        for (pos, orientation) in self.low_walls.borrow().iter() {
+    pub fn set_elevation_borders(&self, borders: HashMap<Position, (Elevation, WallOrientation)>) {
+        for (pos, (elevation, orientation)) in self.elevation_borders.borrow().iter() {
             self.remove_occupied(
                 *pos,
-                Occupation::Terrain(TerrainType::LowWall(*orientation)),
+                Occupation::Terrain(TerrainType::elevation(*elevation, *orientation)),
             );
         }
 
-        for (pos, orientation) in low_walls.iter() {
-            self.set_occupied(
-                *pos,
-                Occupation::Terrain(TerrainType::LowWall(*orientation)),
-            );
+        for (pos, (elevation, orientation)) in borders.iter() {
+            if !self.is_staircase(*pos) {
+                self.set_occupied(
+                    *pos,
+                    Occupation::Terrain(TerrainType::elevation(*elevation, *orientation)),
+                );
+            }
         }
-        *self.low_walls.borrow_mut() = low_walls;
+        *self.elevation_borders.borrow_mut() = borders;
     }
 
-    pub fn set_highground_rect(&self, pos: Position) -> bool {
-        let mut highground = self.high_ground_centers.borrow_mut();
-
-        highground.insert(pos)
+    pub fn set_elevation_center(&self, pos: Position, elevation: Elevation) -> bool {
+        self.elevation_centers
+            .borrow_mut()
+            .insert(pos, elevation)
+            .is_none()
     }
 
-    pub fn highground_centers(&self) -> Ref<'_, HashSet<(i32, i32)>> {
-        self.high_ground_centers.borrow()
+    pub fn remove_elevation_center(&self, pos: Position) -> bool {
+        self.elevation_centers.borrow_mut().remove(&pos).is_some()
     }
 
-    pub fn is_high_ground(&self, pos: Position) -> bool {
-        let centers = self.high_ground_centers.borrow();
+    pub fn elevation_centers(&self) -> Ref<'_, HashMap<Position, Elevation>> {
+        self.elevation_centers.borrow()
+    }
+
+    pub fn elevation(&self, pos: Position) -> Option<Elevation> {
+        let centers = self.elevation_centers.borrow();
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
-                if centers.contains(&(x, y)) {
-                    return true;
+                if let Some(elevation) = centers.get(&(x, y)) {
+                    return Some(*elevation);
                 }
             }
         }
-        false
+        None
     }
 
     pub fn is_staircase(&self, pos: Position) -> bool {
@@ -352,6 +364,18 @@ impl PathfindGrid {
                 }
             }
         }
+
+        /*
+        if value {
+            // Characters must be able to occupy this spot - cannot be simultanouesly occupied by elevation border
+            if let Some(e) = self.elevation(center_pos) {
+                Occupation::Terrain(TerrainType::ElevationBorder((), ()))
+            }
+            if let Some(occupation) = self.occupation(&center_pos) {
+                self.remove_occupied(center_pos, occupation);
+            }
+        }
+         */
     }
 
     pub fn remove_occupied(&self, center_pos: Position, occupation: Occupation) {
@@ -377,7 +401,7 @@ impl PathfindGrid {
     }
 
     pub fn set_occupied(&self, center_pos: Position, occupation: Occupation) {
-        //dbg!((pos, occupation));
+        dbg!((center_pos, occupation));
 
         if let Some((xs, ys)) = occupation.occupied_cells() {
             let mut occupied_cells = self.occupied.borrow_mut();
@@ -392,11 +416,11 @@ impl PathfindGrid {
                     let cell = (center_pos.0 + dx, center_pos.1 + dy);
                     assert!(
                         !occupied_cells.contains_key(&cell),
-                        "Cannot occupy {:?} with {:?}. It's already occupied: {:?}, all: {:?}",
+                        "Cannot occupy {:?} with {:?}. It's already occupied: {:?}",
                         cell,
                         occupation,
                         occupied_cells[&cell],
-                        occupied_cells
+                        //occupied_cells
                     );
                     occupied_cells.insert(cell, occupation);
                 }
@@ -410,6 +434,11 @@ impl PathfindGrid {
 
     pub fn dimensions(&self) -> (u32, u32) {
         self.dimensions
+    }
+
+    pub fn is_within_grid(&self, pos: Position) -> bool {
+        (0..self.dimensions.0 as i32).contains(&pos.0)
+            && (0..self.dimensions.1 as i32).contains(&pos.1)
     }
 
     pub fn find_shortest_path_to_adjacent(
@@ -669,10 +698,9 @@ impl PathfindGrid {
             // The neighbors are (potentially) sorted, with the best one first; iterate in reverse
             // order since we push them onto a stack, and therefore want to push the best one last.
             for (neighbor_pos, neighbor_dist) in neighbors.into_iter().rev() {
-                let within_grid = (0..self.dimensions.0 as i32).contains(&neighbor_pos.0)
-                    && (0..self.dimensions.1 as i32).contains(&neighbor_pos.1);
-
-                if within_grid && self.is_free(Some(character_id), neighbor_pos) {
+                if self.is_within_grid(neighbor_pos)
+                    && self.is_free(Some(character_id), neighbor_pos)
+                {
                     let neighbor_node = ChartNode {
                         distance_from_start: neighbor_dist,
                         position: neighbor_pos,
@@ -774,7 +802,10 @@ impl PathfindGrid {
         line_visitor(from, to, |x, y| {
             matches!(
                 self.occupied.borrow().get(&(x, y)),
-                Some(Occupation::Terrain(TerrainType::TallWall))
+                Some(Occupation::Terrain(TerrainType::ElevationBorder(
+                    Elevation::Wall,
+                    _
+                )))
             )
         })
     }
@@ -792,16 +823,16 @@ impl PathfindGrid {
         let mut other_chars: HashSet<CharacterId> = Default::default();
         let mut terrain_collision = false;
         let mut elevation_collision = false;
-        let mut seen_high_ground = None;
+        let mut prev_elevation = None;
 
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
-                if !(0..self.dimensions.0 as i32).contains(&x)
-                    || !(0..self.dimensions.1 as i32).contains(&y)
-                {
+                if !self.is_within_grid((x, y)) {
                     // This cell is outside of the grid
                     terrain_collision = true;
                 }
+
+                let is_staircase = self.is_staircase((x, y));
 
                 match self.occupied.borrow().get(&(x, y)) {
                     Some(Occupation::Character(id)) => {
@@ -810,27 +841,34 @@ impl PathfindGrid {
                             other_chars.insert(*id);
                         }
                     }
-                    Some(Occupation::Terrain(terrain_type)) => match terrain_type {
-                        TerrainType::LowWall(..) => elevation_collision = true,
-                        _ => terrain_collision = true,
-                    },
+                    Some(Occupation::Terrain(terrain_type)) => {
+                        if !is_staircase {
+                            match terrain_type {
+                                TerrainType::ElevationBorder(..) => elevation_collision = true,
+                                TerrainType::Other => terrain_collision = true,
+                            }
+                        }
+                    }
                     None => {}
                 }
 
                 // Check if there's any difference in elevation among the 9 cells. Can happen even if there's
                 // no occupied cells, since north-facing ledges take up no cells
-                let high_ground = self.is_high_ground((x, y));
-                if !self.is_staircase((x, y)) {
-                    if let Some(seen) = seen_high_ground {
-                        if high_ground != seen {
+                let elevation = self.elevation((x, y));
+                if !is_staircase {
+                    if let Some(prev) = prev_elevation {
+                        if elevation != prev {
                             return Some(Collision::Elevation);
                         }
                     } else {
-                        seen_high_ground = Some(high_ground);
+                        prev_elevation = Some(elevation);
                     }
                 }
             }
         }
+
+        //dbg!(terrain_collision, elevation_collision);
+
         if !other_chars.is_empty() {
             Some(Collision::Characters(other_chars))
         } else if terrain_collision {

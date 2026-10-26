@@ -3,250 +3,76 @@
     39,
     39
   ],
-  "terrain_objects": {
-    "(13, 13)": {
-      "LowWall": "South"
-    },
-    "(13, 10)": {
-      "LowWall": "South"
-    },
-    "(16, 10)": {
-      "LowWall": "South"
-    },
-    "(16, 13)": {
-      "LowWall": "South"
-    },
-    "(13, 7)": {
-      "LowWall": "South"
-    },
-    "(16, 7)": {
-      "LowWall": "South"
-    },
-    "(13, 4)": {
-      "LowWall": "South"
-    },
-    "(16, 4)": {
-      "LowWall": "South"
-    },
-    "(13, 1)": {
-      "LowWall": "South"
-    },
-    "(16, 1)": {
-      "LowWall": "South"
-    },
-    "(19, 13)": {
-      "LowWall": "South"
-    },
-    "(19, 10)": {
-      "LowWall": "South"
-    },
-    "(19, 7)": {
-      "LowWall": "South"
-    },
-    "(19, 4)": {
-      "LowWall": "South"
-    },
-    "(19, 1)": {
-      "LowWall": "South"
-    },
-    "(34, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(34, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(37, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(19, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(16, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 1)": "TombStone",
-    "(22, 1)": "TombStone",
-    "(31, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    }
+  "elevation": {
+    "(34, 19)": "Wall",
+    "(34, 22)": "Wall",
+    "(31, 19)": "Wall",
+    "(28, 19)": "Wall",
+    "(28, 22)": "Wall",
+    "(28, 25)": "Wall",
+    "(31, 25)": "Wall",
+    "(31, 22)": "Wall",
+    "(34, 25)": "Wall",
+    "(25, 22)": "Wall",
+    "(25, 19)": "Wall",
+    "(22, 19)": "Wall",
+    "(22, 22)": "Wall",
+    "(19, 22)": "Wall",
+    "(19, 25)": "Wall",
+    "(16, 25)": "Wall",
+    "(16, 22)": "Wall",
+    "(16, 19)": "Wall",
+    "(19, 19)": "Wall",
+    "(13, 25)": "Wall",
+    "(13, 22)": "Wall",
+    "(13, 19)": "Wall",
+    "(10, 19)": "Wall",
+    "(10, 22)": "Wall",
+    "(7, 22)": "Wall",
+    "(7, 19)": "Wall",
+    "(4, 19)": "Wall",
+    "(4, 22)": "Wall",
+    "(4, 25)": "Wall",
+    "(1, 25)": "Wall",
+    "(1, 22)": "Wall",
+    "(1, 19)": "Wall",
+    "(1, 16)": "Wall",
+    "(4, 16)": "Wall",
+    "(16, 16)": "Wall",
+    "(19, 16)": "Wall",
+    "(22, 16)": "Wall",
+    "(25, 16)": "Wall",
+    "(13, 16)": "Wall",
+    "(10, 16)": "Wall",
+    "(7, 16)": "Wall",
+    "(28, 16)": "Wall",
+    "(31, 16)": "Wall",
+    "(34, 16)": "Wall",
+    "(34, 13)": "Wall",
+    "(31, 13)": "Wall",
+    "(28, 13)": "Wall",
+    "(25, 13)": "Wall",
+    "(19, 13)": "Wall",
+    "(16, 13)": "Wall",
+    "(10, 13)": "Wall",
+    "(7, 13)": "Wall",
+    "(4, 13)": "Wall",
+    "(1, 13)": "Wall",
+    "(13, 13)": "Wall",
+    "(22, 13)": "Wall",
+    "(37, 25)": "Wall",
+    "(37, 22)": "Wall",
+    "(37, 19)": "Wall",
+    "(37, 16)": "Wall",
+    "(37, 13)": "Wall",
+    "(22, 31)": "High",
+    "(25, 31)": "High",
+    "(25, 34)": "High",
+    "(22, 34)": "High",
+    "(19, 34)": "High",
+    "(19, 31)": "High"
   },
+  "terrain_objects": {},
   "background": {
     "(-4, 3)": "Floor",
     "(-2, 1)": "Floor4",
@@ -468,396 +294,16 @@
     "(37, 1)": "Floor2"
   },
   "decorations": {
-    "(16, 13)": "Staircase",
-    "(7, 1)": "Torch",
-    "(4, 1)": "Torch",
-    "(25, 1)": "Torch",
-    "(28, 1)": "Torch"
+    "(31, 25)": "StaircaseTall",
+    "(8, 22)": "WallOpeningNorth",
+    "(10, 22)": "Torch",
+    "(24, 22)": "WallOpeningNorth",
+    "(22, 22)": "Torch",
+    "(16, 25)": "StaircaseTall",
+    "(1, 25)": "StaircaseTall",
+    "(22, 34)": "Staircase"
   },
-  "surfaces": {
-    "(7, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 7)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 4)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 15)": "FireSurfaceSingleCell",
-    "(22, 15)": "FireSurfaceSingleCell",
-    "(10, 12)": "FireSurfaceSingleCell",
-    "(22, 12)": "FireSurfaceSingleCell",
-    "(13, 16)": "FireSurfaceSingleCell",
-    "(19, 16)": "FireSurfaceSingleCell",
-    "(19, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(28, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 25)": "FireSurfaceSingleCell",
-    "(16, 28)": "FireSurfaceSingleCell",
-    "(10, 25)": "FireSurfaceSingleCell",
-    "(10, 28)": "FireSurfaceSingleCell",
-    "(10, 31)": "FireSurfaceSingleCell",
-    "(22, 31)": "FireSurfaceSingleCell",
-    "(22, 28)": "FireSurfaceSingleCell",
-    "(22, 25)": "FireSurfaceSingleCell",
-    "(22, 1)": "SpikesSingleCell",
-    "(10, 1)": "SpikesSingleCell"
-  },
+  "surfaces": {},
   "control_points": {},
   "characters": [
     {
@@ -872,21 +318,10 @@
       "name": null
     },
     {
-      "type_": "Enslaved",
-      "pos": [
-        14,
-        15
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Ghoul2",
       "pos": [
-        13,
-        25
+        7,
+        34
       ],
       "health": null,
       "main_hand": null,
@@ -896,30 +331,8 @@
     {
       "type_": "Clara",
       "pos": [
-        18,
-        32
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Huldra",
-      "pos": [
-        16,
-        9
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Enslaved",
-      "pos": [
-        17,
-        15
+        31,
+        28
       ],
       "health": null,
       "main_hand": null,

@@ -3,159 +3,61 @@
     30,
     39
   ],
-  "highground": {},
+  "elevation": {
+      "(28, 19)": "Wall",
+    "(28, 22)": "Wall",
+    "(1, 22)": "Wall",
+    "(1, 19)": "Wall",
+    "(1, 16)": "Wall",
+    "(1, 13)": "Wall",
+    "(1, 10)": "Wall",
+    "(1, 7)": "Wall",
+    "(1, 4)": "Wall",
+    "(1, 1)": "Wall",
+    "(4, 1)": "Wall",
+    "(7, 1)": "Wall",
+    "(10, 1)": "Wall",
+    "(13, 1)": "Wall",
+    "(16, 1)": "Wall",
+    "(19, 1)": "Wall",
+    "(22, 1)": "Wall",
+    "(28, 16)": "Wall",
+    "(28, 1)": "Wall",
+    "(28, 4)": "Wall",
+    "(28, 7)": "Wall",
+    "(28, 10)": "Wall",
+    "(28, 13)": "Wall",
+    "(1, 25)": "Wall",
+    "(1, 28)": "Wall",
+    "(28, 31)": "Wall",
+    "(28, 34)": "Wall",
+    "(28, 37)": "Wall",
+    "(25, 37)": "Wall",
+    "(22, 37)": "Wall",
+    "(19, 37)": "Wall",
+    "(16, 37)": "Wall",
+    "(28, 28)": "Wall",
+    "(13, 37)": "Wall",
+    "(28, 25)": "Wall",
+    "(25, 1)": "Wall",
+    "(10, 37)": "Wall",
+    "(1, 31)": "Wall",
+    "(1, 34)": "Wall",
+    "(1, 37)": "Wall",
+    "(4, 37)": "Wall",
+    "(7, 37)": "Wall",
+    
+    "(4, 31)": "Wall",
+    "(7, 31)": "Wall",
+    "(7, 34)": "Wall",
+    "(4, 34)": "Wall",
+    "(25, 34)": "Wall",
+    "(25, 31)": "Wall",
+    "(22, 34)": "Wall",
+    "(22, 31)": "Wall"
+  },
   "terrain_objects": {
-    "(28, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(16, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(19, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 16)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 4)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 13)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(19, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(16, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 28)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(14, 7)": "Cauldron2",
-    "(4, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    }
+    "(14, 7)": "Cauldron2"
   },
   "background": {
     "(-4, 3)": "Floor",

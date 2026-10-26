@@ -10,7 +10,7 @@ use macroquad::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    pathfind::{Surface, SurfaceBrushSize, TerrainType, WallType, CELLS_PER_ENTITY},
+    pathfind::{Elevation, Surface, SurfaceBrushSize, TerrainType, CELLS_PER_ENTITY},
     util::{COL_GREEN_3, COL_RED, COL_RED_BRIGHT},
 };
 
@@ -558,9 +558,10 @@ pub enum TerrainId {
     SpikesSingleCell,
     FireSurfaceSingleCell,
     StoneWall(WallOrientation),
-    LowWall(WallOrientation),
+    HighgroundBorder(WallOrientation),
 
     Staircase,
+    StaircaseLeft,
     StaircaseTall,
 
     Bush,
@@ -640,25 +641,36 @@ impl TerrainId {
     pub fn is_wall(&self) -> bool {
         match self {
             TerrainId::StoneWall(..) => true,
-            TerrainId::LowWall(..) => true,
+            TerrainId::HighgroundBorder(..) => true,
             _ => false,
         }
     }
 
-    pub fn wall_type(&self) -> Option<WallType> {
+    pub fn elevation(&self) -> Option<Elevation> {
         match self {
-            TerrainId::StoneWall(..) => Some(WallType::Tall),
-            TerrainId::LowWall(..) => Some(WallType::Low),
+            TerrainId::StoneWall(..) => Some(Elevation::Wall),
+            TerrainId::HighgroundBorder(..) => Some(Elevation::High),
             _ => None,
         }
     }
 
     pub fn terrain_type(&self) -> TerrainType {
         match self {
-            Self::StoneWall(..) => TerrainType::TallWall,
-            Self::LowWall(orientation) => TerrainType::LowWall(*orientation),
+            Self::StoneWall(orientation) => {
+                TerrainType::ElevationBorder(Elevation::Wall, *orientation)
+            }
+            Self::HighgroundBorder(orientation) => {
+                TerrainType::ElevationBorder(Elevation::High, *orientation)
+            }
             _ => TerrainType::Other,
         }
+    }
+
+    pub fn is_staircase(&self) -> bool {
+        matches!(
+            self,
+            TerrainId::Staircase | TerrainId::StaircaseTall | TerrainId::StaircaseLeft
+        )
     }
 }
 
@@ -798,22 +810,23 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::StoneWall(WallOrientation::ConvexSouthEast) => (5, 14),
         TerrainId::StoneWall(WallOrientation::Inner) => (4, 13),
 
-        TerrainId::LowWall(WallOrientation::Single) => (14, 13),
-        TerrainId::LowWall(WallOrientation::ConcaveNorthWest) => (8, 13),
-        TerrainId::LowWall(WallOrientation::North) => (13, 15),
-        TerrainId::LowWall(WallOrientation::ConcaveNorthEast) => (10, 13),
-        TerrainId::LowWall(WallOrientation::West) => (14, 14),
-        TerrainId::LowWall(WallOrientation::East) => (11, 14),
-        TerrainId::LowWall(WallOrientation::ConcaveSouthWest) => (8, 15),
-        TerrainId::LowWall(WallOrientation::South) => (13, 13),
-        TerrainId::LowWall(WallOrientation::ConcaveSouthEast) => (10, 15),
-        TerrainId::LowWall(WallOrientation::ConvexNorthWest) => (11, 13),
-        TerrainId::LowWall(WallOrientation::ConvexNorthEast) => (14, 13),
-        TerrainId::LowWall(WallOrientation::ConvexSouthWest) => (11, 15),
-        TerrainId::LowWall(WallOrientation::ConvexSouthEast) => (14, 15),
-        TerrainId::LowWall(WallOrientation::Inner) => (13, 14),
+        TerrainId::HighgroundBorder(WallOrientation::Single) => (14, 13),
+        TerrainId::HighgroundBorder(WallOrientation::ConcaveNorthWest) => (8, 13),
+        TerrainId::HighgroundBorder(WallOrientation::North) => (13, 15),
+        TerrainId::HighgroundBorder(WallOrientation::ConcaveNorthEast) => (10, 13),
+        TerrainId::HighgroundBorder(WallOrientation::West) => (14, 14),
+        TerrainId::HighgroundBorder(WallOrientation::East) => (11, 14),
+        TerrainId::HighgroundBorder(WallOrientation::ConcaveSouthWest) => (8, 15),
+        TerrainId::HighgroundBorder(WallOrientation::South) => (13, 13),
+        TerrainId::HighgroundBorder(WallOrientation::ConcaveSouthEast) => (10, 15),
+        TerrainId::HighgroundBorder(WallOrientation::ConvexNorthWest) => (11, 13),
+        TerrainId::HighgroundBorder(WallOrientation::ConvexNorthEast) => (14, 13),
+        TerrainId::HighgroundBorder(WallOrientation::ConvexSouthWest) => (11, 15),
+        TerrainId::HighgroundBorder(WallOrientation::ConvexSouthEast) => (14, 15),
+        TerrainId::HighgroundBorder(WallOrientation::Inner) => (13, 14),
 
         TerrainId::Staircase => (12, 15),
+        TerrainId::StaircaseLeft => (6, 15),
         TerrainId::StaircaseTall => (7, 13),
 
         TerrainId::Bush => (0, 7),

@@ -6,7 +6,7 @@ use crate::{
     core::{Character, CharacterId, PlayerId, Position},
     grid::ControlPoint,
     map_data::{create_character, CharacterType, MapData},
-    pathfind::{Occupation, PathfindGrid, Surface},
+    pathfind::{Elevation, Occupation, PathfindGrid, Surface},
     textures::TerrainId,
 };
 
@@ -81,6 +81,10 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
             .insert(*pos, *control_point);
     }
 
+    for (pos, elevation) in &map_data.elevation {
+        pathfind_grid.set_elevation_center(*pos, *elevation);
+    }
+
     GameInitState {
         characters,
         active_character_id: active_char_id.unwrap(),
@@ -102,7 +106,6 @@ pub struct GameInitState {
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     pub surfaces: IndexMap<Position, TerrainId>,
-
     pub control_points: IndexMap<Position, ControlPoint>,
 }
 

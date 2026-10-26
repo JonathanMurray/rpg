@@ -51,7 +51,7 @@ use crate::{
         TargetEffectPreview, TextEffect,
     },
     init_fight_map::GameInitState,
-    pathfind::{Occupation, PathfindGrid, Surface, TerrainType},
+    pathfind::{Elevation, Occupation, PathfindGrid, Surface, TerrainType},
     resources::GameResources,
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
@@ -669,6 +669,7 @@ impl UserInterface {
             init_state.control_points,
             sound_player.clone(),
         );
+
         game_grid.refresh_tiles_and_pathfind_grid();
 
         let player_portraits = PlayerPortraits::new(
@@ -1294,7 +1295,10 @@ impl UserInterface {
                     line_visitor(from, to, |x, y| {
                         if matches!(
                             self.game_grid.pathfind_grid.occupation(&(x, y)),
-                            Some(Occupation::Terrain(TerrainType::TallWall))
+                            Some(Occupation::Terrain(TerrainType::ElevationBorder(
+                                Elevation::Wall,
+                                _
+                            )))
                         ) {
                             *pos = prev;
                             true
