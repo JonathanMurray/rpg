@@ -5976,7 +5976,7 @@ impl GameGrid {
         let animated_limit = (get_time() - self.movement_path_time_before_draw) as f32 * 300.0;
 
         let range = character.remaining_movement.get().min(animated_limit);
-        let extended_range = self.active_char().movement_range().min(animated_limit);
+        let extended_range = character.movement_range().min(animated_limit);
 
         let range_ceil = extended_range.ceil() as i32;
         let origin = character.pos();

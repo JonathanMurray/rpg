@@ -45,7 +45,7 @@ impl GameResources {
         let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
 
         // Change background tiles to "night time"
-        let night_time = false;
+        let night_time = true;
         if night_time {
             replace_color(&terrain_atlas, |[r, g, b, a]| {
                 if r > g && r > b {

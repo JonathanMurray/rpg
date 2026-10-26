@@ -82,7 +82,8 @@
     "(34, 28)": "Wall"
   },
   "terrain_objects": {
-    "(12, 15)": "ChestsObstacle"
+    "(12, 15)": "BarrelsObstacle",
+    "(4, 31)": "BarrelsObstacle2"
   },
   "background": {
     "(-4, 3)": "Floor",

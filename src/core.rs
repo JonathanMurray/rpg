@@ -6410,6 +6410,10 @@ impl Character {
             modifier += 0.25;
         }
 
+        if self.knows_passive(PassiveSkill::Undead) {
+            modifier -= 0.35;
+        }
+
         modifier
     }
 

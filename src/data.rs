@@ -436,6 +436,23 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
     weight: 5,
 };
 
+pub const BOSS_AXE: Weapon = Weapon {
+    name: "Boss axe",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 7,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Strength,
+    attack_enhancement: None,
+    on_attacked_reaction: None,
+    bonus_melee_evasion: 3,
+    on_damage: None,
+    on_kill_apply_self: None,
+    sprite: Some(SpriteId::Bossaxe),
+    icon: EquipmentIconId::Undefined,
+    weight: 5,
+};
+
 pub const WAR_AXE: Weapon = Weapon {
     name: "War axe",
     range: WeaponRange::Melee,
@@ -2889,6 +2906,7 @@ pub enum PassiveSkill {
     RisingTemper,
     SwampDweller,
     Slasher,
+    Undead,
 }
 
 impl PassiveSkill {
@@ -2906,6 +2924,7 @@ impl PassiveSkill {
             RisingTemper => "Rising temper",
             SwampDweller => "Swamp dweller",
             Slasher => "Slasher",
+            Undead => "Undead",
         }
     }
 
@@ -2929,6 +2948,7 @@ impl PassiveSkill {
             SwampDweller => IconId::SwampDweller,
 
             Slasher => IconId::Slashing,
+            Undead => IconId::Undead,
         }
     }
 
@@ -2946,6 +2966,7 @@ impl PassiveSkill {
             RisingTemper => "End of turn: gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
             Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
+            Undead => "Immune to |<keyword>Bleeding|. |<value>-35%| |<boot>| movement speed"
         }
     }
 
@@ -2956,6 +2977,7 @@ impl PassiveSkill {
             RisingTemper => &[Keyword::Cond(Condition::Ferocity, None)],
             SwampDweller => &[Keyword::Cond(Condition::Poisoned, None)],
             Slasher => &[Keyword::Cond(Condition::Bleeding, None)],
+            Undead => &[Keyword::Cond(Condition::Bleeding, None)],
             _ => &[],
         }
     }

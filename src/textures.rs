@@ -24,6 +24,7 @@ pub enum SpriteId {
     Clara,
     Huldra,
     Skeleton,
+    SkeletonBoss,
     Skeleton2,
     Enslaved,
     Draug,
@@ -35,6 +36,7 @@ pub enum SpriteId {
     Magi,
     Warhammer,
     Waraxe,
+    Bossaxe,
     Staff,
     Bow,
     Sword,
@@ -61,6 +63,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Clara, "clara.png"),
         (SpriteId::Huldra, "huldra.png"),
         (SpriteId::Skeleton, "skeleton.png"),
+        (SpriteId::SkeletonBoss, "skeleton_boss.png"),
         (SpriteId::Skeleton2, "skeleton2.png"),
         (SpriteId::Enslaved, "enslaved.png"),
         (SpriteId::Draug, "draug.png"),
@@ -72,6 +75,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Magi, "magi.png"),
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Waraxe, "waraxe.png"),
+        (SpriteId::Bossaxe, "boss_axe.png"),
         (SpriteId::Staff, "staff.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
@@ -122,6 +126,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Alice => 28,
         SpriteId::Huldra => 26,
         SpriteId::Skeleton => 26,
+        SpriteId::SkeletonBoss => 29,
         SpriteId::Skeleton2 => 26,
         SpriteId::Enslaved => 26,
         SpriteId::Ogre => 26,
@@ -174,6 +179,8 @@ pub enum StatusId {
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Undefined,
+
+    Undead,
 
     Fireball,
     SearingLight,
@@ -580,12 +587,15 @@ pub enum TerrainId {
     StaircaseTall,
 
     Bush,
+    DeadBush,
     WallPlant,
     FloorDrain,
     SmallObstacle,
-    ChestsObstacle,
+    BarrelsObstacle,
+    BarrelsObstacle2,
     SmallStone,
     TombStone,
+    DirtMound,
     Boulder2,
     TreeStump,
     Table,
@@ -748,13 +758,17 @@ impl TerrainId {
                     // two lower rows
                     TerrainId::SmallObstacle => (-1..=1, 0..=1),
                     // two lower rows
-                    TerrainId::ChestsObstacle => (-1..=1, 0..=1),
+                    TerrainId::BarrelsObstacle => (-1..=1, 0..=1),
+                    // two left columns
+                    TerrainId::BarrelsObstacle2 => (-1..=0, -1..=1),
                     // two lower rows
                     TerrainId::TombStone => (-1..=1, 0..=1),
                     // two lower rows
                     TerrainId::Chest => (-1..=1, 0..=1),
                     // two lower rows
                     TerrainId::Cauldron2 => (-1..=1, 0..=1),
+                    // two lower rows
+                    TerrainId::DeadBush => (-1..=1, 0..=1),
                     _ => (-1..=1, -1..=1),
                 }
             }
@@ -930,12 +944,15 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::StaircaseTall => (7, 13),
 
         TerrainId::Bush => (0, 7),
+        TerrainId::DeadBush => (7, 7),
         TerrainId::WallPlant => (0, 8),
         TerrainId::SmallStone => (1, 8),
         TerrainId::TombStone => (2, 8),
+        TerrainId::DirtMound => (3, 8),
         TerrainId::FloorDrain => (0, 9),
         TerrainId::SmallObstacle => (1, 9),
-        TerrainId::ChestsObstacle => (0, 10),
+        TerrainId::BarrelsObstacle => (0, 10),
+        TerrainId::BarrelsObstacle2 => (1, 10),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
         TerrainId::Table => (2, 7),
@@ -1273,6 +1290,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
 fn icon_cell(icon: IconId) -> (i32, i32) {
     match icon {
         IconId::Undefined => (1, 3),
+        IconId::Undead => (2, 3),
         IconId::Fireball => (0, 1),
         IconId::SearingLight => (2, 1),
         IconId::MeleeAttack => (6, 8),

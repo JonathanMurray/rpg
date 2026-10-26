@@ -13,9 +13,9 @@ use crate::{
     },
     data::{
         ADRENALIN_POTION, ARCANE_BOW, ARCANE_RING, ASSASSINS_VIAL, BAD_BOW, BAD_DAGGER, BAD_RAPIER,
-        BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, CHAIN_MAIL,
-        COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT, ENEMY_BRACE,
-        ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
+        BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, BOSS_AXE,
+        CHAIN_MAIL, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT,
+        ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS, HEALING_NOVA,
         HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS,
         KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE, LUNGE_ATTACK,
@@ -207,6 +207,7 @@ pub enum CharacterType {
     Clara,
     Skeleton,
     SkeletonLeader,
+    SkeletonBoss,
     Draug,
     Lootgoblin,
     Ogre,
@@ -225,6 +226,7 @@ impl CharacterType {
             CharacterType::Clara => SpriteId::Clara,
             CharacterType::Skeleton => SpriteId::Skeleton,
             CharacterType::SkeletonLeader => SpriteId::Skeleton,
+            CharacterType::SkeletonBoss => SpriteId::SkeletonBoss,
             CharacterType::Draug => SpriteId::Draug,
             CharacterType::Lootgoblin => SpriteId::Lootgoblin,
             CharacterType::Ogre => SpriteId::Ogre,
@@ -335,6 +337,7 @@ pub fn create_character(
             //skeleton.learn_ability(ENEMY_SLASHING_ATTACK);
             //skeleton.learn_attack_enhancement(ENEMY_SLASHING);
             skeleton.learn_passive(PassiveSkill::Slasher);
+            skeleton.learn_passive(PassiveSkill::Undead);
 
             skeleton
         }
@@ -354,6 +357,23 @@ pub fn create_character(
             skeleton.set_shield(SMALL_SHIELD);
             skeleton.learn_ability(&ENEMY_BRACE);
             skeleton.learn_ability(&ENEMY_INSPIRE);
+            skeleton.learn_passive(PassiveSkill::Undead);
+            skeleton
+        }
+        CharacterType::SkeletonBoss => {
+            let skeleton = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 14.0),
+                "Skeleton boss",
+                SoundId::Damage,
+                PortraitId::Skeleton,
+                char_data.type_.sprite_id(),
+                Attributes::new(4, 4, 4, 1),
+                pos,
+            );
+            skeleton.health.change_max_value_to(35);
+            skeleton.armor_piece.set(Some(LEATHER_ARMOR));
+            skeleton.set_weapon(HandType::MainHand, BOSS_AXE);
+            skeleton.learn_passive(PassiveSkill::Undead);
             skeleton
         }
         CharacterType::Draug => {
@@ -369,6 +389,7 @@ pub fn create_character(
             draug.learn_ability(&DRAUG_CLAW);
             draug.learn_ability(&DRAUG_HAUNT);
             draug.health.change_max_value_to(20);
+            draug.learn_passive(PassiveSkill::Undead);
             draug
         }
         CharacterType::Lootgoblin => {

@@ -651,6 +651,7 @@ impl Sidebar {
 
         let terrain_objects = [
             TerrainId::Bush,
+            TerrainId::DeadBush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
@@ -659,7 +660,8 @@ impl Sidebar {
             TerrainId::Chest,
             TerrainId::TombStone,
             TerrainId::SmallObstacle,
-            TerrainId::ChestsObstacle,
+            TerrainId::BarrelsObstacle,
+            TerrainId::BarrelsObstacle2,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_objects
             .iter()
@@ -669,6 +671,7 @@ impl Sidebar {
         let terrain_section = ("Terrain", terrain_actions);
 
         let decorations = [
+            TerrainId::DirtMound,
             TerrainId::GroundBorderEast,
             TerrainId::GroundBorderNorth,
             TerrainId::BookShelf,
@@ -724,6 +727,7 @@ impl Sidebar {
             EditorAction::PlaceCharacter(CharacterType::Clara),
             EditorAction::PlaceCharacter(CharacterType::SkeletonLeader),
             EditorAction::PlaceCharacter(CharacterType::Skeleton),
+            EditorAction::PlaceCharacter(CharacterType::SkeletonBoss),
             EditorAction::PlaceCharacter(CharacterType::Draug),
             EditorAction::PlaceCharacter(CharacterType::Lootgoblin),
             EditorAction::PlaceCharacter(CharacterType::Ghoul1),

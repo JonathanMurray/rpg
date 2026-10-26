@@ -10,7 +10,7 @@
     "(1, 28)": "Wall",
     "(1, 25)": "Wall",
     "(1, 22)": "Wall",
-    "(1, 19)": "Wall",
+    "(37, 1)": "Wall",
     "(1, 16)": "Wall",
     "(1, 13)": "Wall",
     "(1, 10)": "Wall",
@@ -172,12 +172,13 @@
     "(1, 1)": "Wall",
     "(31, 1)": "Wall",
     "(34, 1)": "Wall",
-    "(37, 1)": "Wall"
+    "(1, 19)": "Wall"
   },
   "terrain_objects": {
     "(46, 16)": "Chest",
-    "(10, 19)": "ChestsObstacle",
-    "(16, 6)": "ChestsObstacle"
+    "(10, 19)": "BarrelsObstacle",
+    "(16, 6)": "BarrelsObstacle",
+    "(4, 25)": "BarrelsObstacle2"
   },
   "background": {
     "(-4, 12)": "Floor",
@@ -296,17 +297,17 @@
     "(4, 34)": "Floor",
     "(4, 31)": "Floor2",
     "(7, 31)": "Floor2",
-    "(10, 31)": "Floor3",
+    "(10, 31)": "Floor6",
     "(13, 31)": "Floor2",
     "(16, 31)": "Floor2",
-    "(19, 31)": "Floor3",
+    "(19, 31)": "Floor5",
     "(22, 31)": "Floor2",
-    "(22, 28)": "Floor3",
+    "(22, 28)": "Floor5",
     "(19, 28)": "Floor2",
     "(16, 28)": "Floor2",
     "(13, 28)": "Floor2",
     "(10, 28)": "Floor2",
-    "(7, 28)": "Floor3",
+    "(7, 28)": "Floor6",
     "(4, 28)": "Floor4",
     "(4, 25)": "Floor",
     "(7, 25)": "Floor",
@@ -365,25 +366,26 @@
     "(49, 16)": "Floor2",
     "(40, 34)": "Floor2",
     "(34, 34)": "Floor2",
-    "(34, 25)": "Floor4",
-    "(34, 22)": "Floor4",
-    "(34, 19)": "Floor4",
+    "(34, 25)": "Floor2",
+    "(34, 22)": "Floor2",
+    "(34, 19)": "Floor2",
     "(34, 16)": "Floor2",
     "(34, 13)": "Floor2",
-    "(31, 19)": "Floor4",
-    "(37, 19)": "Floor4",
-    "(40, 19)": "Floor4",
-    "(31, 25)": "Floor4",
-    "(31, 22)": "Floor4",
-    "(37, 25)": "Floor4",
-    "(40, 25)": "Floor4",
-    "(40, 22)": "Floor4",
-    "(37, 22)": "Floor4",
+    "(31, 19)": "Floor2",
+    "(37, 19)": "Floor2",
+    "(40, 19)": "Floor2",
+    "(31, 25)": "Floor2",
+    "(31, 22)": "Floor2",
+    "(37, 25)": "Floor2",
+    "(40, 25)": "Floor2",
+    "(40, 22)": "Floor2",
+    "(37, 22)": "Floor2",
     "(40, 28)": "Floor4",
     "(19, 7)": "Floor",
     "(22, 7)": "Floor",
     "(25, 7)": "Floor",
-    "(16, 7)": "Floor"
+    "(16, 7)": "Floor",
+    "(31, 16)": "Floor2"
   },
   "decorations": {
     "(4, 10)": "WallWindow",
@@ -409,7 +411,10 @@
     "(46, 13)": "WallWindow",
     "(3, 10)": "Barrel",
     "(5, 10)": "Barrel",
-    "(16, 4)": "WallWindow"
+    "(16, 4)": "WallWindow",
+    "(28, 19)": "GroundBorderEast",
+    "(28, 22)": "GroundBorderEast",
+    "(28, 25)": "GroundBorderEast"
   },
   "surfaces": {
     "(13, 22)": {
@@ -466,7 +471,7 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        4,
+        7,
         25
       ],
       "health": 8,
