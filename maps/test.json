@@ -36,14 +36,14 @@
     "(1, 25)": "Wall",
     "(1, 22)": "Wall",
     "(1, 19)": "Wall",
-    "(19, 31)": "High",
+    "(28, 7)": "High",
     "(22, 4)": "High",
-    "(22, 31)": "High",
-    "(22, 34)": "High",
-    "(25, 31)": "High",
-    "(25, 34)": "High",
+    "(31, 7)": "High",
+    "(19, 7)": "High",
+    "(34, 7)": "High",
+    "(34, 10)": "High",
     "(19, 4)": "High",
-    "(19, 34)": "High",
+    "(16, 7)": "High",
     "(25, 4)": "High",
     "(4, 7)": "High",
     "(4, 10)": "High",
@@ -56,18 +56,17 @@
     "(25, 10)": "High",
     "(28, 10)": "High",
     "(31, 10)": "High",
-    "(34, 10)": "High",
-    "(16, 7)": "High",
-    "(19, 7)": "High",
-    "(34, 7)": "High",
-    "(31, 7)": "High",
-    "(28, 7)": "High"
+    "(13, 28)": "High",
+    "(16, 28)": "High",
+    "(19, 28)": "High",
+    "(19, 31)": "High",
+    "(16, 31)": "High",
+    "(13, 31)": "High"
   },
   "terrain_objects": {
     "(28, 25)": "ChestsObstacle",
-    "(25, 25)": "ChestsObstacle",
-    "(13, 27)": "ChestsObstacle",
-    "(4, 27)": "TombStone"
+    "(4, 27)": "TombStone",
+    "(25, 26)": "ChestsObstacle"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -296,10 +295,9 @@
     "(10, 22)": "Torch",
     "(16, 10)": "Staircase",
     "(7, 10)": "Staircase",
-    "(16, 25)": "StaircaseTall",
+    "(31, 10)": "Staircase",
     "(1, 25)": "StaircaseTall",
-    "(22, 34)": "Staircase",
-    "(31, 10)": "Staircase"
+    "(16, 31)": "Staircase"
   },
   "surfaces": {
     "(4, 3)": "FireSurfaceSingleCell",
@@ -484,8 +482,8 @@
     {
       "type_": "Alice",
       "pos": [
-        13,
-        32
+        14,
+        28
       ],
       "health": null,
       "main_hand": null,
@@ -495,19 +493,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        7,
-        34
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
-        31,
-        23
+        6,
+        33
       ],
       "health": null,
       "main_hand": null,

@@ -510,7 +510,7 @@ impl GameGrid {
     pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if self
             .pathfind_grid
-            .is_free(Some(Occupation::Terrain(terrain_id)), pos)
+            .is_free(Occupation::Terrain(terrain_id), pos)
             && !self.terrain_objects.contains_key(&pos)
         {
             println!("{:?} was free, for {:?}", pos, terrain_id);
@@ -676,69 +676,7 @@ impl GameGrid {
         }
 
         self.auto_tile_surfaces();
-        self.auto_tile_elevation_borders();
-    }
-
-    pub fn auto_tile_elevation_borders(&mut self) {
-        let mut new_map: HashMap<Position, (Elevation, WallOrientation)> = Default::default();
-        for (pos, elevation) in self.pathfind_grid.elevation_centers().iter() {
-            let mut neighbors = vec![];
-            let neighbor_positions = &[
-                // west
-                (pos.0 - 3, pos.1),
-                // east
-                (pos.0 + 3, pos.1),
-                // north
-                (pos.0, pos.1 - 3),
-                // south
-                (pos.0, pos.1 + 3),
-                // north-west
-                (pos.0 - 3, pos.1 - 3),
-                // north-east
-                (pos.0 + 3, pos.1 - 3),
-                // south-west
-                (pos.0 - 3, pos.1 + 3),
-                // south-east
-                (pos.0 + 3, pos.1 + 3),
-            ];
-            for neighbor_pos in neighbor_positions {
-                let is_neighbor_same = self.pathfind_grid.elevation(*neighbor_pos)
-                    == Some(*elevation)
-                    || !self.pathfind_grid.is_within_grid(*neighbor_pos);
-                neighbors.push(is_neighbor_same);
-            }
-            let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
-                (true, true, true, true) => {
-                    if !neighbors[4] {
-                        WallOrientation::ConcaveSouthEast
-                    } else if !neighbors[5] {
-                        WallOrientation::ConcaveSouthWest
-                    } else if !neighbors[6] {
-                        WallOrientation::ConcaveNorthEast
-                    } else if !neighbors[7] {
-                        WallOrientation::ConcaveNorthWest
-                    } else {
-                        WallOrientation::Inner
-                    }
-                }
-                (false, true, true, true) => WallOrientation::East,
-                (false, true, false, true) => WallOrientation::ConvexNorthWest,
-                (true, true, false, true) => WallOrientation::South,
-                (true, false, false, true) => WallOrientation::ConvexNorthEast,
-                (true, false, true, true) => WallOrientation::West,
-                (true, false, true, false) => WallOrientation::ConvexSouthEast,
-                (true, true, true, false) => WallOrientation::North,
-                (false, true, true, false) => WallOrientation::ConvexSouthWest,
-
-                neighbors => {
-                    println!("WARN: No wall tile fits neighbors: {:?}", neighbors);
-                    WallOrientation::Single
-                }
-            };
-
-            new_map.insert(*pos, (*elevation, orientation));
-        }
-        self.pathfind_grid.set_elevation_borders(new_map);
+        self.pathfind_grid.auto_tile_elevation_borders();
     }
 
     fn is_water(&self, pos: Position) -> bool {
@@ -3384,7 +3322,7 @@ impl GameGrid {
                             snapped_position_target = Some(end);
                             if self
                                 .pathfind_grid
-                                .is_free(Some(Occupation::Character(self.active_character_id)), end)
+                                .is_free(Occupation::Character(self.active_character_id), end)
                             {
                                 // Highlight the position where you'll end up after the movement
                                 self.draw_cornered_outline(
@@ -6066,21 +6004,12 @@ impl GameGrid {
             for y in (origin.1 - range_ceil).max(0)
                 ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 as i32 - 1)
             {
-                if within_inner(x, y) {
-                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
-                    let thickness = (cell_w / 30.0).ceil();
-                    self.draw_borders(
-                        (x, y),
-                        !within_inner(x - 1, y),
-                        !within_inner(x + 1, y),
-                        !within_inner(x, y - 1),
-                        !within_inner(x, y + 1),
-                        thickness,
-                        MOVE_RANGE_COLOR,
-                        DrawBorder::Line,
-                    );
-                } else if within_outer(x, y) {
-                    self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
+                let is_within_inner = within_inner(x, y);
+
+                if within_outer(x, y) {
+                    if !is_within_inner {
+                        self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
+                    }
                     // Hack: since high-ground can have low-ground as a direct north neighbor,
                     // if both positions are reachable (via completely different routes), clarify with
                     // a border that they are not adjacement, movement-wise.
@@ -6112,6 +6041,22 @@ impl GameGrid {
                         bot,
                         thickness * 2.0,
                         MOVE_RANGE_EXTENDED_COLOR.with_alpha(0.3),
+                        DrawBorder::Line,
+                    );
+                }
+
+                if is_within_inner {
+                    self.fill_cell((x, y), Color::new(0.2, 0.7, 0.3, 0.3), 0.0);
+
+                    let thickness = (cell_w / 30.0).ceil();
+                    self.draw_borders(
+                        (x, y),
+                        !within_inner(x - 1, y),
+                        !within_inner(x + 1, y),
+                        !within_inner(x, y - 1),
+                        !within_inner(x, y + 1),
+                        thickness,
+                        MOVE_RANGE_COLOR,
                         DrawBorder::Line,
                     );
                 }

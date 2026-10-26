@@ -534,6 +534,21 @@ pub enum WallOrientation {
     ConvexSouthWest,
     ConvexSouthEast,
     Inner,
+
+    NorthMezzanine,
+    ConvexSouthEastMezzanine,
+    ConvexSouthWestMezzanine,
+}
+
+impl WallOrientation {
+    pub fn is_wall_highground_mezzanine(&self) -> bool {
+        matches!(
+            self,
+            WallOrientation::NorthMezzanine
+                | WallOrientation::ConvexSouthEastMezzanine
+                | WallOrientation::ConvexSouthWestMezzanine
+        )
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -720,6 +735,12 @@ impl TerrainId {
                     WallOrientation::ConcaveNorthEast => (-1..=-1, 0..=1),
                     // part of right column
                     WallOrientation::ConcaveNorthWest => (1..=1, 0..=1),
+                    // two upper rows
+                    WallOrientation::NorthMezzanine => (-1..=1, -1..=0),
+                    // two upper rows
+                    WallOrientation::ConvexSouthEastMezzanine => (-1..=1, -1..=0),
+                    // two upper rows
+                    WallOrientation::ConvexSouthWestMezzanine => (-1..=1, -1..=0),
                 }
             }
             None => {
@@ -878,6 +899,9 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::StoneWall(WallOrientation::ConvexSouthWest) => (3, 14),
         TerrainId::StoneWall(WallOrientation::ConvexSouthEast) => (5, 14),
         TerrainId::StoneWall(WallOrientation::Inner) => (4, 13),
+        TerrainId::StoneWall(WallOrientation::NorthMezzanine) => (1, 15),
+        TerrainId::StoneWall(WallOrientation::ConvexSouthEastMezzanine) => (2, 15),
+        TerrainId::StoneWall(WallOrientation::ConvexSouthWestMezzanine) => (0, 15),
 
         TerrainId::HighgroundBorder(WallOrientation::Single) => (14, 13),
         TerrainId::HighgroundBorder(WallOrientation::ConcaveNorthWest) => (8, 13),
@@ -893,6 +917,13 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::HighgroundBorder(WallOrientation::ConvexSouthWest) => (11, 15),
         TerrainId::HighgroundBorder(WallOrientation::ConvexSouthEast) => (14, 15),
         TerrainId::HighgroundBorder(WallOrientation::Inner) => (13, 14),
+        TerrainId::HighgroundBorder(
+            WallOrientation::NorthMezzanine
+            | WallOrientation::ConvexSouthEastMezzanine
+            | WallOrientation::ConvexSouthWestMezzanine,
+        ) => {
+            panic!("highground mezzanine?")
+        }
 
         TerrainId::Staircase => (12, 15),
         TerrainId::StaircaseLeft => (6, 15),

@@ -232,6 +232,95 @@ impl PathfindGrid {
         self.elevation_borders.borrow().get(&pos).copied()
     }
 
+    pub fn auto_tile_elevation_borders(&self) {
+        let mut new_map: HashMap<Position, (Elevation, WallOrientation)> = Default::default();
+        for (pos, elevation) in self.elevation_centers.borrow().iter() {
+            let mut neighbors = vec![];
+            let neighbor_positions = &[
+                // west
+                (pos.0 - 3, pos.1),
+                // east
+                (pos.0 + 3, pos.1),
+                // north
+                (pos.0, pos.1 - 3),
+                // south
+                (pos.0, pos.1 + 3),
+                // north-west
+                (pos.0 - 3, pos.1 - 3),
+                // north-east
+                (pos.0 + 3, pos.1 - 3),
+                // south-west
+                (pos.0 - 3, pos.1 + 3),
+                // south-east
+                (pos.0 + 3, pos.1 + 3),
+            ];
+
+            #[derive(PartialEq, Debug, Copy, Clone)]
+            enum NeighborType {
+                // The neighbouring rect is the same type as us (HighGround or Wall)
+                Same,
+                // We are Wall and the neighbour is HighGround
+                Lower,
+                // We are HighGround and the neighbor is Wall
+                Higher,
+                // The neighbor is regular ground
+                Ground,
+            };
+            use NeighborType::*;
+
+            for neighbor_pos in neighbor_positions {
+                let neighbor = self.elevation(*neighbor_pos);
+                let outside_grid = !self.is_within_grid(*neighbor_pos);
+                let t = if neighbor == Some(*elevation) || outside_grid {
+                    Same
+                } else if neighbor == Some(Elevation::High) && *elevation == Elevation::Wall {
+                    Lower
+                } else if neighbor == Some(Elevation::Wall) && *elevation == Elevation::High {
+                    Higher
+                } else {
+                    Ground
+                };
+                neighbors.push(t);
+            }
+            let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                (Same, Same, Same | Higher, Same) => {
+                    if neighbors[4] == Ground {
+                        WallOrientation::ConcaveSouthEast
+                    } else if neighbors[5] == Ground {
+                        WallOrientation::ConcaveSouthWest
+                    } else if neighbors[6] == Ground {
+                        WallOrientation::ConcaveNorthEast
+                    } else if neighbors[7] == Ground {
+                        WallOrientation::ConcaveNorthWest
+                    } else {
+                        WallOrientation::Inner
+                    }
+                }
+                (Ground, Same, Same | Higher, Same) => WallOrientation::East,
+                (Ground, Same, Ground, Same) => WallOrientation::ConvexNorthWest,
+                (Same, Same, Ground, Same) => WallOrientation::South,
+                (Same, Ground, Ground, Same) => WallOrientation::ConvexNorthEast,
+                (Same, Ground, Same | Higher, Same) => WallOrientation::West,
+                (Same, Ground, Same | Higher, Ground) => WallOrientation::ConvexSouthEast,
+                (Same, Same, Same | Higher, Ground) => WallOrientation::North,
+                (Ground, Same, Same | Higher, Ground) => WallOrientation::ConvexSouthWest,
+
+                // Wall with highground to the south
+                (Same, Same, Same, Lower) => WallOrientation::NorthMezzanine,
+                (Same, Ground, Same, Lower) => WallOrientation::ConvexSouthEastMezzanine,
+                (Ground, Same, Same, Lower) => WallOrientation::ConvexSouthWestMezzanine,
+
+                neighbors => {
+                    println!("WARN: No wall tile fits neighbors: {:?}", neighbors);
+                    WallOrientation::Single
+                }
+            };
+
+            new_map.insert(*pos, (*elevation, orientation));
+        }
+        self.set_elevation_borders(new_map);
+    }
+
     pub fn set_elevation_borders(&self, borders: HashMap<Position, (Elevation, WallOrientation)>) {
         for (pos, (elevation, orientation)) in self.elevation_borders.borrow().iter() {
             self.remove_occupied(
@@ -262,15 +351,18 @@ impl PathfindGrid {
         self.elevation_centers.borrow_mut().remove(&pos).is_some()
     }
 
-    pub fn elevation_centers(&self) -> Ref<'_, HashMap<Position, Elevation>> {
-        self.elevation_centers.borrow()
-    }
-
     pub fn elevation(&self, pos: Position) -> Option<Elevation> {
         let centers = self.elevation_centers.borrow();
+        let elevation_borders = self.elevation_borders.borrow();
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
                 if let Some(elevation) = centers.get(&(x, y)) {
+                    if let Some((_elevation, orientation)) = elevation_borders.get(&(x, y)) {
+                        if orientation.is_wall_highground_mezzanine() && y < pos.1 {
+                            // Hack: when the 3x3 rect is a Wall-elevation, but mezzanine, the lowest row is Highground, not Wall
+                            return Some(Elevation::High);
+                        }
+                    }
                     return Some(*elevation);
                 }
             }
@@ -664,7 +756,7 @@ impl PathfindGrid {
             // order since we push them onto a stack, and therefore want to push the best one last.
             for (neighbor_pos, neighbor_dist) in neighbors.into_iter().rev() {
                 if self.is_within_grid(neighbor_pos)
-                    && self.is_free(Some(Occupation::Character(character_id)), neighbor_pos)
+                    && self.is_free(Occupation::Character(character_id), neighbor_pos)
                 {
                     let neighbor_node = ChartNode {
                         distance_from_start: neighbor_dist,
@@ -772,12 +864,11 @@ impl PathfindGrid {
         })
     }
 
-    pub fn is_free(&self, subject: Option<Occupation>, pos: Position) -> bool {
-        self.check_collision(subject, pos).is_none()
+    pub fn is_free(&self, subject: Occupation, pos: Position) -> bool {
+        self.check_collision(Some(subject), pos).is_none()
     }
 
     pub fn check_collision(&self, subject: Option<Occupation>, pos: Position) -> Option<Collision> {
-        // A character takes up 9 cells in a square. Check that each cell is free
         let mut other_chars: HashSet<CharacterId> = Default::default();
         let mut terrain_collision = false;
         let mut elevation_collision = false;
@@ -786,7 +877,8 @@ impl PathfindGrid {
         let (xs, ys) = if let Some(occupation) = subject {
             occupation.occupied_cells().unwrap()
         } else {
-            (-1..=1, -1..=1)
+            // Just a single cell
+            (0..=0, 0..=0)
         };
 
         for x in xs.map(|dx| pos.0 + dx) {
@@ -817,7 +909,7 @@ impl PathfindGrid {
                     None => {}
                 }
 
-                // Check if there's any difference in elevation among the 9 cells. Can happen even if there's
+                // Check if there's any difference in elevation among the subject cells. Can happen even if there's
                 // no occupied cells, since north-facing ledges take up no cells
                 let elevation = self.elevation((x, y));
                 if !is_staircase {

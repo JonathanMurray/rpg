@@ -80,7 +80,6 @@ async fn main() {
         Rc::clone(&snap_to_grid),
     );
 
-    let file_text = format!("{:?}", filepath);
     let mut has_unsaved_changes = false;
 
     let mut inspect_target = None;
@@ -120,23 +119,33 @@ async fn main() {
         sidebar.draw();
         settings.draw(0.0, screen_height() - settings.size().1);
 
-        let mut t = file_text.clone();
-        if has_unsaved_changes {
-            t.push_str(" (*)");
+        {
+            let mut file_text = filepath.clone();
+            if has_unsaved_changes {
+                file_text.push_str(" (*)");
+            }
+            draw_debug_text(&file_text, &resources.simple_font, 0.0, 32);
         }
-        draw_text_ex(
-            &t,
-            screen_width() / 2.0,
-            20.0,
-            TextParams {
-                font: Some(&resources.simple_font),
-                font_size: 32,
-                color: WHITE,
-                ..Default::default()
-            },
-        );
 
         let mut mouse_grid_pos = game_grid.mouse_grid_pos();
+
+        {
+            let mut text = format!("{:?}", mouse_grid_pos);
+            if let Some(collision) = game_grid
+                .pathfind_grid
+                .check_collision(None, mouse_grid_pos)
+            {
+                text.push_str(&format!("  {:?}", collision));
+            } else {
+                text.push_str("  -");
+            }
+            if let Some(elevation) = game_grid.pathfind_grid.elevation(mouse_grid_pos) {
+                text.push_str(&format!("  {:?}", elevation));
+            } else {
+                text.push_str("  -");
+            }
+            draw_debug_text(&text, &resources.simple_font, screen_height() - 40.0, 16);
+        }
 
         if snap_to_grid.get() {
             // Snap to 'large grid' (3x3 squares)
@@ -376,7 +385,10 @@ async fn main() {
                             }
                         }
                         EditorAction::PlaceCharacter(char_type) => {
-                            if game_grid.pathfind_grid.is_free(None, pos) {
+                            if game_grid
+                                .pathfind_grid
+                                .is_free(Occupation::Character(u32::MAX), pos)
+                            {
                                 let max_id =
                                     game_grid.characters.keys().copied().max().unwrap_or(0);
                                 let char_data = CharacterData::base(*char_type, pos);
@@ -457,7 +469,7 @@ async fn main() {
                                 let char = game_grid.characters.get(&char_id).unwrap();
                                 if game_grid
                                     .pathfind_grid
-                                    .is_free(Some(Occupation::Character(char.id())), pos)
+                                    .is_free(Occupation::Character(char.id()), pos)
                                 {
                                     game_grid.pathfind_grid.remove_occupied(
                                         char.pos(),
@@ -548,6 +560,28 @@ async fn main() {
             has_unsaved_changes = false;
         }
     }
+}
+
+fn draw_debug_text(file_text: &str, font: &Font, y: f32, font_size: u16) {
+    let dim = measure_text(&file_text, Some(font), font_size, 1.0);
+    draw_rectangle(
+        screen_width() / 2.0 - dim.width / 2.0,
+        y,
+        dim.width,
+        25.0,
+        BLACK,
+    );
+    draw_text_ex(
+        &file_text,
+        screen_width() / 2.0 - dim.width / 2.0,
+        y + 20.0,
+        TextParams {
+            font: Some(font),
+            font_size: font_size,
+            color: WHITE,
+            ..Default::default()
+        },
+    );
 }
 
 struct Sidebar {
