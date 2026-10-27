@@ -155,7 +155,10 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                                 ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
                                 ButtonAction::Action(BaseAction::UseAbility(&BLESS)),
                             ],
-                            vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2))],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(
+                                &EXPLODING_ARROWS,
+                                2,
+                            ))],
                         ),
                     ),
                 ],
@@ -217,7 +220,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                         PlayerId::Alice,
                         CharacterGrowth::of(
                             vec![ButtonAction::AbilityEnhancement(HEAL_ENERGIZE)],
-                            vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(&BARBED_ARROWS, 2))],
                         ),
                     ),
                     (

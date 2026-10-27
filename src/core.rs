@@ -2027,7 +2027,7 @@ impl CoreGame {
         };
 
         if let Some(game) = real_game {
-            let effects = ally_effect.apply.iter().flatten().flatten().copied();
+            let effects = ally_effect.apply.iter().copied();
 
             for mut effect in effects {
                 match effect {
@@ -5612,7 +5612,7 @@ impl AbilityDamage {
 pub struct AbilityPositiveEffect {
     // TODO: remove healing - can be expressed by ApplyEffect instead
     pub healing: u32,
-    pub apply: Option<[Option<ApplyEffect>; 2]>,
+    pub apply: &'static [ApplyEffect],
 }
 
 #[derive(Debug, Clone, PartialEq)]

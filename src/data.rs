@@ -1432,14 +1432,11 @@ pub const ENEMY_BRACE: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(2),
+                duration_rounds: Some(1),
+            })],
         }),
         environment_effect: None,
     },
@@ -1466,14 +1463,11 @@ pub const BRACE: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(2),
+                duration_rounds: Some(1),
+            })],
         }),
         environment_effect: None,
     },
@@ -1831,7 +1825,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some([Some(ApplyEffect::Escape), None]),
+            apply: &[ApplyEffect::Escape],
         }),
         environment_effect: None,
     },
@@ -1934,14 +1928,11 @@ pub static HULDRA_HEAL: Ability = Ability {
         range: Range::f32(15.5),
         effect: AbilityPositiveEffect {
             healing: 8,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(6),
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(6),
+                duration_rounds: Some(1),
+            })],
         },
     },
     possible_enhancements: [None, None, None],
@@ -1969,7 +1960,7 @@ pub const BLESS: Ability = Ability {
     name: "Bless",
     speech: "",
     description:
-        "Heal ally for |<value>5| |<heart>|, and remove |<keyword>Bleeding|, |<keyword>Poisoned|.",
+        "|<keyword>Protect| an ally from the next attack, and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Bless,
     action_point_cost: 2,
     mana_cost: 2,
@@ -1980,15 +1971,20 @@ pub const BLESS: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::f32(9.5),
         effect: AbilityPositiveEffect {
-            healing: 5,
-            apply: Some([
-                Some(ApplyEffect::LoseCondition {
+            healing: 0,
+            apply: &[
+                ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: Some(3),
+                    duration_rounds: Some(1),
+                }),
+                ApplyEffect::LoseCondition {
                     condition: Condition::Bleeding,
-                }),
-                Some(ApplyEffect::LoseCondition {
+                },
+                ApplyEffect::LoseCondition {
                     condition: Condition::Poisoned,
-                }),
-            ]),
+                },
+            ],
         },
     },
     possible_enhancements: [
@@ -2035,14 +2031,11 @@ pub const HASTE: Ability = Ability {
         range: Range::f32(9.5),
         effect: AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Hastened,
-                    stacks: None,
-                    duration_rounds: Some(4),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Hastened,
+                stacks: None,
+                duration_rounds: Some(4),
+            })],
         },
     },
     possible_enhancements: [None, None, None],
@@ -2100,14 +2093,11 @@ pub const INSPIRE: Ability = Ability {
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
-                apply: Some([
-                    Some(ApplyEffect::Condition(ApplyCondition {
-                        condition: Condition::Inspired,
-                        stacks: None,
-                        duration_rounds: Some(3),
-                    })),
-                    None,
-                ]),
+                apply: &[ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Inspired,
+                    stacks: None,
+                    duration_rounds: Some(3),
+                })],
             }),
         }),
         self_effect: None,
@@ -2143,14 +2133,11 @@ pub const ENEMY_INSPIRE: Ability = Ability {
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
-                apply: Some([
-                    Some(ApplyEffect::Condition(ApplyCondition {
-                        condition: Condition::Inspired,
-                        stacks: None,
-                        duration_rounds: Some(2),
-                    })),
-                    None,
-                ]),
+                apply: &[ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Inspired,
+                    stacks: None,
+                    duration_rounds: Some(2),
+                })],
             }),
         }),
         self_effect: None,
@@ -2183,7 +2170,7 @@ pub const HEALING_NOVA: Ability = Ability {
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
-                apply: None,
+                apply: &[],
             }),
         }),
         self_effect: None,
@@ -2216,14 +2203,11 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(2),
+                duration_rounds: Some(1),
+            })],
         }),
         environment_effect: None,
     },
@@ -2251,14 +2235,11 @@ pub const SELF_HEAL: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(2),
+                duration_rounds: Some(1),
+            })],
         }),
         environment_effect: None,
     },
@@ -2294,7 +2275,7 @@ pub const HEALING_RAIN: Ability = Ability {
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
-                apply: None,
+                apply: &[],
             }),
         },
     },
@@ -2633,7 +2614,7 @@ pub const KILL_SELF: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some([Some(ApplyEffect::LoseHealth(99)), None]),
+            apply: &[ApplyEffect::LoseHealth(99)],
         }),
         environment_effect: None,
     },
@@ -2664,7 +2645,7 @@ pub const MANATEST: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some([Some(ApplyEffect::GainMana(1)), None]),
+            apply: &[ApplyEffect::GainMana(1)],
         }),
         environment_effect: None,
     },
@@ -2778,14 +2759,11 @@ pub const HEALTH_POTION: Consumable = Consumable {
         "Health potion",
         AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::HealthPotionRecovering,
-                    stacks: Some(4),
-                    duration_rounds: None,
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::HealthPotionRecovering,
+                stacks: Some(4),
+                duration_rounds: None,
+            })],
         },
     ),
 };
@@ -2799,7 +2777,7 @@ pub const MANA_POTION: Consumable = Consumable {
         "Mana potion",
         AbilityPositiveEffect {
             healing: 0,
-            apply: Some([Some(ApplyEffect::GainMana(5)), None]),
+            apply: &[ApplyEffect::GainMana(5)],
         },
     ),
 };
@@ -2845,14 +2823,11 @@ pub const ADRENALIN_POTION: Consumable = Consumable {
         "Adrenaline potion    ",
         AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Adrenalin,
-                    stacks: None,
-                    duration_rounds: Some(3),
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Adrenalin,
+                stacks: None,
+                duration_rounds: Some(3),
+            })],
         },
     ),
 };
@@ -2866,7 +2841,7 @@ pub const ENERGY_POTION: Consumable = Consumable {
         "Energy potion",
         AbilityPositiveEffect {
             healing: 0,
-            apply: Some([Some(ApplyEffect::GainStamina(10)), None]),
+            apply: &[ApplyEffect::GainStamina(10)],
         },
     ),
 };
@@ -2880,14 +2855,11 @@ pub const ARCANE_POTION: Consumable = Consumable {
         "Arcane potion",
         AbilityPositiveEffect {
             healing: 0,
-            apply: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::ArcaneSurge,
-                    stacks: Some(3),
-                    duration_rounds: None,
-                })),
-                None,
-            ]),
+            apply: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::ArcaneSurge,
+                stacks: Some(3),
+                duration_rounds: None,
+            })],
         },
     ),
 };

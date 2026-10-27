@@ -222,7 +222,7 @@ pub fn draw_tooltip(
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
     // the width of the tooltip window.
-    let line_len_limit = if header_keyword.is_some() { 25 } else { 40 };
+    let line_len_limit = if header_keyword.is_some() { 30 } else { 40 };
     let mut physical_content_lines = vec![];
     // "|<example>hello|  |<hey>| yo"
     for line in content_lines {

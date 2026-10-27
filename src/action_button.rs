@@ -854,7 +854,7 @@ fn describe_ability_ally_effect(effect: &AbilityPositiveEffect, t: &mut Tooltip)
             .push(format!("  |<heart>| |<value>{}| healing", effect.healing));
     }
 
-    for apply in effect.apply.iter().flatten().flatten().copied() {
+    for apply in effect.apply.iter().copied() {
         describe_apply_effect(apply, t);
     }
 }
