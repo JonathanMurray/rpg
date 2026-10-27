@@ -4836,8 +4836,8 @@ impl Condition {
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes at most |<value>1| damage from the next attack.",
-            Bleeding => "End of turn: lose |<value>x| health.\nHalved every turn.",
-            Burning => "End of turn: deals |<value>x| damage.\n50% spreads to adjacent.",
+            Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
+            Burning => "|<faded>End of turn:| deals |<value>x| damage.\n50% spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<evasion>| |<stat>Evasion| against the next attack.",
             Weakened => "|<value>-x| to all defenses and dice rolls.",
@@ -4852,11 +4852,11 @@ impl Condition {
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| |<ap>| AP per turn",
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
-            HealthPotionRecovering => "End of turn: heal |<value>2| |<heart>|",
+            HealthPotionRecovering => "|<faded>End of turn:| heal |<value>2| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
-            Poisoned => "|<value>-5| |<toughness>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
+            Poisoned => "|<faded>End of turn:| lose |<value>10%| of current health |<heart>|",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
             ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
@@ -4964,7 +4964,7 @@ impl Condition {
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 5;
-const POISONED_TOUGHNESS_PENALTY: u32 = 5;
+//const POISONED_TOUGHNESS_PENALTY: u32 = 5;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 //const INSPIRED_WILL_BONUS: u32 = 3;
 const INSPIRED_MOVE_BONUS: f32 = 3.0;
@@ -7509,9 +7509,9 @@ impl Character {
         if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
-        if self.has_condition(&Condition::Poisoned) {
-            res = res.saturating_sub(POISONED_TOUGHNESS_PENALTY);
-        }
+        //if self.has_condition(&Condition::Poisoned) {
+        //res = res.saturating_sub(POISONED_TOUGHNESS_PENALTY);
+        //}
         res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
 
         res
@@ -7825,7 +7825,6 @@ impl Character {
         terms
     }
 
-    // TODO: Poisoned should count, but only for abilities that target Toughness!
     pub fn incoming_ability_bonus_contributors(
         &self,
         main_damage_type: Option<DamageType>,

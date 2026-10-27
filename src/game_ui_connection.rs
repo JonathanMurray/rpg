@@ -332,7 +332,7 @@ impl _GameUserInterfaceConnection {
 
             MessageFromGame::Event(event) => {
                 waiting_for_ui_animation_potentially = true;
-                println!("calling ui.handle_game_event() ...");
+                //println!("calling ui.handle_game_event() ...");
                 user_interface.handle_game_event(event);
             }
         }
