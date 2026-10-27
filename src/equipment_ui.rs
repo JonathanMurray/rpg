@@ -64,7 +64,7 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
             .push("|<single_target>| |<faded>(target):|".to_string());
         describe_apply_effect(effect, &mut t);
     }
-    if let Some(area_effect) = stack.arrow.area_effect {
+    if let Some(area_effect) = &stack.arrow.area_effect {
         describe_area_effect(None, area_effect, &mut t);
     }
     t

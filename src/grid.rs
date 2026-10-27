@@ -3274,7 +3274,7 @@ impl GameGrid {
                         }
                     }
 
-                    match ability.target {
+                    match &ability.target {
                         AbilityTarget::Enemy {
                             impact_circle: impact_area,
                             reach,
@@ -3312,7 +3312,10 @@ impl GameGrid {
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
-                            MouseState::RequiresPositionTarget { shape: None, range }
+                            MouseState::RequiresPositionTarget {
+                                shape: None,
+                                range: *range,
+                            }
                         }
                         AbilityTarget::None { self_area, .. } => MouseState::ImplicitTarget,
                     }
@@ -4669,7 +4672,7 @@ impl GameGrid {
             if enhancement.effect.consume_equipped_arrow {
                 let attacker = &self.characters[&self.active_character_id];
                 let arrow = attacker.unwrap_arrow();
-                if let Some(area_effect) = arrow.area_effect {
+                if let Some(area_effect) = &arrow.area_effect {
                     let target_char = &self.characters[&target_id];
 
                     for other_char in self.characters.values() {

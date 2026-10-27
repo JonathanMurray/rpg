@@ -553,7 +553,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack {
-        arrow: FIRE_ARROWS,
+        arrow: &FIRE_ARROWS,
         quantity: 2,
     }));
 
@@ -689,9 +689,12 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     );
     alice.set_weapon(HandType::MainHand, ZERO_BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(FIRE_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(FIRE_ARROWS, 2)));
+    alice.arrows.set(Some(ArrowStack::new(&FIRE_ARROWS, 3)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
+        &EXPLODING_ARROWS,
+        2,
+    )));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(&FIRE_ARROWS, 2)));
 
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));

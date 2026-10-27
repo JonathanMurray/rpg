@@ -562,7 +562,7 @@ fn candidate_ability_actions(bot: &Character) -> Vec<BotAction> {
     for a in bot.known_abilities() {
         dbg!(a.name);
         //if may_use(bot, a) {
-        let candidate = match a.target {
+        let candidate = match &a.target {
             AbilityTarget::Enemy { .. } => BotAction::SingleEnemyTarget(a),
             AbilityTarget::None { .. } => BotAction::NonTarget(a),
             AbilityTarget::Ally { .. } => BotAction::SingleFriendlyTarget(a),

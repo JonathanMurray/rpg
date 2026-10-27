@@ -243,13 +243,16 @@ pub fn generate_shop_contents() -> Vec<ShopEntry> {
         (EquipmentEntry::Consumable(ENERGY_POTION), 6),
         (EquipmentEntry::Consumable(ARCANE_POTION), 4),
         (
-            EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
+            EquipmentEntry::Arrows(ArrowStack::new(&PENETRATING_ARROWS, 3)),
             4,
         ),
-        (EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)), 4),
-        (EquipmentEntry::Arrows(ArrowStack::new(COLD_ARROWS, 3)), 4),
         (
-            EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3)),
+            EquipmentEntry::Arrows(ArrowStack::new(&BARBED_ARROWS, 3)),
+            4,
+        ),
+        (EquipmentEntry::Arrows(ArrowStack::new(&COLD_ARROWS, 3)), 4),
+        (
+            EquipmentEntry::Arrows(ArrowStack::new(&EXPLODING_ARROWS, 3)),
             4,
         ),
     ];

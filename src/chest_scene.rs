@@ -213,8 +213,8 @@ pub fn generate_chest_content() -> Vec<ChestEntry> {
     let candidate_chest_rewards = vec![
         EquipmentEntry::Armor(CHAIN_MAIL),
         EquipmentEntry::Shield(MEDIUM_SHIELD),
-        EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
-        EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)),
+        EquipmentEntry::Arrows(ArrowStack::new(&PENETRATING_ARROWS, 3)),
+        EquipmentEntry::Arrows(ArrowStack::new(&BARBED_ARROWS, 3)),
         EquipmentEntry::Consumable(ARCANE_POTION),
         EquipmentEntry::Consumable(ENERGY_POTION),
         EquipmentEntry::Consumable(ADRENALIN_POTION),

@@ -1271,7 +1271,7 @@ impl UserInterface {
         if let AbilityTarget::Area {
             mut range,
             area_effect,
-        } = ability.target
+        } = &ability.target
         {
             if area_effect.shape == AreaShape::Line {
                 if let ActionTarget::Position(pos) = target {

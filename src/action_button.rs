@@ -586,7 +586,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         }
     }
 
-    match ability.target {
+    match &ability.target {
         AbilityTarget::Enemy {
             effect,
             impact_circle: area,
@@ -603,14 +603,14 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 range.range_with_icon(),
                 def
             ));
-            describe_ability_negative_effect(effect, &mut t);
+            describe_ability_negative_effect(&effect, &mut t);
 
             if let Some((range, acquisition, effect)) = area {
                 t.technical_description.push("".to_string());
                 let def = def_suffix(effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
-                describe_ability_negative_effect(effect, &mut t);
+                describe_ability_negative_effect(&effect, &mut t);
             }
 
             if let Some(env_effect) = environment_effect {
@@ -621,7 +621,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         AbilityTarget::Ally { range, effect } => {
             t.technical_description
                 .push(format!("|<single_target>| {}|", range.range_with_icon()));
-            describe_ability_ally_effect(effect, &mut t);
+            describe_ability_ally_effect(&effect, &mut t);
         }
 
         AbilityTarget::None {
@@ -632,7 +632,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             if let Some(effect) = self_effect {
                 t.technical_description
                     .push("|<single_target>| |<faded>(self):|".to_string());
-                describe_ability_ally_effect(effect, &mut t);
+                describe_ability_ally_effect(&effect, &mut t);
             }
 
             if let Some(AreaEffect {
@@ -643,7 +643,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             }) = self_area
             {
                 // There's no use-case for this yet (?)
-                assert!(acquisition != AreaTargetAcquisition::Everyone);
+                assert!(acquisition != &AreaTargetAcquisition::Everyone);
 
                 let radius_str = match shape {
                     AreaShape::Circle(r) => r.radius_with_icon(),
@@ -655,15 +655,15 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                     .push(format!("|<multi_target>| {radius_str}{def}"));
                 match effect {
                     AbilityEffect::Negative(effect) => {
-                        describe_ability_negative_effect(effect, &mut t);
+                        describe_ability_negative_effect(&effect, &mut t);
                     }
                     AbilityEffect::Positive(effect) => {
-                        describe_ability_ally_effect(effect, &mut t);
+                        describe_ability_ally_effect(&effect, &mut t);
                     }
                 }
 
                 if let Some(surface) = create_surface {
-                    describe_create_surface(surface, &mut t);
+                    describe_create_surface(*surface, &mut t);
                 }
             }
 
@@ -673,7 +673,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         }
 
         AbilityTarget::Area { range, area_effect } => {
-            describe_area_effect(Some(range), area_effect, &mut t)
+            describe_area_effect(Some(*range), &area_effect, &mut t)
         }
 
         AbilityTarget::Destination { range } => {
@@ -690,7 +690,7 @@ fn def_suffix(defense_type: Option<DefenseType>) -> String {
         .unwrap_or(String::new())
 }
 
-fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
+fn describe_environment_effect(env_effect: &EnvironmentEffect, t: &mut Tooltip) {
     match env_effect {
         EnvironmentEffect::ConvertSurface(from, to) => {
             t.technical_description.push(format!(
@@ -698,15 +698,15 @@ fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
                 from.name(),
                 to.name()
             ));
-            if [from, to].contains(&Surface::Water) {
+            if [from, to].contains(&&Surface::Water) {
                 t.keywords.push(Keyword::Cond(Condition::Wet, None));
             }
-            if [from, to].contains(&Surface::Poison) {
+            if [from, to].contains(&&Surface::Poison) {
                 t.keywords.push(Keyword::Cond(Condition::Poisoned, None));
             }
         }
         EnvironmentEffect::CreateSurface(surface, _shape) => {
-            describe_create_surface(surface, t);
+            describe_create_surface(*surface, t);
         }
     }
 }
@@ -722,8 +722,8 @@ fn describe_create_surface(surface: Surface, t: &mut Tooltip) {
     }
 }
 
-pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &mut Tooltip) {
-    match area_effect.effect {
+pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &mut Tooltip) {
+    match &area_effect.effect {
         AbilityEffect::Negative(effect) => {
             let def = def_suffix(effect.defense_type());
             let targets_str = match area_effect.acquisition {
@@ -786,7 +786,7 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
     }
 }
 
-fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
+fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             if let Some(ability_dmg) = effect.damage {
@@ -807,7 +807,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
                 describe_apply_effect(*apply_effect, t);
             }
             if let Some(environment_effect) = effect.environment_effect {
-                describe_environment_effect(environment_effect, t);
+                describe_environment_effect(&environment_effect, t);
             }
         }
 
@@ -848,7 +848,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
     }
 }
 
-fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut Tooltip) {
+fn describe_ability_ally_effect(effect: &AbilityPositiveEffect, t: &mut Tooltip) {
     if effect.healing > 0 {
         t.technical_description
             .push(format!("  |<heart>| |<value>{}| healing", effect.healing));
