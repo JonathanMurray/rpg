@@ -1416,7 +1416,6 @@ pub const EXECUTE: Ability = Ability {
     }),
 };
 
-// TODO Should not be possible to use Brace if you already have that number of Protected stacks
 pub const ENEMY_BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
@@ -1436,7 +1435,7 @@ pub const ENEMY_BRACE: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: None, //Some(2),
+                    stacks: Some(2),
                     duration_rounds: Some(1),
                 })),
                 None,
@@ -1470,7 +1469,7 @@ pub const BRACE: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: None, //Some(2),
+                    stacks: Some(2),
                     duration_rounds: Some(1),
                 })),
                 None,
@@ -1938,7 +1937,7 @@ pub static HULDRA_HEAL: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: None,
+                    stacks: Some(6),
                     duration_rounds: Some(1),
                 })),
                 None,
@@ -1954,7 +1953,7 @@ pub static HULDRA_HEAL: Ability = Ability {
 };
 
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Heal,
+    ability_id: AbilityId::Bless,
     name: "Energize",
     description: "Also restore |<value>4| |<stamina>| stamina",
     icon: IconId::Energize,
@@ -1965,13 +1964,13 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     }),
     ..AbilityEnhancement::default()
 };
-pub const HEAL: Ability = Ability {
-    id: AbilityId::Heal,
-    name: "Heal",
+pub const BLESS: Ability = Ability {
+    id: AbilityId::Bless,
+    name: "Bless",
     speech: "",
     description:
         "Heal ally for |<value>5| |<heart>|, and remove |<keyword>Bleeding|, |<keyword>Poisoned|.",
-    icon: IconId::Heal,
+    icon: IconId::Bless,
     action_point_cost: 2,
     mana_cost: 2,
     stamina_cost: 0,
@@ -1994,7 +1993,7 @@ pub const HEAL: Ability = Ability {
     },
     possible_enhancements: [
         Some(AbilityEnhancement {
-            ability_id: AbilityId::Heal,
+            ability_id: AbilityId::Bless,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
@@ -2220,7 +2219,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: None, //Some(2),
+                    stacks: Some(2),
                     duration_rounds: Some(1),
                 })),
                 None,
@@ -2255,7 +2254,7 @@ pub const SELF_HEAL: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: None, //Some(2),
+                    stacks: Some(2),
                     duration_rounds: Some(1),
                 })),
                 None,

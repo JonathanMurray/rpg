@@ -228,7 +228,7 @@ pub enum IconId {
     Slashing,
     Stabbing,
     Feint,
-    Heal,
+    Bless,
     BloodMagic,
     SpikeTrap,
 
@@ -1343,7 +1343,7 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
         IconId::Slashing => (0, 8),
         IconId::Stabbing => (1, 8),
         IconId::Feint => (0, 7),
-        IconId::Heal => (6, 1),
+        IconId::Bless => (6, 1),
         IconId::BloodMagic => (0, 3),
         IconId::Inferno => (3, 2),
         IconId::Energize => (4, 1),

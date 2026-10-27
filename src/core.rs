@@ -1517,7 +1517,7 @@ impl CoreGame {
                         actor.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
-                            ability: ability.clone(),
+                            ability: ability,
                             target: Some(*target_id),
                             area_at: None,
                         })
@@ -2374,8 +2374,13 @@ impl CoreGame {
                     RollInstruction::RollWithAttackModifier { .. }
                 ) {
                     // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                    if target.conditions.borrow().has(&Condition::Protected) {
-                        apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                    let protected = target.get_condition_stacks(Condition::Protected);
+                    if protected > 0 {
+                        apply_protected_bonus_against_attack(
+                            &mut dmg_str,
+                            &mut dmg_calculation,
+                            protected,
+                        );
                     }
                 }
             }
@@ -2448,7 +2453,7 @@ impl CoreGame {
                 RollInstruction::RollWithAttackModifier { .. }
             ) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                if target.lose_protected() {
+                if target.lose_condition(Condition::Protected) {
                     detail_lines.push(format!("|{}| lost |<keyword>Protected|", target.name_tag()));
                 }
 
@@ -2921,8 +2926,13 @@ impl CoreGame {
                     dmg_calculation -= amount as i32;
                 }
 
-                if defender.conditions.borrow().has(&Condition::Protected) {
-                    apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                let protected = defender.get_condition_stacks(Condition::Protected);
+                if protected > 0 {
+                    apply_protected_bonus_against_attack(
+                        &mut dmg_str,
+                        &mut dmg_calculation,
+                        protected,
+                    );
                 }
 
                 let damage = dmg_calculation.max(0) as u32;
@@ -3146,7 +3156,7 @@ impl CoreGame {
                         });
                     }
 
-                    if defender.lose_protected() {
+                    if defender.lose_condition(Condition::Protected) {
                         detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
                     }
 
@@ -3172,7 +3182,7 @@ impl CoreGame {
 
         let mut area_outcomes = None;
         if let Some(game) = game {
-            if defender.lose_distracted() {
+            if defender.lose_condition(Condition::Distracted) {
                 detail_lines.push(format!("|{}| lost Distracted", defender.name_tag()));
             }
 
@@ -4162,7 +4172,7 @@ pub enum GameEvent {
     Attacked(AttackedEvent),
     AbilityWasInitiated {
         actor: CharacterId,
-        ability: Ability,
+        ability: &'static Ability,
         target: Option<CharacterId>,
         area_at: Option<(AreaShape, Position)>,
     },
@@ -4740,9 +4750,13 @@ impl Display for AttackHitEffect {
     }
 }
 
-fn apply_protected_bonus_against_attack(dmg_str: &mut String, dmg_calculation: &mut i32) {
-    dmg_str.push_str(" max 1 |<faded>(Protected)|");
-    *dmg_calculation = *dmg_calculation.min(&mut 1);
+fn apply_protected_bonus_against_attack(
+    dmg_str: &mut String,
+    dmg_calculation: &mut i32,
+    stacks: u32,
+) {
+    dmg_str.push_str(&format!(" - {stacks} |<faded>(Protected)|"));
+    *dmg_calculation = *dmg_calculation - (stacks as i32);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -4835,7 +4849,7 @@ impl Condition {
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
-            Protected => "Takes at most |<value>1| damage from the next attack.",
+            Protected => "Takes |<value>-x| |<sword>| damage from the next attack.",
             Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
             Burning => "|<faded>End of turn:| deals |<value>x| damage.\n50% spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
@@ -5301,7 +5315,7 @@ pub struct AbilityChargeFx {
     pub(crate) sound: SoundId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Ability {
     pub id: AbilityId,
     pub name: &'static str,
@@ -5448,7 +5462,7 @@ pub enum AbilityId {
     Dash,
     Spikes,
     PiercingShot,
-    Heal,
+    Bless,
     HealingNova,
     SelfHeal,
     HealingRain,
@@ -6580,14 +6594,6 @@ impl Character {
             | EquipmentEntry::Trinket(..) => true,
             EquipmentEntry::Consumable(..) => false,
         }
-    }
-
-    fn lose_protected(&self) -> bool {
-        self.lose_condition(Condition::Protected)
-    }
-
-    fn lose_distracted(&self) -> bool {
-        self.lose_condition(Condition::Distracted)
     }
 
     pub fn equipment_weight(&self) -> u32 {

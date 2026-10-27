@@ -509,7 +509,8 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 line.push_str(&format!(" x |<value>{}|", stacks));
             }
             if let Some(rounds) = apply_condition.duration_rounds {
-                line.push_str(&format!(" for |<value>{}| rounds", rounds));
+                let suffix = if rounds > 1 { "s" } else { "" };
+                line.push_str(&format!(" for |<value>{}| round{}", rounds, suffix));
             }
             t.technical_description.push(line);
             t.keywords.push(Keyword::Cond(

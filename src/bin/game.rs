@@ -25,10 +25,11 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, CRIPPLING_SHOT,
-    DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE, HEAL, HEALTH_POTION,
-    HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, NECROTIC_BAND,
-    PIERCING_SHOT, SPIKETEST, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
+    PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, BLESS,
+    CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE,
+    HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION,
+    NECROTIC_BAND, PIERCING_SHOT, SPIKETEST, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH,
+    TOXIC_GRENADE,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -152,7 +153,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                         CharacterGrowth::of(
                             vec![
                                 ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                                ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
+                                ButtonAction::Action(BaseAction::UseAbility(&BLESS)),
                             ],
                             vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2))],
                         ),

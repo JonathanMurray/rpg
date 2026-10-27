@@ -28,7 +28,7 @@ use crate::{
         OnHitReaction, Party, WeaponType,
     },
     data::{
-        PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
+        PassiveSkill, BLESS, BRACE, CRIPPLING_SHOT, FIREBALL, HEALING_NOVA, HEALING_RAIN,
         LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
         SMITE, SWEEP_ATTACK,
     },
@@ -420,7 +420,7 @@ pub async fn run_victory_loop(
             &SCREAM,
             &SHACKLED_MIND,
             &MIND_BLAST,
-            &HEAL,
+            &BLESS,
             &HEALING_NOVA,
             &HEALING_RAIN,
         ] {

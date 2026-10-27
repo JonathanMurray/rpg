@@ -31,7 +31,7 @@ use crate::base_ui::{Container, Drawable, Element, LayoutDirection, Style};
 use crate::core::BaseAction;
 
 use crate::data::{
-    PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, INFLICT_WOUNDS, LUNGE_ATTACK, MIND_BLAST,
+    PassiveSkill, BLESS, BRACE, CRIPPLING_SHOT, FIREBALL, INFLICT_WOUNDS, LUNGE_ATTACK, MIND_BLAST,
     QUICK, RAGE, SCREAM, SEARING_LIGHT, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
@@ -162,7 +162,7 @@ pub async fn run_editor() {
         &SHACKLED_MIND,
         &MIND_BLAST,
         &INFLICT_WOUNDS,
-        &HEAL,
+        &BLESS,
         &SEARING_LIGHT,
         &FIREBALL,
     ];
@@ -888,7 +888,7 @@ fn skills_mapping() -> Vec<(Skill, ButtonAction)> {
             (Skill::ShackledMind, ability(&SHACKLED_MIND)),
             (Skill::MindBlast, ability(&MIND_BLAST)),
             (Skill::InflictWounds, ability(&INFLICT_WOUNDS)),
-            (Skill::Heal, ability(&HEAL)),
+            (Skill::Heal, ability(&BLESS)),
             (Skill::SearingLight, ability(&SEARING_LIGHT)),
             (Skill::Fireball, ability(&FIREBALL)),
             (Skill::Quick, atk_enhancement(QUICK)),

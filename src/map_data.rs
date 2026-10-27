@@ -31,8 +31,8 @@ use crate::{
 };
 
 use crate::data::{
-    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE,
+    PassiveSkill, ARCANE_POTION, BLESS, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
+    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEALTH_POTION, HEAL_ENERGIZE,
     INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MEDIUM_SHIELD,
     PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE, SWEEP_ATTACK,
     SWORD,
@@ -700,7 +700,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
 
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
     alice.trinket.set(Some(ASSASSINS_VIAL));
-    alice.learn_ability(&HEAL);
+    alice.learn_ability(&BLESS);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_passive(PassiveSkill::WeaponProficiency);
