@@ -613,6 +613,7 @@ pub enum TerrainId {
     Cauldron,
     Cauldron2,
     Chest,
+    FenceHor,
     WallOpeningNorth,
     WallOpeningEast,
     WallOpeningWest,
@@ -766,6 +767,8 @@ impl TerrainId {
                     TerrainId::TombStone => (-1..=1, 0..=1),
                     // two lower rows
                     TerrainId::Chest => (-1..=1, 0..=1),
+                    // bottom row
+                    TerrainId::FenceHor => (-1..=1, 1..=1),
                     // two lower rows
                     TerrainId::Cauldron2 => (-1..=1, 0..=1),
                     // two lower rows
@@ -972,6 +975,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::Cauldron => (5, 8),
         TerrainId::Cauldron2 => (6, 8),
         TerrainId::Chest => (9, 8),
+        TerrainId::FenceHor => (9, 7),
         TerrainId::WallWindow => (11, 8),
         TerrainId::WallWindow2 => (12, 8),
         TerrainId::WallWindow2Left => (13, 8),

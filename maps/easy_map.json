@@ -176,9 +176,8 @@
   },
   "terrain_objects": {
     "(46, 16)": "Chest",
-    "(10, 19)": "BarrelsObstacle",
-    "(16, 6)": "BarrelsObstacle",
-    "(4, 25)": "BarrelsObstacle2"
+    "(11, 19)": "BarrelsObstacle2",
+    "(16, 6)": "BarrelsObstacle"
   },
   "background": {
     "(-4, 12)": "Floor",

@@ -225,10 +225,12 @@ async fn main() {
                         game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
 
                         let (mut xs, mut ys) = terrain_id.occupied_cells().unwrap();
-                        let left = snapped_mouse_screen_pos.0 + xs.next().unwrap() as f32 * cell_w;
+                        let left =
+                            snapped_mouse_screen_pos.0 + xs.clone().next().unwrap() as f32 * cell_w;
                         let right = snapped_mouse_screen_pos.0
                             + (xs.next_back().unwrap() + 1) as f32 * cell_w;
-                        let top = snapped_mouse_screen_pos.1 + ys.next().unwrap() as f32 * cell_w;
+                        let top =
+                            snapped_mouse_screen_pos.1 + ys.clone().next().unwrap() as f32 * cell_w;
                         let bot = snapped_mouse_screen_pos.1
                             + (ys.next_back().unwrap() + 1) as f32 * cell_w;
                         draw_rectangle_lines2(left, top, right - left, bot - top, 4.0, RED);
@@ -661,6 +663,7 @@ impl Sidebar {
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
+            TerrainId::FenceHor,
             TerrainId::TombStone,
             TerrainId::SmallObstacle,
             TerrainId::BarrelsObstacle,

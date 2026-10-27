@@ -98,7 +98,11 @@
     "(7, 21)": "TombStone",
     "(7, 23)": "TombStone",
     "(7, 25)": "TombStone",
-    "(10, 25)": "TombStone"
+    "(10, 25)": "TombStone",
+    "(19, 28)": "FenceHor",
+    "(22, 28)": "FenceHor",
+    "(13, 37)": "FenceHor",
+    "(19, 37)": "FenceHor"
   },
   "background": {
     "(-2, 7)": "Grass",

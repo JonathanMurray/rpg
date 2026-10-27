@@ -253,7 +253,9 @@
     "(28, 16)": "WallWindow2Right",
     "(28, 22)": "WallWindow2Right",
     "(28, 28)": "WallWindow2Right",
-    "(23, 15)": "SmallStone"
+    "(23, 15)": "SmallStone",
+    "(22, 34)": "WallWindow2Right",
+    "(7, 34)": "WallWindow2Left"
   },
   "surfaces": {
     "(16, 13)": {
@@ -543,7 +545,9 @@
         "NorthEast",
         "Water"
       ]
-    }
+    },
+    "(7, 28)": "FireSurfaceSingleCell",
+    "(22, 28)": "FireSurfaceSingleCell"
   },
   "control_points": {},
   "characters": [
