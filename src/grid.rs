@@ -2343,37 +2343,45 @@ impl GameGrid {
             TextEffectStyle::StrongHit => rgb(201, 226, 118),
         };
 
-        let random_movement = if rise_indefinitely {
-            Some((
+        let mut text_graphics = TextGraphics {
+            status_texture,
+            text,
+            font: font.clone(),
+            font_size,
+            color,
+            start_offset: (0.0, 0.0),
+            movement: None,
+            background,
+        };
+
+        if rise_indefinitely {
+            text_graphics.movement = Some((
                 rng.random_range(-1.0..1.0) * 30.0,
                 rng.random_range(0.2..1.0) * 40.0,
-            ))
-        } else {
-            None
-        };
+            ));
+            text_graphics.start_offset =
+                (rng.random_range(-0.3..=0.3), rng.random_range(-0.3..=0.3));
 
-        let random_offset = if rise_indefinitely {
-            (rng.random_range(-0.3..=0.3), rng.random_range(-0.3..=0.3))
-        } else {
-            (0.0, 0.0)
-        };
+            let character = self.characters.get(&character_id).unwrap();
 
-        let animation = CharacterAnimation::new(
-            character_id,
-            start_time,
-            duration,
-            AnimationDetails::Text(TextGraphics {
-                status_texture,
-                text,
-                font: font.clone(),
-                font_size,
-                color,
-                start_offset: random_offset,
-                movement: random_movement,
-                background,
-            }),
-        );
-        self.character_animations.push(animation);
+            self.add_effect(
+                character.pos(),
+                character.pos(),
+                EffectData {
+                    start_time,
+                    end_time: start_time + duration,
+                    variant: EffectVariant::Text(text_graphics),
+                },
+            );
+        } else {
+            let animation = CharacterAnimation::new(
+                character_id,
+                start_time,
+                duration,
+                AnimationDetails::Text(text_graphics),
+            );
+            self.character_animations.push(animation);
+        }
     }
 
     pub fn add_effect(&mut self, source: Position, destination: Position, data: EffectData) {
@@ -5857,6 +5865,19 @@ impl GameGrid {
                         *is_in_liquid,
                     );
                 }
+
+                EffectVariant::Text(text_graphics) => {
+                    let duration = effect.data.end_time - effect.data.start_time;
+                    let x = self.grid_x_f32_to_screen(effect.source_grid_pos.0);
+                    let y = self.grid_y_f32_to_screen(effect.source_grid_pos.1);
+                    draw_text_graphics(
+                        (x, y),
+                        text_graphics,
+                        self.cell_w(),
+                        duration,
+                        duration - effect.age,
+                    );
+                }
             }
         }
     }
@@ -6506,6 +6527,7 @@ pub enum EffectVariant {
         shield: Option<SpriteId>,
         is_in_liquid: bool,
     },
+    Text(TextGraphics),
 }
 #[derive(Debug)]
 pub enum EffectPosition {
