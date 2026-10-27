@@ -57,6 +57,7 @@ use crate::{
     },
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
+    game_ui_connection::DEBUG,
     grid::SpriteProperty::{ReplaceHandHeldWithProjectile, WeaponXOffsetCellW},
     pathfind::{
         ChartNode, Elevation, Occupation, PathNode, PathfindGrid, Surface, TerrainType,
@@ -223,7 +224,6 @@ enum AnimationDetails {
     MotionPreview {
         positions: Vec<Position>,
     },
-    Death,
     AttackCrosshairPreview {
         target_pos: Position,
     },
@@ -495,13 +495,11 @@ pub struct GameGrid {
     terrain_atlas: Texture2D,
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
-
     pub surfaces: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     pub control_points: IndexMap<Position, ControlPoint>,
     sprites: HashMap<SpriteId, Sprite>,
     pub pathfind_grid: Rc<PathfindGrid>,
-    //routes: IndexMap<Position, ChartNode>,
     pub characters: HashMap<CharacterId, Rc<Character>>,
 
     ability_cast_particle_group: Option<(AbilityId, ParticleGroup)>,
@@ -1019,16 +1017,26 @@ impl GameGrid {
         self.hovered_character_portrait = character_id;
     }
 
-    pub fn animate_death(&mut self, character_id: CharacterId) -> f32 {
-        let duration = 1.5;
-        self.character_animations.push(CharacterAnimation::new(
-            character_id,
-            0.0,
-            duration,
-            AnimationDetails::Death,
-        ));
-        // Need to block UI for the entire duration. Otherwise the game removes the character which cuts of the animation
-        duration
+    pub fn animate_death(&mut self, character_id: CharacterId) {
+        let character = self.characters.get(&character_id).unwrap();
+
+        let standing_on_surface = self.pathfind_grid.surface(character.pos());
+        let is_in_liquid = standing_on_surface.map(|s| s.is_liquid()).unwrap_or(false);
+
+        self.add_effect(
+            character.pos(),
+            character.pos(),
+            EffectData {
+                start_time: 0.0,
+                end_time: 6.0,
+                variant: EffectVariant::Corpse {
+                    sprite: character.sprite,
+                    weapon: character.weapon(HandType::MainHand).and_then(|w| w.sprite),
+                    shield: character.shield().and_then(|s| s.sprite),
+                    is_in_liquid,
+                },
+            },
+        );
     }
 
     pub fn animate_magic_sparks(&mut self, char: CharacterId, color: Color) {
@@ -1139,7 +1147,7 @@ impl GameGrid {
                 self.add_effect(
                     attacker_pos,
                     target_pos,
-                    Effect {
+                    EffectData {
                         start_time: delay + aim_duration,
                         end_time: delay + aim_duration + projectile_duration,
                         variant: EffectVariant::At(
@@ -1158,7 +1166,7 @@ impl GameGrid {
                 self.add_effect(
                     attacker_pos,
                     target_pos,
-                    Effect {
+                    EffectData {
                         start_time: delay + aim_duration + projectile_duration,
                         end_time: delay + aim_duration + projectile_duration + 0.2,
                         variant: EffectVariant::At(
@@ -1332,7 +1340,7 @@ impl GameGrid {
                     self.add_effect(
                         caster_pos,
                         area_pos,
-                        Effect {
+                        EffectData {
                             start_time: delay,
                             end_time: delay + visual_duration,
                             variant: EffectVariant::Fx { texture },
@@ -1343,7 +1351,7 @@ impl GameGrid {
                     self.add_effect(
                         caster_pos,
                         area_pos,
-                        Effect {
+                        EffectData {
                             start_time: delay,
                             end_time: delay + visual_duration,
                             variant: EffectVariant::Line {
@@ -1375,7 +1383,7 @@ impl GameGrid {
             self.add_effect(
                 caster_pos,
                 target_pos,
-                Effect {
+                EffectData {
                     start_time: start_time + i as f32 * 0.025,
                     end_time: start_time + duration + i as f32 * 0.025,
                     variant: EffectVariant::At(
@@ -1519,7 +1527,7 @@ impl GameGrid {
             self.add_effect(
                 attacker_pos,
                 target_pos,
-                Effect {
+                EffectData {
                     start_time: delay + aim_duration,
                     end_time: delay + aim_duration + projectile_duration,
                     variant: EffectVariant::At(
@@ -1538,7 +1546,7 @@ impl GameGrid {
             self.add_effect(
                 attacker_pos,
                 target_pos,
-                Effect {
+                EffectData {
                     start_time: delay + aim_duration + projectile_duration,
                     end_time: delay + aim_duration + projectile_duration + 0.2,
                     variant: EffectVariant::At(
@@ -1572,7 +1580,7 @@ impl GameGrid {
             self.add_effect(
                 attacker_pos,
                 target_pos,
-                Effect {
+                EffectData {
                     start_time: delay + 0.1,
                     end_time: delay + 0.4,
                     variant: EffectVariant::At(
@@ -1937,14 +1945,16 @@ impl GameGrid {
         let rect = effect_atlas_rect(effect);
         self.effects.push(ConcreteEffect {
             age: 0.0,
-            start_time: 0.0,
-            end_time: duration,
-            source_pos: pos,
-            destination_pos: pos,
-            variant: EffectVariant::At(
-                EffectPosition::Source,
-                EffectGraphics::Texture(texture.clone(), Some(rect)),
-            ),
+            source_grid_pos: pos,
+            destination_grid_pos: pos,
+            data: EffectData {
+                start_time: 0.0,
+                end_time: duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Source,
+                    EffectGraphics::Texture(texture.clone(), Some(rect)),
+                ),
+            },
         });
     }
 
@@ -2097,7 +2107,7 @@ impl GameGrid {
         for effect in &mut self.effects {
             effect.age += elapsed;
         }
-        self.effects.retain(|e| e.age <= e.end_time);
+        self.effects.retain(|e| e.age <= e.data.end_time);
 
         for a in self.character_animations.iter_mut() {
             let char_pos = &self.characters[&a.character_id].pos();
@@ -2366,17 +2376,15 @@ impl GameGrid {
         self.character_animations.push(animation);
     }
 
-    pub fn add_effect(&mut self, source: Position, destination: Position, effect: Effect) {
+    pub fn add_effect(&mut self, source: Position, destination: Position, data: EffectData) {
         let source_pos = (source.0 as f32, source.1 as f32);
         let destination_pos = (destination.0 as f32, destination.1 as f32);
 
         let concrete_effect = ConcreteEffect {
             age: 0.0,
-            start_time: effect.start_time,
-            end_time: effect.end_time,
-            source_pos,
-            destination_pos,
-            variant: effect.variant,
+            source_grid_pos: source_pos,
+            destination_grid_pos: destination_pos,
+            data,
         };
 
         self.effects.push(concrete_effect);
@@ -2589,17 +2597,15 @@ impl GameGrid {
         let mut params = DrawTextureParams {
             dest_size: Some(size.into()),
             flip_x: character.facing.get().is_east(),
-            //pivot: Some((size.0 / 2.0, size.1 / 2.0).into()),
             ..Default::default()
         };
 
         let (mut x, mut y) = self.character_screen_pos(character);
         let cell_w = self.cell_w();
         x -= cell_w;
-        y -= cell_w;
-        let (mut shadow_x, mut shadow_y) = (x, y);
+        y -= cell_w * 2.2;
 
-        let mut dying = false;
+        let (mut shadow_x, mut shadow_y) = (x, y);
 
         struct HeldSphere {
             color: Color,
@@ -2629,7 +2635,6 @@ impl GameGrid {
             .filter(|a| a.character_id == character.id() && a.has_started())
         {
             let remaining = animation.remaining_duration;
-            let remaining_ratio = animation.remaining_duration_ratio();
             match &animation.kind {
                 AnimationDetails::Text(_text_graphics) => {}
                 AnimationDetails::MotionPreview { positions } => {
@@ -2653,27 +2658,7 @@ impl GameGrid {
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
                 }
-                AnimationDetails::Death => {
-                    let max_rotation = PI * 0.5;
-                    if remaining_ratio > 0.9 {
-                        x += random_range(-6.0..6.0);
-                        y += random_range(-7.0..3.0);
 
-                        // from 0 to 1
-                        let rotation_progress = (1.0 - remaining_ratio) * 10.0;
-                        params.rotation = max_rotation * rotation_progress;
-                    } else {
-                        params.rotation = max_rotation;
-
-                        let factor = remaining_ratio.min(0.6);
-                        // Corpse sinking down into the ground/water
-                        character_crop_factor = (factor, 1.0);
-                        character_offset = ((0.8 - factor) * self.rect_w as f32, 0.0);
-                    };
-
-                    dying = true;
-                    params.flip_x = false;
-                }
                 AnimationDetails::MagicSparks { .. } => {
                     // This is drawn separately
                 }
@@ -2845,13 +2830,6 @@ impl GameGrid {
             shadow_x += dx;
         }
 
-        if true {
-            // !dying {
-            let offset = cell_w * 1.2;
-            y -= offset;
-            shadow_y -= offset;
-        }
-
         let standing_on_surface = self.pathfind_grid.surface(character.pos());
 
         let standing_in_liquid = standing_on_surface.map(|s| s.is_liquid()).unwrap_or(false);
@@ -2861,21 +2839,23 @@ impl GameGrid {
         if standing_in_liquid {
             let water_depth_factor = 0.125;
 
+            /*
             if dying {
                 // corpse is rotated 90 degrees clockwise
                 x += cell_w * 0.5;
             } else {
-                character_crop_factor = (1.0, 1.0 - water_depth_factor);
-            }
+              */
+            character_crop_factor = (1.0, 1.0 - water_depth_factor);
+            //}
             y += water_depth_factor * self.rect_w as f32;
             shadow_y += water_depth_factor * cell_w * 1.0;
         }
 
         if standing_on_surface == Some(Surface::Fire) {
             // Hide feet in the fire
-            if !dying {
-                character_crop_factor = (1.0, 0.8);
-            }
+            //if !dying {
+            character_crop_factor = (1.0, 0.8);
+            //}
         }
 
         x = x.floor();
@@ -2965,40 +2945,25 @@ impl GameGrid {
 
                 if let Some(weapon) = character.weapon(HandType::MainHand) {
                     if let Some(texture) = weapon.sprite {
-                        let mut y_offset = 0.0;
-
-                        let mut rotation = params.rotation + weapon_rotation_modifier;
-                        if dying {
-                            rotation = 0.2 * PI;
-                            y_offset = cell_w * 1.0;
-                        }
-                        let weapon_params = DrawTextureParams { rotation, ..params };
-                        //let dest_size = params.dest_size.unwrap();
-                        //weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
+                        let rotation = params.rotation + weapon_rotation_modifier;
                         draw_texture_ex(
                             &self.sprites[&texture].regular,
                             x + weapon_offset.0,
-                            y + weapon_offset.1 + y_offset,
+                            y + weapon_offset.1 + 0.0,
                             WHITE,
-                            weapon_params,
+                            DrawTextureParams { rotation, ..params },
                         );
                     }
                 }
 
                 if let Some(shield) = character.shield() {
                     if let Some(texture) = shield.sprite {
-                        let mut rotation = params.rotation; // + weapon_rotation_modifier;
-                        if dying {
-                            rotation = 0.0;
-                            shield_offset = (0.0, cell_w * 1.0);
-                        }
-                        let shield_params = DrawTextureParams { rotation, ..params };
                         draw_texture_ex(
                             &self.sprites[&texture].regular,
                             x + shield_offset.0,
                             y + shield_offset.1,
                             WHITE,
-                            shield_params,
+                            params,
                         );
                     }
                 }
@@ -5748,21 +5713,22 @@ impl GameGrid {
 
     fn draw_effects(&self) {
         for effect in &self.effects {
-            if effect.age < effect.start_time {
+            if effect.age < effect.data.start_time {
                 continue;
             }
-            let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
+            let t = (effect.age - effect.data.start_time)
+                / (effect.data.end_time - effect.data.start_time);
 
-            match &effect.variant {
+            match &effect.data.variant {
                 EffectVariant::At(position, graphics) => {
                     let (x, y) = match position {
-                        EffectPosition::Source => effect.source_pos,
-                        EffectPosition::Destination => effect.destination_pos,
+                        EffectPosition::Source => effect.source_grid_pos,
+                        EffectPosition::Destination => effect.destination_grid_pos,
                         EffectPosition::StraightProjectile => {
-                            let x = effect.source_pos.0
-                                + (effect.destination_pos.0 - effect.source_pos.0) * t;
-                            let y = effect.source_pos.1
-                                + (effect.destination_pos.1 - effect.source_pos.1) * t;
+                            let x = effect.source_grid_pos.0
+                                + (effect.destination_grid_pos.0 - effect.source_grid_pos.0) * t;
+                            let y = effect.source_grid_pos.1
+                                + (effect.destination_grid_pos.1 - effect.source_grid_pos.1) * t;
                             (x, y)
                         }
                         EffectPosition::GravitationalProjectile {
@@ -5770,10 +5736,10 @@ impl GameGrid {
                         } => {
                             let dy = -gravity * t + gravity * t.powf(2.0);
 
-                            let x = effect.source_pos.0
-                                + (effect.destination_pos.0 - effect.source_pos.0) * t;
-                            let y = effect.source_pos.1
-                                + (effect.destination_pos.1 - effect.source_pos.1) * t
+                            let x = effect.source_grid_pos.0
+                                + (effect.destination_grid_pos.0 - effect.source_grid_pos.0) * t;
+                            let y = effect.source_grid_pos.1
+                                + (effect.destination_grid_pos.1 - effect.source_grid_pos.1) * t
                                 + dy;
                             // Center of entity
                             (x, y - 1.0)
@@ -5792,12 +5758,12 @@ impl GameGrid {
                     extend_gradually,
                 } => {
                     let from = (
-                        self.grid_x_f32_to_screen(effect.source_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.source_pos.1 - 0.5),
+                        self.grid_x_f32_to_screen(effect.source_grid_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_grid_pos.1 - 0.5),
                     );
                     let mut to = (
-                        self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.destination_pos.1 - 0.5),
+                        self.grid_x_f32_to_screen(effect.destination_grid_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_grid_pos.1 - 0.5),
                     );
 
                     if *extend_gradually {
@@ -5812,12 +5778,12 @@ impl GameGrid {
                 }
                 EffectVariant::Fx { texture } => {
                     let from = (
-                        self.grid_x_f32_to_screen(effect.source_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.source_pos.1 + 0.5),
+                        self.grid_x_f32_to_screen(effect.source_grid_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_grid_pos.1 + 0.5),
                     );
                     let final_to = (
-                        self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.destination_pos.1 + 0.5),
+                        self.grid_x_f32_to_screen(effect.destination_grid_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_grid_pos.1 + 0.5),
                     );
                     let texture_size = texture.size();
                     let texture_draw_size = self.default_entity_draw_size();
@@ -5875,7 +5841,108 @@ impl GameGrid {
                         );
                     }
                 }
+
+                EffectVariant::Corpse {
+                    sprite,
+                    weapon,
+                    shield,
+                    is_in_liquid,
+                } => {
+                    self.draw_corpse(
+                        t,
+                        effect.source_grid_pos,
+                        sprite,
+                        weapon,
+                        shield,
+                        *is_in_liquid,
+                    );
+                }
             }
+        }
+    }
+
+    fn draw_corpse(
+        &self,
+        t: f32,
+        grid_pos: (f32, f32),
+        sprite: &SpriteId,
+        weapon: &Option<SpriteId>,
+        shield: &Option<SpriteId>,
+        is_in_liquid: bool,
+    ) {
+        let cell_w = self.cell_w();
+        let mut x = self.grid_x_f32_to_screen(grid_pos.0) - cell_w;
+        let mut y = self.grid_y_f32_to_screen(grid_pos.1) - cell_w * 2.2;
+        let remaining_ratio = 1.0 - t;
+        let max_rotation = PI * 0.5;
+        let mut params = DrawTextureParams {
+            dest_size: Some(self.default_entity_draw_size().into()),
+            ..Default::default()
+        };
+        let mut character_crop_factor = (1.0, 1.0);
+        let mut character_offset = (0.0, 0.0);
+
+        let fall = 0.05;
+        if remaining_ratio > 1.0 - fall {
+            x += random_range(-6.0..6.0);
+            y += random_range(-7.0..3.0);
+
+            // from 0 to 1
+            let rotation_progress = (1.0 - remaining_ratio) / fall;
+            params.rotation = max_rotation * rotation_progress;
+        } else {
+            params.rotation = max_rotation;
+
+            let factor = remaining_ratio.min(0.6);
+            // Corpse sinking down into the ground/water
+            character_crop_factor = (factor, 1.0);
+            character_offset = ((0.8 - factor) * self.rect_w as f32, 0.0);
+        };
+
+        if is_in_liquid {
+            // corpse is rotated 90 degrees clockwise
+            x += cell_w * 0.5;
+
+            let water_depth_factor = 0.125;
+            y += water_depth_factor * self.rect_w as f32;
+        }
+
+        params.pivot = Some((x + cell_w * 1.5, y + cell_w * 2.0).into());
+
+        let mut character_params = params.clone();
+
+        character_params.source = Some(Rect::new(
+            0.0,
+            0.0,
+            32.0 * character_crop_factor.0,
+            32.0 * character_crop_factor.1,
+        ));
+        character_params.dest_size.as_mut().unwrap().x *= character_crop_factor.0;
+        character_params.dest_size.as_mut().unwrap().y *= character_crop_factor.1;
+
+        draw_texture_ex(
+            &self.sprites[&sprite].regular,
+            x + character_offset.0,
+            y + character_offset.1,
+            WHITE,
+            character_params,
+        );
+
+        if let Some(sprite) = weapon {
+            draw_texture_ex(
+                &self.sprites[&sprite].regular,
+                x,
+                y + cell_w,
+                WHITE,
+                DrawTextureParams {
+                    rotation: 0.2 * PI,
+                    ..params
+                },
+            );
+        }
+
+        if let Some(sprite) = shield {
+            draw_texture_ex(&self.sprites[&sprite].regular, x, y + cell_w, WHITE, params);
         }
     }
 
@@ -6409,14 +6476,13 @@ pub enum NewState {
 #[derive(Debug)]
 struct ConcreteEffect {
     age: f32,
-    start_time: f32,
-    end_time: f32,
-    source_pos: (f32, f32),
-    destination_pos: (f32, f32),
-    variant: EffectVariant,
+    source_grid_pos: (f32, f32),
+    destination_grid_pos: (f32, f32),
+    data: EffectData,
 }
 
-pub struct Effect {
+#[derive(Debug)]
+pub struct EffectData {
     pub start_time: f32,
     pub end_time: f32,
     pub variant: EffectVariant,
@@ -6433,6 +6499,12 @@ pub enum EffectVariant {
     },
     Fx {
         texture: &'static Texture2D,
+    },
+    Corpse {
+        sprite: SpriteId,
+        weapon: Option<SpriteId>,
+        shield: Option<SpriteId>,
+        is_in_liquid: bool,
     },
 }
 #[derive(Debug)]
@@ -6477,10 +6549,11 @@ pub struct TextGraphics {
 
 impl EffectGraphics {
     fn draw(&self, mut x: f32, mut y: f32, effect: &ConcreteEffect, cell_w: f32) {
-        if effect.age < effect.start_time {
+        if effect.age < effect.data.start_time {
             return;
         }
-        let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
+        let t =
+            (effect.age - effect.data.start_time) / (effect.data.end_time - effect.data.start_time);
         match self {
             EffectGraphics::Circle {
                 radius,

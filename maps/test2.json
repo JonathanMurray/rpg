@@ -416,21 +416,34 @@
     "(19, 21)": "FireSurfaceSingleCell",
     "(13, 21)": "FireSurfaceSingleCell",
     "(13, 23)": "FireSurfaceSingleCell",
-    "(19, 23)": "FireSurfaceSingleCell"
+    "(19, 23)": "FireSurfaceSingleCell",
+    "(16, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
   },
   "control_points": {},
   "characters": [
-    {
-      "type_": "Clara",
-      "pos": [
-        13,
-        10
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
     {
       "type_": "Lootgoblin",
       "pos": [
@@ -455,17 +468,6 @@
     },
     {
       "type_": "Alice",
-      "pos": [
-        10,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
       "pos": [
         19,
         10

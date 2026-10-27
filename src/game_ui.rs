@@ -47,7 +47,7 @@ use crate::{
         TopCharacterPortraits,
     },
     grid::{
-        Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
+        EffectData, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
         TargetEffectPreview, TextEffect,
     },
     init_fight_map::GameInitState,
@@ -1723,8 +1723,8 @@ impl UserInterface {
                 for char_id in characters {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {
-                        let duration = self.game_grid.animate_death(char_id);
-                        self.animation_stopwatch.set_to_at_least(duration);
+                        self.game_grid.animate_death(char_id);
+                        //self.animation_stopwatch.set_to_at_least(duration);
                         someone_died = true;
                     }
                 }
@@ -2065,7 +2065,7 @@ impl UserInterface {
                 self.game_grid.add_effect(
                     *area_center_pos,
                     *area_center_pos,
-                    Effect {
+                    EffectData {
                         start_time,
                         end_time: start_time + area_duration,
                         variant: EffectVariant::At(
@@ -2094,7 +2094,7 @@ impl UserInterface {
             self.game_grid.add_effect(
                 (area_center_pos.0, area_center_pos.1),
                 target_pos,
-                Effect {
+                EffectData {
                     start_time: start,
                     end_time: end,
                     variant: EffectVariant::At(
