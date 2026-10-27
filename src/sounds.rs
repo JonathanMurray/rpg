@@ -62,6 +62,7 @@ impl SoundPlayer {
             (SoundId::ShootArrow, 1.0, vec!["fl_shoot_arrow.ogg"]),
             //(SoundId::HitArrow, 1.0, vec!["hit_arrow"]),
             (SoundId::HitArrow, 1.0, vec!["fl_thump.ogg"]),
+            (SoundId::UndeadRise, 1.0, vec!["fl_undead_rise.ogg"]),
             (
                 SoundId::Walk,
                 1.2,
@@ -253,6 +254,7 @@ pub enum SoundId {
     ArmorAbsorbed,
     ShootArrow,
     HitArrow,
+    UndeadRise,
     Walk,
     WalkWater,
     Debuff,

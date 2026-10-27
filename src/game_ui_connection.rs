@@ -220,7 +220,7 @@ impl GameUserInterfaceConnection {
             Err(QuitEvent) => {
                 println!("QUIT REQUESTED...");
             }
-            _ => unreachable!(),
+            unexpected => panic!("Unexpected UI outcome: {:?}", unexpected),
         }
     }
 }

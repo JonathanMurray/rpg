@@ -254,6 +254,7 @@ pub enum EffectId {
     Pow,
     Zap,
     Bonk,
+    Cloud,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -1391,6 +1392,7 @@ pub fn effect_atlas_rect(effect: EffectId) -> Rect {
         EffectId::Pow => (0, 0),
         EffectId::Zap => (1, 0),
         EffectId::Bonk => (0, 1),
+        EffectId::Cloud => (1, 1),
     };
     let icon_w = 32.0;
     let icon_h = 32.0;

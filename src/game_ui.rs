@@ -1903,6 +1903,15 @@ impl UserInterface {
                 }
                 self.animation_stopwatch.set_to_at_least(duration);
             }
+            GameEvent::CharactersSpawning { characters } => {
+                let mut duration = 0.0;
+                for ch_id in characters {
+                    duration = self.game_grid.animate_character_spawn_from_ground(ch_id);
+                }
+                self.sound_player.play_delayed(SoundId::UndeadRise, 0.5);
+
+                self.animation_stopwatch.set_to_at_least(duration);
+            }
             GameEvent::CharacterTookDamage {
                 character,
                 amount,

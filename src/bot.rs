@@ -16,6 +16,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
     },
     data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
+    grid::ControlPoint,
     pathfind::{Path, PathfindGrid, TraversalType},
     util::CustomShuffle,
 };
@@ -34,14 +35,22 @@ pub struct LootgoblinBehaviour {}
 impl LootgoblinBehaviour {
     fn get_goal(&self, game: &CoreGame) -> BotGoal {
         let control_points = game.pathfind_grid.control_points();
-        let (pos, _control_point) = control_points.iter().next().unwrap();
+        let exit_pos = control_points
+            .iter()
+            .filter(|(_pos, control_point)| **control_point == ControlPoint::Exit)
+            .next()
+            .map(|v| v.0);
 
         let bot = game.characters.get_rc(game.active_character_id);
 
-        let action = if bot.pos() == *pos {
-            BotAction::NonTarget(&ENEMY_ESCAPE)
+        let action = if let Some(pos) = exit_pos {
+            if bot.pos() == *pos {
+                BotAction::NonTarget(&ENEMY_ESCAPE)
+            } else {
+                BotAction::MoveTo(*pos)
+            }
         } else {
-            BotAction::MoveTo(*pos)
+            BotAction::MoveTo(bot.pos())
         };
 
         BotGoal {

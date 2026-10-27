@@ -10,7 +10,7 @@ use std::{
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PINK, SKYBLUE, YELLOW},
+    color::{Color, BLACK, BROWN, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PINK, SKYBLUE, YELLOW},
     input::mouse_wheel,
     math::{Rect, Vec2},
     miniquad::window::dpi_scale,
@@ -183,6 +183,13 @@ impl CharacterAnimation {
         }
     }
 
+    fn update(&mut self, char_pos: Position, elapsed: f32) {
+        self.remaining_duration -= elapsed;
+        if let AnimationDetails::ParticleGroup(particle_group) = &mut self.kind {
+            particle_group.update(char_pos, elapsed);
+        }
+    }
+
     fn remaining_duration_ratio(&self) -> f32 {
         // Report 1.0 until the animation starts, and then gradually lower until 0.0 when it ends
         (self.remaining_duration / self.duration).min(1.0)
@@ -201,13 +208,14 @@ impl CharacterAnimation {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum AnimationDetails {
     Text(TextGraphics),
     Motion {
         from: Position,
         to: Position,
     },
+    ParticleGroup(ParticleGroup),
     MagicSparks {
         particles: RefCell<Vec<(f32, f32)>>,
         color: Color,
@@ -324,6 +332,9 @@ enum SpriteProperty {
     ShieldXOffsetCellW,
     ShieldYOffsetCellW,
     ReplaceHandHeldWithProjectile(Color),
+    HideHandHeld,
+    Hide,
+    SinkIntoGroundRatio,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -364,19 +375,104 @@ pub enum TextEffect {
     HitDamage(u32, HitType),
 }
 
+#[derive(Debug)]
 struct ParticleGroup {
     character_id: CharacterId,
-    ability_id: AbilityId,
     particles: Vec<Particle>,
     color: Color,
     shape: ParticleShape,
+    target_count: u32,
+    target_age: f32,
+    max_start_x_offset: f32,
+    max_dx: f32,
+    start_y_speed: std::ops::Range<f32>,
+    gravity: f32,
+    decay_speed: std::ops::Range<f32>,
+    radius: std::ops::Range<f32>,
 }
 
+impl ParticleGroup {
+    fn calm(character_id: CharacterId, color: Color, shape: ParticleShape) -> Self {
+        Self {
+            character_id,
+            particles: vec![],
+            color,
+            shape,
+            target_count: 3,
+            target_age: 0.8,
+            max_start_x_offset: 1.3,
+            max_dx: 0.0,
+            start_y_speed: 1.5..2.0,
+            gravity: 0.0,
+            decay_speed: 0.3..0.5,
+            radius: 2.0..6.0,
+        }
+    }
+
+    fn busy(character_id: CharacterId, color: Color, shape: ParticleShape) -> Self {
+        Self {
+            character_id,
+            particles: vec![],
+            color,
+            shape,
+            target_count: 10,
+            target_age: 0.2,
+            max_start_x_offset: 0.4,
+            max_dx: 10.0,
+            start_y_speed: 5.0..10.0,
+            gravity: 50.0,
+            decay_speed: 2.0..3.0,
+            radius: 4.0..5.0,
+        }
+    }
+
+    fn update(&mut self, char_pos: Position, elapsed: f32) {
+        let mut rng = rand::rng();
+        let mut fresh_count = 0;
+        for particle in &mut self.particles {
+            particle.age += elapsed;
+            particle.dy -= elapsed * self.gravity;
+            particle.grid_y -= elapsed * particle.dy;
+            particle.grid_x += elapsed * particle.dx;
+            particle.alpha -= elapsed * rng.random_range(self.decay_speed.clone());
+            if particle.age < self.target_age {
+                fresh_count += 1;
+            }
+        }
+        self.particles.retain(|p| p.alpha > 0.0);
+        for _ in 0..(self.target_count - fresh_count) {
+            let grid_x = char_pos.0 as f32
+                + 0.5
+                + rng.random_range(-self.max_start_x_offset..=self.max_start_x_offset);
+            let grid_y = char_pos.1 as f32 + 0.2 + rng.random_range(-1.0..=0.0);
+            let radius = rng.random_range(self.radius.clone());
+
+            let age = rng.random_range(-0.3..0.0);
+
+            let p = Particle {
+                age,
+                grid_x,
+                grid_y,
+                radius,
+                alpha: 0.8 + age,
+                dx: rng.random_range(-self.max_dx..=self.max_dx),
+                dy: rng.random_range(self.start_y_speed.clone()),
+            };
+
+            self.particles.push(p);
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Particle {
-    x: f32,
-    y: f32,
+    age: f32,
+    grid_x: f32,
+    grid_y: f32,
     radius: f32,
     alpha: f32,
+    dx: f32,
+    dy: f32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -388,6 +484,7 @@ pub enum ParticleShape {
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ControlPoint {
     Exit,
+    Spawn,
 }
 
 pub struct GameGrid {
@@ -407,7 +504,7 @@ pub struct GameGrid {
     //routes: IndexMap<Position, ChartNode>,
     pub characters: HashMap<CharacterId, Rc<Character>>,
 
-    ability_cast_particle_group: Option<ParticleGroup>,
+    ability_cast_particle_group: Option<(AbilityId, ParticleGroup)>,
     target_effect_previews: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
     effects: Vec<ConcreteEffect>,
@@ -580,6 +677,21 @@ impl GameGrid {
                 self.pathfind_grid.set_surface(pos, Some(surface), size);
             }
             self.refresh_tiles_and_pathfind_grid();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_add_control_point(&mut self, pos: Position, control_point: ControlPoint) -> bool {
+        if !self.control_points.contains_key(&pos) {
+            self.control_points.insert(pos, control_point);
+
+            self.pathfind_grid
+                .control_points
+                .borrow_mut()
+                .insert(pos, control_point);
             true
         } else {
             false
@@ -1742,6 +1854,81 @@ impl GameGrid {
         ));
     }
 
+    pub fn animate_character_spawn_from_ground(&mut self, character_id: CharacterId) -> f32 {
+        let duration = 1.5;
+        //  self.animate_effect(character_id, duration, EffectId::Cloud);
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            0.5,
+            duration - 0.5,
+            AnimationDetails::ParticleGroup(ParticleGroup::busy(
+                character_id,
+                BLACK,
+                ParticleShape::Circle,
+            )),
+        ));
+
+        let x_offset = 0.1;
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            0.0,
+            duration,
+            AnimationDetails::TransformSprite {
+                timelines: vec![
+                    (
+                        SpriteProperty::Hide,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.0, 1.0),
+                            PropertyUpdate::fixed(0.5),
+                            PropertyUpdate::linear(0.5, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::SinkIntoGroundRatio,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, 1.0),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::CharacterXOffsetCellW,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, x_offset),
+                            PropertyUpdate::linear(0.6, -x_offset),
+                            PropertyUpdate::linear(0.7, x_offset),
+                            PropertyUpdate::linear(0.8, -x_offset),
+                            PropertyUpdate::linear(0.9, x_offset),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::CharacterRotateForward,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, PI * 0.1),
+                            PropertyUpdate::linear(0.7, -PI * 0.1),
+                            PropertyUpdate::linear(0.9, PI * 0.05),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::HideHandHeld,
+                        PropertyTimeline(vec![PropertyUpdate::linear(0.0, 1.0)]),
+                    ),
+                ],
+            },
+        ));
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            0.0,
+            duration,
+            AnimationDetails::HideLabel,
+        ));
+
+        duration
+    }
+
     pub fn animate_effect(&mut self, character_id: CharacterId, duration: f32, effect: EffectId) {
         let pos = self.characters.get(&character_id).unwrap().pos();
         let pos = (pos.0 as f32, pos.1 as f32 - 0.5);
@@ -1913,37 +2100,15 @@ impl GameGrid {
         self.effects.retain(|e| e.age <= e.end_time);
 
         for a in self.character_animations.iter_mut() {
-            a.remaining_duration -= elapsed;
+            let char_pos = &self.characters[&a.character_id].pos();
+            a.update(*char_pos, elapsed);
         }
         self.character_animations
             .retain(|a| a.remaining_duration > 0.0);
 
-        if let Some(particle_group) = &mut self.ability_cast_particle_group {
-            let mut rng = rand::rng();
-            let mut fresh_count = 0;
-            for particle in &mut particle_group.particles {
-                particle.y -= elapsed * 1.5;
-                particle.alpha -= elapsed * (0.3 + rng.random_range(0.0..0.2));
-                if particle.alpha > 0.2 {
-                    fresh_count += 1;
-                }
-            }
-            particle_group.particles.retain(|p| p.alpha > 0.0);
-            for _ in 0..(3 - fresh_count) {
-                let char_pos = &self.characters[&particle_group.character_id].pos();
-                let px = char_pos.0 as f32 + 0.5 + rng.random_range(-1.3..=1.3);
-                let py = char_pos.1 as f32 + 0.2 + rng.random_range(-1.0..=0.0);
-                let radius = 2.0 + rng.random_range(0.0..4.0);
-
-                let p = Particle {
-                    x: px,
-                    y: py,
-                    radius,
-                    alpha: 0.5 + rng.random_range(0.0..0.3),
-                };
-
-                particle_group.particles.push(p);
-            }
+        if let Some((_ability_id, particle_group)) = &mut self.ability_cast_particle_group {
+            let char_pos = &self.characters[&particle_group.character_id].pos();
+            particle_group.update(*char_pos, elapsed);
         }
 
         let camera_speed = 5.0;
@@ -2309,8 +2474,12 @@ impl GameGrid {
                 let y0 = self.grid_y_to_screen(row);
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    if let Some(_control_point) = self.control_points.get(&(col, row)) {
-                        draw_rectangle(x0, y0, cell_w, cell_w, Color::new(1.0, 1.0, 1.0, 0.5));
+                    if let Some(control_point) = self.control_points.get(&(col, row)) {
+                        let color = match control_point {
+                            ControlPoint::Exit => Color::new(1.0, 1.0, 1.0, 0.5),
+                            ControlPoint::Spawn => Color::new(1.0, 0.5, 1.0, 0.5),
+                        };
+                        draw_rectangle(x0, y0, cell_w, cell_w, color);
                         //self.fill_cell((col, row), Color::new(1.0, 1.0, 1.0, 0.5)  , 1.0);
                     }
                 }
@@ -2440,6 +2609,7 @@ impl GameGrid {
         }
 
         let mut held_sphere = None;
+        let mut show_regular_hald_hend = true;
 
         let mut weapon_rotation_modifier = 0.0;
         let mut shield_offset = (0.0, 0.0);
@@ -2451,6 +2621,7 @@ impl GameGrid {
         let mut character_crop_factor = (1.0, 1.0);
 
         let mut show_sprite = true;
+        let mut show_shadow = true;
         let mut is_in_motion = false;
         for animation in self
             .character_animations
@@ -2506,6 +2677,9 @@ impl GameGrid {
                 AnimationDetails::MagicSparks { .. } => {
                     // This is drawn separately
                 }
+                AnimationDetails::ParticleGroup(..) => {
+                    // This is drawn separately
+                }
                 AnimationDetails::AttackCrosshairPreview { .. } => {
                     // This is drawn separately, after all the characters
                 }
@@ -2525,6 +2699,16 @@ impl GameGrid {
                     for (property, timeline) in interpolations {
                         let value = timeline.get_value(elapsed_ratio);
                         match property {
+                            SpriteProperty::Hide => {
+                                if value == 1.0 {
+                                    show_sprite = false;
+                                    show_shadow = false;
+                                }
+                            }
+                            SpriteProperty::SinkIntoGroundRatio => {
+                                character_crop_factor = (1.0, 1.0 - value);
+                                character_offset = (0.0, value * self.rect_w as f32);
+                            }
                             SpriteProperty::ReplaceHandHeldWithProjectile(color) => {
                                 if value == 1.0 {
                                     held_sphere = Some(HeldSphere {
@@ -2534,6 +2718,9 @@ impl GameGrid {
                                         offset: (0.0, 0.0),
                                     });
                                 }
+                            }
+                            SpriteProperty::HideHandHeld => {
+                                show_regular_hald_hend = false;
                             }
                             SpriteProperty::CharacterRotateForward => {
                                 params.rotation = if character.facing.get().is_east() {
@@ -2696,17 +2883,19 @@ impl GameGrid {
         shadow_x = shadow_x.floor();
         shadow_y = shadow_y.floor();
 
-        draw_texture_ex(
-            &self.sprites[&SpriteId::CharacterShadow].regular,
-            shadow_x,
-            shadow_y,
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some((self.rect_w as f32, self.rect_w as f32).into()),
-                flip_x: character.facing.get().is_east(),
-                ..Default::default()
-            },
-        );
+        if show_shadow {
+            draw_texture_ex(
+                &self.sprites[&SpriteId::CharacterShadow].regular,
+                shadow_x,
+                shadow_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some((self.rect_w as f32, self.rect_w as f32).into()),
+                    flip_x: character.facing.get().is_east(),
+                    ..Default::default()
+                },
+            );
+        }
 
         if is_in_motion {
             // Even if character is losing health, we skip blinking sprite effect if they're in motion as
@@ -2768,7 +2957,7 @@ impl GameGrid {
                 if sphere.outline {
                     draw_circle_lines(x0, y0, sphere.radius, 3.0, BLACK);
                 }
-            } else {
+            } else if show_regular_hald_hend {
                 if !params.flip_x {
                     weapon_rotation_modifier *= -1.0;
                     weapon_offset.0 *= -1.0;
@@ -3013,16 +3202,17 @@ impl GameGrid {
             if self
                 .ability_cast_particle_group
                 .as_ref()
-                .map(|group| group.ability_id != ability.id)
+                .map(|(ability_id, group)| *ability_id != ability.id)
                 .unwrap_or(true)
             {
-                self.ability_cast_particle_group = Some(ParticleGroup {
-                    ability_id: ability.id,
-                    character_id: self.active_character_id,
-                    particles: vec![],
-                    color: ability.animation_color,
-                    shape: ability.charge_fx.unwrap().particle_shape,
-                });
+                self.ability_cast_particle_group = Some((
+                    ability.id,
+                    ParticleGroup::calm(
+                        self.active_character_id,
+                        ability.animation_color,
+                        ability.charge_fx.unwrap().particle_shape,
+                    ),
+                ));
             }
         } else {
             self.ability_cast_particle_group = None;
@@ -3194,25 +3384,8 @@ impl GameGrid {
             }
         }
 
-        if let Some(group) = &self.ability_cast_particle_group {
-            for particle in &group.particles {
-                let x = self.grid_x_f32_to_screen(particle.x);
-                let y = self.grid_y_f32_to_screen(particle.y);
-                let mut color = group.color;
-                color.a = particle.alpha;
-                let r = particle.radius;
-                let line_color = Color::new(0.8, 0.8, 0.8, 0.3 + particle.alpha);
-                match group.shape {
-                    ParticleShape::Circle => {
-                        draw_circle(x, y, r, color);
-                        draw_circle_lines(x, y, r, 1.0, line_color);
-                    }
-                    ParticleShape::Rect => {
-                        draw_rectangle(x - r, y - r, r * 2.0, r * 2.0, color);
-                        draw_rectangle_lines2(x - r, y - r, r * 2.0, r * 2.0, 2.0, line_color);
-                    }
-                }
-            }
+        if let Some((_ability_id, group)) = &self.ability_cast_particle_group {
+            self.draw_particle_group(group);
         }
 
         if let Some((char_id, range, indicator, acquisition)) = range_indicator {
@@ -4170,6 +4343,27 @@ impl GameGrid {
         outcome
     }
 
+    fn draw_particle_group(&self, group: &ParticleGroup) {
+        for particle in &group.particles {
+            let x = self.grid_x_f32_to_screen(particle.grid_x);
+            let y = self.grid_y_f32_to_screen(particle.grid_y);
+            let mut color = group.color;
+            color.a = particle.alpha;
+            let r = particle.radius;
+            let line_color = Color::new(0.8, 0.8, 0.8, 0.3 + particle.alpha);
+            match group.shape {
+                ParticleShape::Circle => {
+                    draw_circle(x, y, r, color);
+                    draw_circle_lines(x, y, r, 1.0, line_color);
+                }
+                ParticleShape::Rect => {
+                    draw_rectangle(x - r, y - r, r * 2.0, r * 2.0, color);
+                    draw_rectangle_lines2(x - r, y - r, r * 2.0, r * 2.0, 2.0, line_color);
+                }
+            }
+        }
+    }
+
     fn determine_character_anticipation(
         &self,
         ui_state: &UiState,
@@ -4352,6 +4546,9 @@ impl GameGrid {
                             color,
                         );
                     }
+                }
+                AnimationDetails::ParticleGroup(group) => {
+                    self.draw_particle_group(group);
                 }
                 AnimationDetails::CastingSpell { color } => {
                     let pos = self.character_screen_pos(&self.characters[&animation.character_id]);

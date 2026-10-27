@@ -19,7 +19,7 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
-use crate::grid::{GameGrid, ParticleShape};
+use crate::grid::{ControlPoint, GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
 use crate::sounds::SoundId;
@@ -72,7 +72,6 @@ impl CoreGame {
 
     pub async fn run(mut self) -> Result<(), QuitEvent> {
         self.log("The battle begins").await;
-        self.log("Round 1").await;
 
         for character in self.characters.iter() {
             character.on_battle_start();
@@ -86,10 +85,16 @@ impl CoreGame {
             self.handle_character_standing_on_surface(character, char_game_time)
                 .await;
         }
+
+        self.on_character_positions_changed();
+
+        self.spawn_undeads_at_start_of_battle().await;
+
         for player_char in self.player_characters() {
             self.set_character_part_of_active_group(player_char).await;
         }
-        self.on_character_positions_changed();
+
+        self.log("Round 1").await;
 
         loop {
             println!(
@@ -344,6 +349,23 @@ impl CoreGame {
                     }
                 }
             }
+        }
+    }
+
+    async fn spawn_undeads_at_start_of_battle(&self) {
+        let mut spawners = vec![];
+        for ch in self.characters.iter() {
+            if let Some(cp) = self.pathfind_grid.control_points().get(&ch.pos()) {
+                if cp == &ControlPoint::Spawn {
+                    spawners.push(ch.id());
+                }
+            }
+        }
+        if !spawners.is_empty() {
+            self.ui_handle_event(GameEvent::CharactersSpawning {
+                characters: spawners,
+            })
+            .await;
         }
     }
 
@@ -1105,13 +1127,16 @@ impl CoreGame {
         let ends_at = apply_condition
             .duration_rounds
             .map(|rounds| self.current_time() + (rounds * self.round_length));
-        character.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
-        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-            character: character.id(),
-            applied_effect: ApplyEffect::Condition(apply_condition),
-            source: "",
-        })
-        .await;
+        let did_receive =
+            character.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
+        if did_receive {
+            self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                character: character.id(),
+                applied_effect: ApplyEffect::Condition(apply_condition),
+                source: "",
+            })
+            .await;
+        }
     }
 
     async fn handle_swamp_dweller_left_poison(&self, character: &Rc<Character>) {
@@ -1288,8 +1313,13 @@ impl CoreGame {
                 format!("  |{}| gained {} health", receiver.name_tag(), gained)
             }
             e @ ApplyEffect::Condition(apply_condition) => {
-                actual_effect = Some(e);
-                self.apply_condition_on_character(apply_condition, receiver)
+                match self.apply_condition_on_character(apply_condition, receiver) {
+                    Ok(line) => {
+                        actual_effect = Some(e);
+                        line
+                    }
+                    Err(line) => line,
+                }
             }
 
             e @ ApplyEffect::LoseCondition { condition } => {
@@ -1361,25 +1391,37 @@ impl CoreGame {
         &self,
         apply_condition: ApplyCondition,
         receiver: &Character,
-    ) -> String {
+    ) -> Result<String, String> {
         let ends_at = apply_condition
             .duration_rounds
             .map(|rounds| self.current_time() + (rounds * self.round_length));
-        receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
-        let mut line = format!(
-            "  |{}| received |<keyword>{}|",
-            receiver.name_tag(),
-            apply_condition.condition.name()
-        );
+        let did_receive =
+            receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
 
-        if let Some(stacks) = apply_condition.stacks {
-            line.push_str(&format!(" x {}", stacks));
-        }
+        if did_receive {
+            let mut line = format!(
+                "  |{}| received |<keyword>{}|",
+                receiver.name_tag(),
+                apply_condition.condition.name()
+            );
 
-        if let Some(duration) = apply_condition.duration_rounds {
-            line.push_str(&format!(" ({})", duration));
+            if let Some(stacks) = apply_condition.stacks {
+                line.push_str(&format!(" x {}", stacks));
+            }
+
+            if let Some(duration) = apply_condition.duration_rounds {
+                line.push_str(&format!(" ({})", duration));
+            }
+
+            Ok(line)
+        } else {
+            let line = format!(
+                "  |{}| is immune to |<keyword>{}|",
+                receiver.name_tag(),
+                apply_condition.condition.name()
+            );
+            Err(line)
         }
-        line
     }
 
     async fn perform_ability(
@@ -3046,14 +3088,16 @@ impl CoreGame {
                             if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
                                 //*condition.stacks().unwrap() = damage;
                                 let stacks = (damage * x.num) / x.den;
-                                let line = game.apply_condition_on_character(
-                                    ApplyCondition {
-                                        condition,
-                                        stacks: Some(stacks),
-                                        duration_rounds: None,
-                                    },
-                                    defender,
-                                );
+                                let line = game
+                                    .apply_condition_on_character(
+                                        ApplyCondition {
+                                            condition,
+                                            stacks: Some(stacks),
+                                            duration_rounds: None,
+                                        },
+                                        defender,
+                                    )
+                                    .map_or_else(std::convert::identity, std::convert::identity);
                                 detail_lines.push(format!("{} |<faded>({})|", line, name))
                             }
 
@@ -4144,6 +4188,9 @@ pub enum GameEvent {
         character: CharacterId,
         amount: u32,
         source: DamageSource,
+    },
+    CharactersSpawning {
+        characters: Vec<CharacterId>,
     },
     CharacterEffectWasApplied {
         character: CharacterId,
@@ -7818,7 +7865,12 @@ impl Character {
         condition: Condition,
         stacks: Option<u32>,
         ends_at: Option<u32>,
-    ) {
+    ) -> bool {
+        if self.knows_passive(PassiveSkill::Undead) && condition == Condition::Bleeding {
+            println!("Undead immune to bleeding");
+            return false;
+        }
+
         let mut conditions = self.conditions.borrow_mut();
 
         if let Some(state) = conditions.map.get_mut(&condition) {
@@ -7854,6 +7906,8 @@ impl Character {
                 .map
                 .insert(condition, ConditionState { stacks, ends_at });
         }
+
+        true
     }
 
     fn clear_condition(&self, condition: Condition) -> bool {

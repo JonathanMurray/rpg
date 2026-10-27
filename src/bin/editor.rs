@@ -88,6 +88,7 @@ async fn main() {
 
     loop {
         next_frame().await;
+        let draw_control_points = true;
         let grid_outcome = game_grid.draw(
             true,
             &mut UiState::Idle {
@@ -96,7 +97,7 @@ async fn main() {
             true,
             None,
             (0, 0),
-            true,
+            draw_control_points,
         );
         if show_grid.get() {
             game_grid.draw_debug_cells();
@@ -143,6 +144,13 @@ async fn main() {
                 text.push_str(&format!("  {:?}", elevation));
             } else {
                 text.push_str("  -");
+            }
+            if let Some(cp) = game_grid
+                .pathfind_grid
+                .control_points()
+                .get(&mouse_grid_pos)
+            {
+                text.push_str(&format!("  [{:?}]", cp));
             }
             draw_debug_text(&text, &resources.simple_font, screen_height() - 40.0, 16);
         }
@@ -403,15 +411,10 @@ async fn main() {
                             }
                         }
                         EditorAction::PlaceControlPoint(control_point) => {
-                            // TODO: encapsulate some of this
-                            map_data.control_points.insert(pos, *control_point);
-                            game_grid.control_points.insert(pos, *control_point);
-                            game_grid
-                                .pathfind_grid
-                                .control_points
-                                .borrow_mut()
-                                .insert(pos, *control_point);
-                            has_unsaved_changes = true;
+                            if game_grid.editor_add_control_point(pos, *control_point) {
+                                map_data.control_points.insert(pos, *control_point);
+                                has_unsaved_changes = true;
+                            }
                         }
                         EditorAction::EraseBackground => {
                             if game_grid.background.contains_key(&pos) {
@@ -743,6 +746,7 @@ impl Sidebar {
 
         let control_actions = vec![
             EditorAction::PlaceControlPoint(ControlPoint::Exit),
+            EditorAction::PlaceControlPoint(ControlPoint::Spawn),
             EditorAction::EraseControlPoint,
         ];
         let control_section = ("Control points", control_actions);

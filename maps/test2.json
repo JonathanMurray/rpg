@@ -10,22 +10,22 @@
     "(40, 25)": "High",
     "(40, 22)": "Wall",
     "(1, 4)": "Wall",
-    "(19, 22)": "High",
+    "(34, 22)": "Wall",
     "(1, 1)": "Wall",
     "(10, 1)": "Wall",
-    "(13, 25)": "High",
+    "(34, 19)": "Wall",
     "(1, 22)": "Wall",
     "(7, 1)": "Wall",
     "(4, 1)": "Wall",
-    "(16, 22)": "High",
+    "(31, 22)": "Wall",
     "(7, 7)": "Wall",
     "(19, 4)": "Wall",
     "(34, 25)": "Wall",
     "(4, 37)": "Wall",
     "(1, 13)": "Wall",
-    "(19, 25)": "High",
+    "(37, 22)": "Wall",
     "(16, 4)": "Wall",
-    "(16, 25)": "High",
+    "(37, 19)": "Wall",
     "(19, 1)": "Wall",
     "(4, 7)": "Wall",
     "(40, 31)": "Wall",
@@ -76,7 +76,7 @@
     "(4, 4)": "Wall",
     "(37, 46)": "High",
     "(1, 10)": "Wall",
-    "(13, 22)": "High",
+    "(31, 19)": "Wall",
     "(7, 4)": "Wall",
     "(10, 4)": "Wall",
     "(13, 4)": "Wall",
@@ -84,7 +84,7 @@
     "(16, 7)": "Wall",
     "(13, 7)": "Wall",
     "(10, 7)": "Wall",
-    "(10, 22)": "Wall",
+    "(31, 16)": "Wall",
     "(10, 19)": "Wall",
     "(13, 19)": "Wall",
     "(16, 19)": "Wall",
@@ -105,7 +105,7 @@
     "(25, 16)": "Wall",
     "(7, 25)": "Wall",
     "(22, 25)": "Wall",
-    "(10, 25)": "Wall",
+    "(4, 25)": "Wall",
     "(34, 16)": "Wall",
     "(4, 22)": "Wall",
     "(4, 19)": "Wall",
@@ -114,14 +114,14 @@
     "(28, 22)": "Wall",
     "(28, 19)": "Wall",
     "(28, 16)": "Wall",
-    "(31, 22)": "Wall",
-    "(34, 22)": "Wall",
-    "(37, 22)": "Wall",
-    "(37, 19)": "Wall",
-    "(34, 19)": "Wall",
-    "(31, 19)": "Wall",
-    "(31, 16)": "Wall",
-    "(4, 25)": "Wall"
+    "(10, 25)": "Wall",
+    "(10, 22)": "Wall",
+    "(22, 28)": "High",
+    "(25, 28)": "High",
+    "(28, 28)": "High",
+    "(28, 31)": "High",
+    "(25, 31)": "High",
+    "(22, 31)": "High"
   },
   "terrain_objects": {},
   "background": {
@@ -406,11 +406,11 @@
     "(31, 22)": "StaircaseTall",
     "(16, 7)": "StaircaseTall",
     "(16, 19)": "WallWindow2",
-    "(25, 25)": "WallOpeningNorth",
+    "(1, 22)": "WallOpeningNorth",
     "(13, 19)": "Torch",
     "(19, 19)": "Torch",
     "(7, 25)": "StaircaseTall",
-    "(1, 22)": "WallOpeningNorth"
+    "(25, 31)": "Staircase"
   },
   "surfaces": {
     "(19, 21)": "FireSurfaceSingleCell",
@@ -421,32 +421,21 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Bob",
-      "pos": [
-        28,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Skeleton",
-      "pos": [
-        22,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Clara",
       "pos": [
         13,
         10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        16,
+        31
       ],
       "health": null,
       "main_hand": null,
