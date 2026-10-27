@@ -2367,7 +2367,12 @@ impl CoreGame {
                         multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
                 }
+
                 dmg_calculation += multiplicative_bonus_dmg;
+
+                if caster.has_condition(&Condition::BloodRage) {
+                    apply_blood_rage_bonus_to_attack(&mut dmg_str, &mut dmg_calculation);
+                }
 
                 if matches!(
                     roll_instruction,
@@ -2921,6 +2926,10 @@ impl CoreGame {
                     visual_effect: None,
                 }
             } else {
+                if attacker.has_condition(&Condition::BloodRage) {
+                    apply_blood_rage_bonus_to_attack(&mut dmg_str, &mut dmg_calculation);
+                }
+
                 if let Some((name, amount)) = damage_prevention {
                     dmg_str.push_str(&format!(" -{} |<faded>({})|", amount, name));
                     dmg_calculation -= amount as i32;
@@ -4750,6 +4759,11 @@ impl Display for AttackHitEffect {
     }
 }
 
+fn apply_blood_rage_bonus_to_attack(dmg_str: &mut String, dmg_calculation: &mut i32) {
+    dmg_str.push_str(" +25% |<faded>(Blood rage)|");
+    *dmg_calculation += (*dmg_calculation as f32 * 0.25).ceil() as i32;
+}
+
 fn apply_protected_bonus_against_attack(
     dmg_str: &mut String,
     dmg_calculation: &mut i32,
@@ -4858,10 +4872,10 @@ impl Condition {
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<evasion>| |<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
-            NearDeath => "|<value>-1| |<ap>| AP per turn.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < |<value>20%| health)",
+            NearDeath => "|<value>-1| |<ap>| AP per turn.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(While below |<value>20%| health |<heart>|)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
-            BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
+            BloodRage => "|<value>+25%| attack damage (passive skill).",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| |<ap>| AP per turn",
@@ -7578,9 +7592,7 @@ impl Character {
         if conditions.has(&Condition::Inspired) {
             res += 3;
         }
-        if conditions.has(&Condition::BloodRage) {
-            res += 3;
-        }
+
         if conditions.has(&Condition::Dazed) {
             res -= 5;
         }
@@ -7699,7 +7711,7 @@ impl Character {
         }
 
         if conditions.has(&Condition::BloodRage) {
-            // applied from attack_modifer()
+            // Increases damage
             bonuses.push(("Blood rage", RollBonusContributor::OtherPositive));
         }
         if conditions.has(&Condition::ThrillOfBattle) {

@@ -441,6 +441,39 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Ogre",
+      "pos": [
+        16,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        10,
+        13
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        19,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }
