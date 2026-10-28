@@ -594,6 +594,10 @@ pub enum TerrainId {
     SmallObstacle,
     BarrelsObstacle,
     BarrelsObstacle2,
+    BarrelsObstacle3,
+    BarrelsObstacle4,
+    SackObstacle,
+    BoxesObstacle,
     SmallStone,
     TombStone,
     DirtMound,
@@ -626,6 +630,7 @@ pub enum TerrainId {
     Torch,
     Lantern,
     FoodPlate,
+    FoodPlate2,
 
     NewWater(WaterOrientation, LiquidType),
 
@@ -763,6 +768,14 @@ impl TerrainId {
                     TerrainId::BarrelsObstacle => (-1..=1, 0..=1),
                     // two left columns
                     TerrainId::BarrelsObstacle2 => (-1..=0, -1..=1),
+                    // part of two lower rows
+                    TerrainId::BarrelsObstacle3 => (-1..=0, 0..=1),
+                    // part of two lower rows
+                    TerrainId::BarrelsObstacle4 => (-1..=0, 0..=1),
+                    // part of two lower rows
+                    TerrainId::SackObstacle => (-1..=0, 0..=1),
+                    // two lower rows
+                    TerrainId::BoxesObstacle => (-1..=1, 0..=1),
                     // two lower rows
                     TerrainId::TombStone => (-1..=1, 0..=1),
                     // two lower rows
@@ -957,6 +970,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::SmallObstacle => (1, 9),
         TerrainId::BarrelsObstacle => (0, 10),
         TerrainId::BarrelsObstacle2 => (1, 10),
+        TerrainId::BarrelsObstacle3 => (11, 7),
+        TerrainId::BarrelsObstacle4 => (12, 7),
+        TerrainId::SackObstacle => (13, 7),
+        TerrainId::BoxesObstacle => (14, 7),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
         TerrainId::Table => (2, 7),
@@ -987,6 +1004,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::SuitOfArmor => (4, 7),
         TerrainId::AnimalHead => (5, 7),
         TerrainId::FoodPlate => (6, 5),
+        TerrainId::FoodPlate2 => (7, 6),
         TerrainId::SpikesSingleCell => (1, 11),
         TerrainId::FireSurfaceSingleCell => (9, 3),
 

@@ -668,6 +668,10 @@ impl Sidebar {
             TerrainId::SmallObstacle,
             TerrainId::BarrelsObstacle,
             TerrainId::BarrelsObstacle2,
+            TerrainId::BarrelsObstacle3,
+            TerrainId::BarrelsObstacle4,
+            TerrainId::SackObstacle,
+            TerrainId::BoxesObstacle,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_objects
             .iter()
@@ -704,6 +708,7 @@ impl Sidebar {
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
+            TerrainId::FoodPlate2,
             TerrainId::Staircase,
             TerrainId::StaircaseLeft,
             TerrainId::StaircaseTall,

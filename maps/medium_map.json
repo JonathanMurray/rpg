@@ -106,11 +106,11 @@
     "(4, 34)": "Wall"
   },
   "terrain_objects": {
-    "(12, 15)": "BarrelsObstacle",
-    "(4, 31)": "BarrelsObstacle2",
     "(5, 41)": "Table",
-    "(17, 26)": "BarrelsObstacle",
-    "(20, 28)": "BarrelsObstacle2"
+    "(4, 31)": "BarrelsObstacle2",
+    "(11, 15)": "BoxesObstacle",
+    "(16, 26)": "BarrelsObstacle4",
+    "(19, 27)": "SackObstacle"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -358,11 +358,11 @@
     "(19, 37)": "GroundBorderNorth",
     "(16, 37)": "GroundBorderNorth",
     "(5, 41)": "FoodPlate",
-    "(17, 28)": "FoodPlate",
+    "(8, 13)": "Torch",
     "(12, 13)": "Torch",
     "(11, 37)": "Torch",
     "(4, 13)": "Torch",
-    "(8, 13)": "Torch"
+    "(16, 28)": "FoodPlate"
   },
   "surfaces": {},
   "control_points": {},

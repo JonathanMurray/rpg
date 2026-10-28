@@ -123,7 +123,18 @@
     "(25, 31)": "High",
     "(22, 31)": "High"
   },
-  "terrain_objects": {},
+  "terrain_objects": {
+    "(8, 12)": "BarrelsObstacle3",
+    "(26, 11)": "BarrelsObstacle",
+    "(30, 9)": "BarrelsObstacle2",
+    "(29, 11)": "BarrelsObstacle3",
+    "(31, 11)": "BarrelsObstacle3",
+    "(31, 4)": "BarrelsObstacle4",
+    "(37, 11)": "SackObstacle",
+    "(6, 11)": "SackObstacle",
+    "(13, 10)": "BarrelsObstacle4",
+    "(37, 4)": "BoxesObstacle"
+  },
   "background": {
     "(-2, 4)": "Floor2",
     "(-2, 7)": "Floor2",
@@ -458,8 +469,8 @@
     {
       "type_": "Clara",
       "pos": [
-        10,
-        10
+        33,
+        12
       ],
       "health": null,
       "main_hand": null,

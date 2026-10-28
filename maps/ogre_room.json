@@ -129,7 +129,12 @@
     "(4, 46)": "Bush",
     "(4, 7)": "Boulder2",
     "(51, 33)": "Chest",
-    "(16, 45)": "Boulder2"
+    "(16, 45)": "Boulder2",
+    "(44, 25)": "SackObstacle",
+    "(20, 14)": "BarrelsObstacle4",
+    "(11, 18)": "BarrelsObstacle3",
+    "(13, 17)": "BarrelsObstacle",
+    "(47, 33)": "BoxesObstacle"
   },
   "background": {
     "(7, 25)": "Floor",
@@ -510,7 +515,8 @@
     "(37, 31)": "GroundBorderNorth",
     "(55, 31)": "GroundBorderNorth",
     "(19, 43)": "GroundBorderEast",
-    "(28, 43)": "GroundBorderEast"
+    "(28, 43)": "GroundBorderEast",
+    "(43, 24)": "FoodPlate2"
   },
   "surfaces": {
     "(43, 43)": {
