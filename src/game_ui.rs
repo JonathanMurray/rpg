@@ -2204,7 +2204,7 @@ impl UserInterface {
                     ..
                 } => {
                     missed = matches!(hit_type, HitType::Miss);
-                    if let Some(dmg) = damage {
+                    if let Some((dmg, _dmg_type)) = damage {
                         line.push_str(&format!(" (|<value>{}| damage)", dmg))
                     } else if applied_effects.is_empty() {
                         let suffix = match hit_type {
@@ -2449,7 +2449,7 @@ impl UserInterface {
                 // TODO: color (and/or entire effect) should depend on the ability?
                 self.game_grid.animate_magic_sparks(target, RED);
 
-                if let Some(dmg) = damage {
+                if let Some((dmg, _dmg_type)) = damage {
                     effects.push(TextEffect::HitDamage(*dmg, *hit_type));
                     if *dmg > 0 {
                         let damage_source = ability.map(|a| DamageSource::Ability(a));

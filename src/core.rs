@@ -2299,6 +2299,8 @@ impl CoreGame {
             let is_fire_dmg;
             let is_lightning_dmg;
 
+            let overall_dmg_type;
+
             match ability_damage {
                 AbilityDamage::Fixed(n, dmg_type) => {
                     dmg_calculation = n as i32;
@@ -2306,12 +2308,14 @@ impl CoreGame {
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
+                    overall_dmg_type = dmg_type;
                 }
                 AbilityDamage::Dynamic(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
+                    overall_dmg_type = dmg_type;
                 }
             };
 
@@ -2401,14 +2405,12 @@ impl CoreGame {
                 detail_lines.push(dmg_str);
             }
 
-            Some(damage)
+            Some((damage, overall_dmg_type))
         } else {
             None
         };
 
         let mut applied_effects = vec![];
-
-        let mut damage_from_effects = 0;
 
         if let Some(game) = real_game {
             for effect in spell_enemy_effect
@@ -2470,12 +2472,6 @@ impl CoreGame {
                 }
             }
         }
-
-        let damage = match damage {
-            Some(dmg) => Some(dmg + damage_from_effects),
-            None if damage_from_effects > 0 => Some(damage_from_effects),
-            _ => None,
-        };
 
         AbilityTargetOutcome::HitEnemy {
             damage,
@@ -3746,6 +3742,7 @@ impl From<AttackPrediction> for TargetPrediction {
     fn from(value: AttackPrediction) -> Self {
         Self {
             damage: Some(DamageInterval {
+                dmg_type: DamageType::Regular,
                 min: value.min_damage,
                 max: value.max_damage,
             }),
@@ -3759,6 +3756,7 @@ impl From<AttackPrediction> for TargetPrediction {
 
 #[derive(Debug, Copy, Clone)]
 pub struct DamageInterval {
+    pub dmg_type: DamageType,
     pub min: u32,
     pub max: u32,
 }
@@ -3863,7 +3861,8 @@ pub fn predict_ability(
                 targets.insert(
                     target_id,
                     TargetPrediction {
-                        damage: result.damage.map(|dmg| DamageInterval {
+                        damage: result.damage.map(|(dmg, dmg_type)| DamageInterval {
+                            dmg_type,
                             min: dmg,
                             max: 0, // filled in later
                         }),
@@ -3874,7 +3873,7 @@ pub fn predict_ability(
                     },
                 );
             } else if unmodified_roll == 19 {
-                if let Some(dmg) = result.damage {
+                if let Some((dmg, dmg_type)) = result.damage {
                     targets
                         .get_mut(&target_id)
                         .unwrap()
@@ -3953,7 +3952,11 @@ pub fn predict_attack(
         if area_targets.is_empty() {
             if let Some((_shape, outcomes)) = &event.area_outcomes {
                 for (target_id, outcome) in outcomes {
-                    let damage = outcome.damage().map(|d| DamageInterval { min: d, max: d });
+                    let damage = outcome.damage().map(|(d, dmg_type)| DamageInterval {
+                        min: d,
+                        max: d,
+                        dmg_type,
+                    });
                     area_targets.push((*target_id, damage));
                 }
             }
@@ -4310,7 +4313,7 @@ impl AbilityResolvedEvent {
                     (None, None) => None,
                     (Some(d), None) => Some(d),
                     (None, Some(d)) => Some(d),
-                    (Some(d1), Some(d2)) => Some(d1 + d2),
+                    (Some((d1, dmg_type)), Some((d2, _dmg_type2))) => Some((d1 + d2, dmg_type)),
                 };
                 if outcome.is_buff() {
                     entry.is_buff = true;
@@ -4323,7 +4326,7 @@ impl AbilityResolvedEvent {
 
 #[derive(Debug)]
 struct TargetResult {
-    damage: Option<u32>,
+    damage: Option<(u32, DamageType)>,
     is_buff: bool,
     hit_type: Option<HitType>,
 }
@@ -4371,7 +4374,7 @@ pub struct OffensiveHitReactionOutcome {
 #[derive(Debug, Clone)]
 pub enum AbilityTargetOutcome {
     HitEnemy {
-        damage: Option<u32>,
+        damage: Option<(u32, DamageType)>,
         applied_effects: Vec<ApplyEffect>,
         hit_type: HitType,
         actual_health_lost: u32,
@@ -4383,11 +4386,11 @@ pub enum AbilityTargetOutcome {
 }
 
 impl AbilityTargetOutcome {
-    fn damage(&self) -> Option<u32> {
+    fn damage(&self) -> Option<(u32, DamageType)> {
         match self {
             AbilityTargetOutcome::HitEnemy { damage, .. } => *damage,
             AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
-                Some(attacked_event.outcome.damage)
+                Some((attacked_event.outcome.damage, DamageType::Regular))
             }
             AbilityTargetOutcome::AffectedAlly { .. } => None,
         }
@@ -4886,7 +4889,7 @@ impl Condition {
             HealthPotionRecovering => "|<faded>End of turn:| heal |<value>2| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
-            Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
+            Wet => "Takes |<value>-25%| |<fire>|fire damage and |<value>+50%| |<lightning>|lightning damage",
             Poisoned => "|<faded>End of turn:| lose |<value>10%| of current health |<heart>|",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
@@ -5608,6 +5611,24 @@ pub enum DamageType {
     Regular,
     Fire,
     Lightning,
+}
+
+impl DamageType {
+    pub fn font_icon(&self) -> &'static str {
+        match self {
+            DamageType::Regular => "<sword>",
+            DamageType::Fire => "<fire>",
+            DamageType::Lightning => "<lightning>",
+        }
+    }
+
+    pub fn dmg_str(&self) -> &'static str {
+        match self {
+            DamageType::Regular => "|<sword>| damage",
+            DamageType::Fire => "|<fire>|fire damage",
+            DamageType::Lightning => "|<lightning>|lightning damage",
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

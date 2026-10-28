@@ -445,32 +445,32 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Alice",
-      "pos": [
-        22,
-        12
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        15,
-        11
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Ghoul1",
       "pos": [
         18,
         12
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        10,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "SkeletonBoss",
+      "pos": [
+        28,
+        5
       ],
       "health": null,
       "main_hand": null,

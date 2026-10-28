@@ -5468,10 +5468,11 @@ impl GameGrid {
             );
 
             let header = if let Some(damage) = damage {
+                let icon = damage.dmg_type.font_icon();
                 if damage.max > damage.min {
-                    format!("|<sword>|{}-{}", damage.min, damage.max)
+                    format!("|{}|{}-{}", icon, damage.min, damage.max)
                 } else {
-                    format!("|<sword>|{}", damage.min)
+                    format!("|{}|{}", icon, damage.min)
                 }
             } else if preview.prediction.is_buff {
                 "|<heart>|".to_string()

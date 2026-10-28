@@ -650,7 +650,7 @@ pub const COLD_ARROWS: Arrow = Arrow {
 
 pub const FIRE_ARROWS: Arrow = Arrow {
     name: "Fire arrows",
-    description: "Deals |<value>2| fire damage in an area and sets the ground on fire",
+    description: "Deals |<value>2| |<fire>|fire damage in an area and sets the ground on fire",
     icon: EquipmentIconId::FireArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
@@ -673,7 +673,7 @@ pub const FIRE_ARROWS: Arrow = Arrow {
 
 pub const EXPLODING_ARROWS: Arrow = Arrow {
     name: "Exploding arrows",
-    description: "Deals |<value>2| fire damage in an area and pushes affected targets",
+    description: "Deals |<value>2| |<fire>|fire damage in an area and pushes affected targets",
     icon: EquipmentIconId::ExplodingArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
@@ -2424,7 +2424,8 @@ pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireball,
     name: "Fireball",
     speech: "",
-    description: "Deal fire damage to an enemy and its surroundings",
+    description:
+        "Deal |<value>3| |<fire>|fire damage to an enemy and |<value>4| to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2469,7 +2470,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     id: AbilityId::EnemyBurningArrow,
     name: "Burning arrow",
     speech: "",
-    description: "Deal fire damage to an enemy and its surroundings",
+    description: "Deal |<value>3| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 4,
     mana_cost: 0,
@@ -2526,7 +2527,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
     speech: "",
-    description: "Deal lightning damage in a line",
+    description: "Deal |<value>7| |<lightning>|lightning damage in a line",
     icon: IconId::LightningBolt,
     action_point_cost: 3,
     mana_cost: 2,

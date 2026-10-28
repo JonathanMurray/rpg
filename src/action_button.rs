@@ -794,12 +794,7 @@ fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tool
                     AbilityDamage::Fixed(n, dmg_type) => (n, dmg_type),
                     AbilityDamage::Dynamic(n, dmg_type) => (n, dmg_type),
                 };
-                let mut line = format!("  |<sword>| |<value>{}|", value);
-                match dmg_type {
-                    DamageType::Fire => line.push_str(" |<faded>fire damage|"),
-                    DamageType::Lightning => line.push_str(" |<faded>lightning damage|"),
-                    DamageType::Regular => line.push_str(" |<faded>damage|"),
-                }
+                let mut line = format!("  |<value>{}| {}", value, dmg_type.dmg_str());
                 t.technical_description.push(line);
             }
 
