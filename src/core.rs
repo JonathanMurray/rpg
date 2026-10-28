@@ -908,7 +908,7 @@ impl CoreGame {
         let mut step_idx = 0;
 
         while !positions.is_empty() {
-            let new_position = positions.remove(0);
+            let new_position = positions[0];
             if new_position == character.pos() {
                 panic!(
                     "Character {} tried to move 0 distance from {:?}",
@@ -946,13 +946,15 @@ impl CoreGame {
                         if movement_type == MovementType::Regular {
                             let reactor = other_char;
 
+                            let mut movement = vec![character.pos()];
+                            movement.extend_from_slice(&positions);
                             let chooses_to_use_opportunity_attack = self
                                 .user_interface
                                 .choose_movement_opportunity_attack(
                                     self,
                                     reactor.id(),
                                     character.id(),
-                                    (character.pos(), new_position),
+                                    movement,
                                 )
                                 .await?;
 
@@ -1040,6 +1042,7 @@ impl CoreGame {
             self.handle_character_standing_on_surface(character, self.current_time())
                 .await;
 
+            positions.remove(0);
             step_idx += 1;
         }
 
@@ -1592,7 +1595,7 @@ impl CoreGame {
                         actor.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
-                            ability: ability.clone(),
+                            ability,
                             target: Some(target_id),
                             area_at: None,
                         })
@@ -1635,7 +1638,7 @@ impl CoreGame {
                         actor.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
-                            ability: ability.clone(),
+                            ability,
                             target: None,
                             area_at: Some((area_effect.shape, target_pos)),
                         })
@@ -1688,7 +1691,7 @@ impl CoreGame {
                     if let Some(game) = real_game {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
-                            ability: ability.clone(),
+                            ability,
                             target: None,
                             area_at: None,
                         })

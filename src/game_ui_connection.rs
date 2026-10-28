@@ -53,9 +53,8 @@ enum MessageFromGame {
     },
     AwaitingChooseMovementOpportunityAttack {
         reactor: CharacterId,
-        // TODO characterId?
-        target: u32,
-        movement: ((i32, i32), (i32, i32)),
+        target: CharacterId,
+        movement: Vec<Position>,
     },
     AwaitingChooseRangedOpportunityAttack {
         reactor: CharacterId,
@@ -170,7 +169,7 @@ impl GameUserInterfaceConnection {
         game: &CoreGame,
         reactor: CharacterId,
         target: CharacterId,
-        movement: (Position, Position),
+        movement: Vec<Position>,
     ) -> Result<bool, QuitEvent> {
         match self
             .run_ui(

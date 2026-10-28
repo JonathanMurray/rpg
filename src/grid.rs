@@ -3506,24 +3506,14 @@ impl GameGrid {
                 let target = &self.characters[target];
                 let reactor = &self.characters[reactor];
 
-                self.draw_movement_path_with_arrow(
-                    [
-                        MovementPathNode {
-                            pos: movement.0,
-                            difficult_terrain: false,
-                            dangerous: false,
-                            ap_cost_breakpoint: false,
-                        },
-                        MovementPathNode {
-                            pos: movement.1,
-                            difficult_terrain: false,
-                            dangerous: false,
-                            ap_cost_breakpoint: false,
-                        },
-                    ]
-                    .into_iter(),
-                    RED,
-                );
+                let path = movement.into_iter().map(|pos| MovementPathNode {
+                    pos: *pos,
+                    difficult_terrain: false,
+                    dangerous: false,
+                    ap_cost_breakpoint: false,
+                });
+
+                self.draw_movement_path_with_arrow(path, RED);
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,

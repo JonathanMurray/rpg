@@ -93,7 +93,7 @@ pub enum UiState {
     ReactingToMovementAttackOpportunity {
         reactor: CharacterId,
         target: CharacterId,
-        movement: ((i32, i32), (i32, i32)),
+        movement: Vec<Position>,
         selected: bool,
     },
     ReactingToRangedAttackOpportunity {
