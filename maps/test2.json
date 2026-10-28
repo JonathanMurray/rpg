@@ -447,8 +447,8 @@
     {
       "type_": "Alice",
       "pos": [
-        25,
-        4
+        22,
+        12
       ],
       "health": null,
       "main_hand": null,
@@ -467,10 +467,10 @@
       "name": null
     },
     {
-      "type_": "Ogre",
+      "type_": "Ghoul1",
       "pos": [
         18,
-        11
+        12
       ],
       "health": null,
       "main_hand": null,

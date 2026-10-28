@@ -3531,9 +3531,9 @@ impl GameGrid {
                         CROSSHAIR_ARROW_THICK,
                         true,
                     );
-                    reaction_choice = Some("Attack");
+                    reaction_choice = Some(("Attack", Some(target.name.clone())));
                 } else {
-                    reaction_choice = Some("No reaction");
+                    reaction_choice = Some(("No reaction", None));
                 }
 
                 detail_labelled_char_ids.insert(target.id());
@@ -3582,9 +3582,9 @@ impl GameGrid {
                         CROSSHAIR_ARROW_THICK,
                         true,
                     );
-                    reaction_choice = Some("Attack");
+                    reaction_choice = Some(("Attack", Some(attacker.name.clone())));
                 } else {
-                    reaction_choice = Some("No reaction");
+                    reaction_choice = Some(("No reaction", None));
                 }
 
                 detail_labelled_char_ids.insert(attacker.id());
@@ -3627,8 +3627,8 @@ impl GameGrid {
                 self.draw_overhead_question_mark(reactor);
 
                 reaction_choice = selected
-                    .map(|reaction| reaction.name)
-                    .or(Some("No reaction"));
+                    .map(|reaction| (reaction.name, None))
+                    .or(Some(("No reaction", None)));
             }
 
             UiState::ReactingToHit {
@@ -3647,8 +3647,8 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(reactor.id());
                 self.draw_overhead_question_mark(reactor);
                 reaction_choice = selected
-                    .map(|reaction| reaction.name)
-                    .or(Some("No reaction"));
+                    .map(|reaction| (reaction.name, None))
+                    .or(Some(("No reaction", None)));
             }
 
             _ => {}
@@ -3869,12 +3869,12 @@ impl GameGrid {
                 }
             }
 
-            if let Some(reaction_choice) = reaction_choice {
-                front_cursor_text = Some((
-                    Cow::Owned(format!("|<confirm>|{}", reaction_choice)),
-                    None,
-                    CursorTextColor::Info,
-                ));
+            if let Some((reaction_choice, target_str)) = reaction_choice {
+                let mut text = format!("|<confirm>|{}", reaction_choice);
+                if let Some(target_str) = target_str {
+                    text.push_str(&format!("\n|<target>|{}", target_str));
+                }
+                front_cursor_text = Some((Cow::Owned(text), None, CursorTextColor::Info));
                 if pressed_left_mouse {
                     outcome.committed_action = true;
                 }
