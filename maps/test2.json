@@ -487,6 +487,28 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Skeleton",
+      "pos": [
+        25,
+        1
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Skeleton",
+      "pos": [
+        28,
+        1
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

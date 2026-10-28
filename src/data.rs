@@ -2336,7 +2336,7 @@ pub const DASH: Ability = Ability {
     requirement: None,
     roll: None,
     possible_enhancements: [None, None, None],
-    target: AbilityTarget::Destination {
+    target: AbilityTarget::Movement {
         range: Range::f32(8.0),
     },
     animation_color: RED,
@@ -2449,6 +2449,50 @@ pub const FIREBALL: Ability = Ability {
             }),
         )),
         environment_effect: None,
+    },
+    possible_enhancements: [
+        Some(FIREBALL_REACH),
+        Some(FIREBALL_MASSIVE),
+        Some(FIREBALL_INFERNO),
+    ],
+
+    animation_color: RED,
+    animation: AbilityAnimation::CastSpell,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::FireballHit),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::FireCrackle,
+    }),
+};
+
+pub const FIREBALL2: Ability = Ability {
+    id: AbilityId::Fireball2,
+    name: "Fireball 2",
+    speech: "",
+    description: "todo",
+    icon: IconId::Fireball,
+    action_point_cost: 0,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    target: AbilityTarget::Projectile {
+        range: Range::f32(12.5),
+        impact_effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Fire)),
+            ..SpellNegativeEffect::default()
+        }),
+        impact_circle: Some((
+            Range::f32(2.5),
+            AreaTargetAcquisition::Everyone,
+            AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
+                ..SpellNegativeEffect::default()
+            }),
+        )),
     },
     possible_enhancements: [
         Some(FIREBALL_REACH),

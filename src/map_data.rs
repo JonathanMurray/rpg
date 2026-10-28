@@ -16,10 +16,10 @@ use crate::{
         BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, BOSS_AXE,
         CHAIN_MAIL, CHEAT_BOW, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE,
         DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
-        ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS,
-        HEALING_NOVA, HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
-        INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE,
-        LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
+        ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIREBALL2,
+        FIRE_ARROWS, HEALING_NOVA, HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE,
+        HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
+        LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
         SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF,
         SWEEP_ATTACK_PUSH, TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW,
     },
@@ -735,7 +735,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 fn make_high_clara(party: &Rc<Party>) -> Character {
     let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
-        "Clara",
+        "Test mage",
         SoundId::DamageFemale,
         PortraitId::Clara,
         SpriteId::Clara,
@@ -746,10 +746,8 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_passive(PassiveSkill::CriticalCharge);
+    clara.learn_ability(&FIREBALL2);
     clara.learn_ability(&FIREBALL);
-    clara.learn_ability_enhancement(FIREBALL_INFERNO);
-    clara.learn_ability_enhancement(FIREBALL_REACH);
-    clara.learn_ability_enhancement(FIREBALL_MASSIVE);
     clara.learn_ability(&SHACKLED_MIND);
     clara.learn_ability(&INFLICT_WOUNDS);
     clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);

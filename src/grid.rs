@@ -48,8 +48,8 @@ use crate::{
         within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction,
-        Character, CharacterFacing, Condition, Goodness, HitType, MovementType, Position,
-        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        Character, CharacterFacing, ConcreteAbilityTarget, Condition, Goodness, HitType,
+        MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -1055,14 +1055,22 @@ impl GameGrid {
         &mut self,
         actor: CharacterId,
         ability: &Ability,
-        target: Option<CharacterId>,
-        area_at: Option<(AreaShape, Position)>,
+        target: Option<ConcreteAbilityTarget>,
     ) -> (f32, f32) {
         let actor = self.characters.get(&actor).unwrap();
 
-        let target_pos = target
-            .map(|char_id| self.characters.get(&char_id).unwrap().pos())
-            .or(area_at.map(|(_shape, pos)| pos));
+        let mut shape = None;
+
+        let target_pos = target.map(|target| match target {
+            ConcreteAbilityTarget::SingleCharacter(ch_id) => {
+                self.characters.get(&ch_id).unwrap().pos()
+            }
+            ConcreteAbilityTarget::Area(area_shape, pos) => {
+                shape = Some(area_shape);
+                pos
+            }
+            ConcreteAbilityTarget::Projectile(pos) => pos,
+        });
 
         let mut delay = 0.0;
 
@@ -1124,10 +1132,10 @@ impl GameGrid {
                     target_pos.unwrap(),
                 );
                 let mut effect_duration = 0.0;
-                if let Some((shape, area_pos)) = area_at {
+                if let Some(shape) = shape {
                     effect_duration = self.animate_ability_area_effect(
                         actor_pos,
-                        area_pos,
+                        target_pos.unwrap(),
                         shape,
                         ability,
                         delay + aim_duration,
@@ -1279,9 +1287,16 @@ impl GameGrid {
                     },
                 ));
 
-                if target.is_some() {
-                    let target_pos = target_pos.unwrap();
-
+                if let Some(shape) = shape {
+                    let duration = self.animate_ability_area_effect(
+                        actor_pos,
+                        target_pos.unwrap(),
+                        shape,
+                        ability,
+                        delay + casting_duration,
+                    );
+                    casting_duration + duration
+                } else if let Some(target_pos) = target_pos {
                     let duration = 0.04 * distance_between(actor_pos, target_pos);
 
                     self.add_circle_projectile_effect(
@@ -1292,15 +1307,6 @@ impl GameGrid {
                         target_pos,
                     );
 
-                    casting_duration + duration
-                } else if let Some((shape, area_pos)) = area_at {
-                    let duration = self.animate_ability_area_effect(
-                        actor_pos,
-                        area_pos,
-                        shape,
-                        ability,
-                        delay + casting_duration,
-                    );
                     casting_duration + duration
                 } else {
                     casting_duration
@@ -3032,7 +3038,10 @@ impl GameGrid {
                     }
 
                     ConfiguredAction::UseAbility {
-                        target: t @ (ActionTarget::Character(..) | ActionTarget::Position(..)),
+                        target:
+                            t @ (ActionTarget::Character(..)
+                            | ActionTarget::Position(..)
+                            | ActionTarget::Projectile(..)),
                         ..
                     } => {
                         outcome.switched_players_action_target = true;
@@ -3276,17 +3285,37 @@ impl GameGrid {
                                 should_highlight_character_occupations = true;
                             }
 
-                            MouseState::RequiresPositionTarget {
-                                shape: Some(area_effect.shape),
+                            let kind = match area_effect.shape {
+                                AreaShape::Circle(range) => PointTargetKind::PositionCircle(range),
+                                AreaShape::Line => PointTargetKind::Line,
+                            };
+
+                            MouseState::RequiresPointTarget {
+                                kind,
                                 range: range.plus_tenths(increased_range_tenths),
                             }
                         }
-                        AbilityTarget::Destination { range } => {
+                        AbilityTarget::Projectile {
+                            range,
+                            impact_effect,
+                            impact_circle,
+                        } => {
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
-                            MouseState::RequiresPositionTarget {
-                                shape: None,
+                            let circle_radius =
+                                impact_circle.map(|(range, _acquisition, _effect)| range);
+                            MouseState::RequiresPointTarget {
+                                kind: PointTargetKind::Projectile { circle_radius },
+                                range: range.plus_tenths(increased_range_tenths),
+                            }
+                        }
+                        AbilityTarget::Movement { range } => {
+                            if *target == ActionTarget::None {
+                                should_highlight_character_occupations = true;
+                            }
+                            MouseState::RequiresPointTarget {
+                                kind: PointTargetKind::Movement,
                                 range: *range,
                             }
                         }
@@ -3392,7 +3421,7 @@ impl GameGrid {
 
         let pressed_left_mouse = is_mouse_button_pressed(MouseButton::Left);
 
-        let mut snapped_position_target: Option<Position> = None;
+        let mut snapped_position_target: Option<SnappedPositionTarget> = None;
         let mut mouse_pos_target_problem = None;
 
         match mouse_state {
@@ -3426,56 +3455,83 @@ impl GameGrid {
                 }
             }
 
-            MouseState::RequiresPositionTarget { shape, range } => {
-                let mut has_valid_target = false;
-                let point = if let ActionTarget::Position(pos) = ui_state.players_action_target() {
-                    //println!("players_action_target = {:?}", pos);
-                    has_valid_target = true;
-                    Some(pos)
-                } else if is_mouse_within_grid && receptive_to_input {
-                    Some(mouse_grid_pos)
-                } else {
-                    None
+            MouseState::RequiresPointTarget { kind, range } => {
+                let already_has_valid_target = matches!(
+                    ui_state.players_action_target(),
+                    ActionTarget::Position(..) | ActionTarget::Projectile(..)
+                );
+
+                let point = match ui_state.players_action_target() {
+                    ActionTarget::Position(pos) => Some(pos),
+                    ActionTarget::Projectile(pos, _ch_id) => Some(pos),
+                    _ => {
+                        if is_mouse_within_grid && receptive_to_input {
+                            Some(mouse_grid_pos)
+                        } else {
+                            None
+                        }
+                    }
                 };
-                match shape {
-                    Some(AreaShape::Circle(radius)) => {
+
+                match kind {
+                    PointTargetKind::PositionCircle(radius) => {
                         if let Some(center) = point {
                             self.draw_range_indicator(
                                 center,
                                 radius,
-                                RangeIndicatorType::TargetAreaEffect(has_valid_target),
+                                RangeIndicatorType::TargetAreaEffect(already_has_valid_target),
                             );
                         }
                     }
-                    Some(AreaShape::Line) => {
+                    PointTargetKind::Line => {
                         if let Some(to) = point {
-                            let end = self.draw_target_line(
+                            let snapped = self.draw_target_line(
                                 range,
                                 &self.characters[&self.active_character_id],
                                 to,
-                                false,
-                                has_valid_target,
+                                kind,
+                                already_has_valid_target,
                             );
-                            snapped_position_target = Some(end);
+                            snapped_position_target = Some(snapped);
                         }
                     }
-                    None => {
+                    PointTargetKind::Projectile { circle_radius } => {
                         if let Some(to) = point {
-                            let end = self.draw_target_line(
+                            let snapped = self.draw_target_line(
                                 range,
                                 &self.characters[&self.active_character_id],
                                 to,
-                                true,
-                                has_valid_target,
+                                kind,
+                                already_has_valid_target,
                             );
-                            snapped_position_target = Some(end);
-                            if self
-                                .pathfind_grid
-                                .is_free(Occupation::Character(self.active_character_id), end)
-                            {
+                            snapped_position_target = Some(snapped);
+
+                            if let Some(radius) = circle_radius {
+                                self.draw_range_indicator(
+                                    snapped.pos,
+                                    radius,
+                                    RangeIndicatorType::TargetAreaEffect(already_has_valid_target),
+                                );
+                            }
+                        }
+                    }
+                    PointTargetKind::Movement => {
+                        if let Some(to) = point {
+                            let snapped = self.draw_target_line(
+                                range,
+                                &self.characters[&self.active_character_id],
+                                to,
+                                kind,
+                                already_has_valid_target,
+                            );
+                            snapped_position_target = Some(snapped);
+                            if self.pathfind_grid.is_free(
+                                Occupation::Character(self.active_character_id),
+                                snapped.pos,
+                            ) {
                                 // Highlight the position where you'll end up after the movement
                                 self.draw_cornered_outline(
-                                    self.grid_pos_to_screen(end),
+                                    self.grid_pos_to_screen(snapped.pos),
                                     ABILITY_MOVEMENT_DST_COLOR,
                                     5.0,
                                     3.0,
@@ -3670,7 +3726,7 @@ impl GameGrid {
                     ConfiguredAction::Attack { .. } => Some("Attack".to_string()),
                     ConfiguredAction::UseAbility { ability, .. } => {
                         let num_targets = self.target_effect_previews.len();
-                        if matches!(ability.target, AbilityTarget::Destination { .. }) {
+                        if matches!(ability.target, AbilityTarget::Movement { .. }) {
                             Some(ability.name.to_owned())
                         } else {
                             let target_str = if num_targets == 1 {
@@ -3762,10 +3818,10 @@ impl GameGrid {
                         }
                     }
                 }
-                MouseState::RequiresPositionTarget { shape, .. } => {
+                MouseState::RequiresPointTarget { kind, .. } => {
                     if matches!(
                         ui_state.players_action_target(),
-                        ActionTarget::Position { .. }
+                        ActionTarget::Position { .. } | ActionTarget::Projectile(..)
                     ) && is_mouse_within_grid
                     {
                         may_commit_action_with_left_click = true;
@@ -3784,7 +3840,9 @@ impl GameGrid {
                         {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
-                            let position_target = snapped_position_target.unwrap_or(mouse_grid_pos);
+                            let position_target = snapped_position_target
+                                .map(|snapped| snapped.pos)
+                                .unwrap_or(mouse_grid_pos);
 
                             self.draw_target_crosshair(
                                 self.characters[&self.active_character_id].pos(),
@@ -3796,8 +3854,8 @@ impl GameGrid {
                             );
                         }
 
-                        match shape {
-                            Some(AreaShape::Circle(..)) => {
+                        match kind {
+                            PointTargetKind::PositionCircle(..) => {
                                 if is_mouse_pos_out_of_range {
                                     front_cursor_text = Some((
                                         Cow::Borrowed("Out of reach"),
@@ -3805,6 +3863,7 @@ impl GameGrid {
                                         CursorTextColor::Error,
                                     ));
                                 } else {
+                                    println!("Shape circle");
                                     front_cursor_text = Some((
                                         Cow::Borrowed("Confirm area"),
                                         Some(mouse_grid_pos),
@@ -3812,14 +3871,21 @@ impl GameGrid {
                                     ));
                                 }
                             }
-                            Some(AreaShape::Line) => {
+                            PointTargetKind::Line => {
                                 front_cursor_text = Some((
                                     Cow::Borrowed("Confirm aim"),
                                     None,
                                     CursorTextColor::Info,
                                 ));
                             }
-                            None => {
+                            PointTargetKind::Projectile { .. } => {
+                                front_cursor_text = Some((
+                                    Cow::Borrowed("Confirm aim"),
+                                    None,
+                                    CursorTextColor::Info,
+                                ));
+                            }
+                            PointTargetKind::Movement => {
                                 if let Some(text) = mouse_pos_target_problem {
                                     front_cursor_text = Some((
                                         Cow::Borrowed(text),
@@ -3896,14 +3962,22 @@ impl GameGrid {
                             outcome.switched_players_action_target = true;
                         }
                     }
-                    MouseState::RequiresPositionTarget { .. } => {
+                    MouseState::RequiresPointTarget { kind, .. } => {
                         dbg!(ui_state.players_action_target());
                         if ui_state.players_action_target() == ActionTarget::None {
                             // Had no target => set target
                             if mouse_pos_target_problem.is_none() {
                                 println!("Set target");
-                                let target_pos = snapped_position_target.unwrap_or(mouse_grid_pos);
-                                ui_state.set_target(ActionTarget::Position(target_pos));
+                                //let target_pos = snapped_position_target.unwrap_or(mouse_grid_pos);
+                                let snapped = snapped_position_target.unwrap();
+                                let target = match kind {
+                                    PointTargetKind::Projectile { .. } => ActionTarget::Projectile(
+                                        snapped.pos,
+                                        snapped.obstructing_character,
+                                    ),
+                                    _ => ActionTarget::Position(snapped.pos),
+                                };
+                                ui_state.set_target(target);
                                 outcome.switched_players_action_target = true;
                             }
                         } else {
@@ -3993,7 +4067,7 @@ impl GameGrid {
 
                     if pressed_left_mouse && !outcome.committed_action {
                         if self.active_character_id == hovered_id {
-                            if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
+                            if matches!(mouse_state, MouseState::RequiresPointTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;
                             } else if mouse_state == MouseState::RequiresAllyTarget {
@@ -4246,6 +4320,20 @@ impl GameGrid {
                     !cannot_reach,
                 );
             }
+            ActionTarget::Projectile(pos, impact_ch_id) => {
+                let cannot_reach = matches!(
+                    range_indicator,
+                    Some((_, _, RangeIndicatorType::CannotReach, _))
+                );
+                self.draw_target_crosshair(
+                    active_char_pos,
+                    pos,
+                    false,
+                    PLAYERS_TARGET_CROSSHAIR_COLOR,
+                    CROSSHAIR_ARROW_THICK,
+                    !cannot_reach,
+                );
+            }
             ActionTarget::None => {}
         }
 
@@ -4292,7 +4380,7 @@ impl GameGrid {
 
         let inspect_target = match ui_state.players_action_target() {
             ActionTarget::Character(char_id, _) => Some(char_id),
-            ActionTarget::Position(..) | ActionTarget::None => {
+            ActionTarget::Position(..) | ActionTarget::Projectile(..) | ActionTarget::None => {
                 self.hovered_character.or(self.hovered_character_portrait)
             }
         };
@@ -4707,23 +4795,32 @@ impl GameGrid {
         range: Range,
         actor: &Character,
         mut to: Position,
-        dash: bool,
+        kind: PointTargetKind,
         locked_target: bool,
-    ) -> Position {
+    ) -> SnappedPositionTarget {
         let from = actor.pos();
 
-        // Dash => limited to range
-        // not Dash => limited to range and extend to range
-        modify_line_len(from, &mut to, range, !dash);
+        let extend_to_range = matches!(
+            kind,
+            PointTargetKind::Line | PointTargetKind::Projectile { .. }
+        );
+        modify_line_len(from, &mut to, range, extend_to_range);
 
+        let mut obstructing_character: Option<CharacterId> = None;
         let mut end = to;
 
         let mut prev = from;
 
-        let obstructs = |occupation: Option<&Occupation>| {
-            if dash {
+        let stops_at_character = matches!(
+            kind,
+            PointTargetKind::Movement | PointTargetKind::Projectile { .. }
+        );
+        let obstructs = |occupation: Option<Occupation>,
+                         obstructing_character: &mut Option<CharacterId>| {
+            if stops_at_character {
                 if let Some(Occupation::Character(character_id)) = occupation {
-                    if *character_id != actor.id() {
+                    if character_id != actor.id() {
+                        *obstructing_character = Some(character_id);
                         return true;
                     }
                 }
@@ -4734,8 +4831,17 @@ impl GameGrid {
             )
         };
 
+        let char_elevation = self.pathfind_grid.elevation(actor.pos());
+
         line_visitor(from, to, |x, y| {
-            let obstructed = obstructs(self.pathfind_grid.occupation(&(x, y)).as_ref());
+            let pos = (x, y);
+
+            let occupation = self.pathfind_grid.occupation(&pos);
+            let obstructed = obstructs(occupation, &mut obstructing_character)
+                || !self.pathfind_grid.is_within_grid(pos)
+                // Hack: the north side of a wall has no occupied cells
+                || (self.pathfind_grid.elevation(pos) == Some(Elevation::Wall)
+                    && char_elevation != Some(Elevation::Wall));
 
             let color = if obstructed {
                 Color::new(1.0, 0.4, 0.4, 0.55)
@@ -4747,14 +4853,18 @@ impl GameGrid {
             self.fill_cell((x, y), color, 0.0);
             if obstructed {
                 end = prev;
+                //dbg!((pos, end));
                 true
             } else {
-                prev = (x, y);
+                prev = pos;
                 false
             }
         });
 
-        end
+        SnappedPositionTarget {
+            pos: end,
+            obstructing_character,
+        }
     }
 
     fn draw_cursor_text(
@@ -5135,6 +5245,7 @@ impl GameGrid {
                             Some(self.characters[target_char_id].pos())
                         }
                         ActionTarget::Position(pos) => Some(*pos),
+                        ActionTarget::Projectile(pos, impact_character_id) => Some(*pos),
                         ActionTarget::None => {
                             let mut pos = None;
                             if let Some(hovered_id) = self.hovered_character {
@@ -6447,6 +6558,12 @@ impl GameGrid {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+struct SnappedPositionTarget {
+    pos: Position,
+    obstructing_character: Option<CharacterId>,
+}
+
 struct MovementPathNode {
     pos: Position,
     difficult_terrain: bool,
@@ -6790,13 +6907,21 @@ enum MouseState {
         move_into_melee: Option<Range>,
     },
     RequiresAllyTarget,
-    RequiresPositionTarget {
-        shape: Option<AreaShape>,
+    RequiresPointTarget {
+        kind: PointTargetKind,
         range: Range,
     },
     ImplicitTarget,
     Movement,
     None,
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+enum PointTargetKind {
+    PositionCircle(Range),
+    Line,
+    Projectile { circle_radius: Option<Range> },
+    Movement,
 }
 
 fn has_non_empty_movement_path(ui_state: &UiState) -> bool {

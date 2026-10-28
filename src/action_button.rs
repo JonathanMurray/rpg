@@ -676,7 +676,30 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             describe_area_effect(Some(*range), &area_effect, &mut t)
         }
 
-        AbilityTarget::Destination { range } => {
+        AbilityTarget::Projectile {
+            range,
+            impact_effect,
+            impact_circle,
+        } => {
+            let def = def_suffix(impact_effect.defense_type());
+
+            t.technical_description.push(format!(
+                "(todo) |<single_target>| {}{}",
+                range.range_with_icon(),
+                def
+            ));
+            describe_ability_negative_effect(&*impact_effect, &mut t);
+
+            if let Some((range, acquisition, effect)) = impact_circle {
+                t.technical_description.push("".to_string());
+                let def = def_suffix(effect.defense_type());
+                t.technical_description
+                    .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
+                describe_ability_negative_effect(&effect, &mut t);
+            }
+        }
+
+        AbilityTarget::Movement { range } => {
             t.technical_description.push(format!("|<range>| {range}"));
         }
     };

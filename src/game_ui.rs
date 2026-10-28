@@ -223,6 +223,19 @@ fn ability_usability_problem(
         return Some(UsabilityProblem::NotEnoughAp);
     }
 
+    let usability_check_reach_and_line_of_sight =
+        |target_pos: Position| -> Option<UsabilityProblem> {
+            if relevant_character.reaches_with_ability(ability, selected_enhancements, target_pos) {
+                if pathfind_grid.obstructed_line_of_sight(relevant_character.pos(), target_pos) {
+                    Some(UsabilityProblem::NoLineOfSight)
+                } else {
+                    None
+                }
+            } else {
+                Some(UsabilityProblem::OutOfReach)
+            }
+        };
+
     match target {
         ActionTarget::Character(target_id, movement) => {
             if let Some(positions) = movement {
@@ -231,39 +244,20 @@ fn ability_usability_problem(
                 }
             }
             let target_char = characters.get(*target_id);
-
-            if relevant_character.reaches_with_ability(
-                ability,
-                selected_enhancements,
-                target_char.position.get(),
-            ) {
-                if pathfind_grid
-                    .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
-                {
-                    Some(UsabilityProblem::NoLineOfSight)
-                } else {
-                    None
-                }
-            } else {
-                Some(UsabilityProblem::OutOfReach)
-            }
+            usability_check_reach_and_line_of_sight(target_char.pos())
         }
 
         ActionTarget::Position(target_pos) => {
             assert!(matches!(
                 ability.target,
-                AbilityTarget::Area { .. } | AbilityTarget::Destination { .. }
+                AbilityTarget::Area { .. } | AbilityTarget::Movement { .. }
             ));
-            if relevant_character.reaches_with_ability(ability, selected_enhancements, *target_pos)
-            {
-                if pathfind_grid.obstructed_line_of_sight(relevant_character.pos(), *target_pos) {
-                    Some(UsabilityProblem::NoLineOfSight)
-                } else {
-                    None
-                }
-            } else {
-                Some(UsabilityProblem::OutOfReach)
-            }
+            usability_check_reach_and_line_of_sight(*target_pos)
+        }
+
+        ActionTarget::Projectile(target_pos, impact_ch_id) => {
+            assert!(matches!(ability.target, AbilityTarget::Projectile { .. }));
+            usability_check_reach_and_line_of_sight(*target_pos)
         }
 
         // There is a usability problem; we will not be able to call predict_ability for example,
@@ -273,7 +267,8 @@ fn ability_usability_problem(
             AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
             AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
             AbilityTarget::Area { .. } => Some(UsabilityProblem::SelectArea),
-            AbilityTarget::Destination { .. } => Some(UsabilityProblem::SelectDestination),
+            AbilityTarget::Movement { .. } => Some(UsabilityProblem::SelectDestination),
+            AbilityTarget::Projectile { .. } => Some(UsabilityProblem::SelectArea),
         },
     }
 }
@@ -1101,6 +1096,7 @@ impl UserInterface {
                             Some(self.characters.get(*character_id).pos())
                         }
                         ActionTarget::Position(pos) => Some(*pos),
+                        ActionTarget::Projectile(pos, _ch_id) => Some(*pos),
                         ActionTarget::None => None,
                     },
                     _ => None,
@@ -1718,12 +1714,11 @@ impl UserInterface {
                 actor,
                 ability,
                 target,
-                area_at,
             } => {
                 println!("Ability was initiated: {}", ability.name);
                 let (delay, duration) = self
                     .game_grid
-                    .animate_initiating_ability(actor, &ability, target, area_at);
+                    .animate_initiating_ability(actor, &ability, target);
 
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.play_delayed(sound_id, delay);

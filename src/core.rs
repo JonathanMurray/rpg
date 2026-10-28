@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::IntoStringError;
 use std::fmt::Display;
 use std::pin::Pin;
+use std::process::exit;
 use std::rc::{Rc, Weak};
 use std::time::SystemTime;
 
@@ -1521,8 +1522,7 @@ impl CoreGame {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability: ability,
-                            target: Some(*target_id),
-                            area_at: None,
+                            target: Some(ConcreteAbilityTarget::SingleCharacter(*target_id)),
                         })
                         .await;
 
@@ -1583,6 +1583,89 @@ impl CoreGame {
                     //dbg!(before.elapsed().unwrap());
                 }
 
+                AbilityTarget::Projectile {
+                    range,
+                    impact_effect,
+                    impact_circle,
+                } => {
+                    /*
+                    dbg!(selected_target);
+                    dbg!(impact_effect);
+                    dbg!(impact_circle);
+                     */
+
+                    let (target_pos, target_id) = selected_target.unwrap_projectile();
+
+                    if let Some(game) = real_game {
+                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(
+                            !game
+                                .pathfind_grid
+                                .obstructed_line_of_sight(actor.pos(), target_pos),
+                            "{:?} {:?}",
+                            actor.pos(),
+                            target_pos
+                        );
+
+                        actor.set_facing_toward(target_pos);
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: actor_id,
+                            ability,
+                            target: Some(ConcreteAbilityTarget::Projectile(target_pos)),
+                        })
+                        .await;
+                    }
+
+                    if let Some(target_id) = target_id {
+                        let target = mode.characters().get_rc(target_id);
+                        let outcome = Self::perform_ability_enemy_effect(
+                            actor,
+                            ability.name,
+                            roll_instruction.as_ref().unwrap(),
+                            enhancements,
+                            impact_effect,
+                            target,
+                            0,
+                            &mut detail_lines,
+                            None,
+                            mode,
+                        )
+                        .await;
+                        target_outcome = Some((target_id, outcome));
+                    }
+
+                    if let Some((radius, acquisition, negative_effect)) = impact_circle {
+                        let shape = AreaShape::Circle(*radius);
+
+                        detail_lines.push("|<faded>Area of effect:|".to_string());
+
+                        let area_effect = AreaEffect {
+                            shape,
+                            acquisition: *acquisition,
+                            effect: AbilityEffect::Negative(*negative_effect),
+                            create_surface: None,
+                        };
+
+                        let outcomes = Self::perform_ability_area_effect(
+                            ability.name,
+                            roll_instruction.as_ref().unwrap(),
+                            enhancements,
+                            actor,
+                            target_pos,
+                            &area_effect,
+                            &mut detail_lines,
+                            mode,
+                        )
+                        .await;
+
+                        area_outcome = Some(AbilityAreaOutcome {
+                            center: target_pos,
+                            targets: outcomes,
+                            shape: area_effect.shape,
+                        });
+                    }
+                }
+
                 AbilityTarget::Ally { range: _, effect } => {
                     let target_id = selected_target.character_target_id().unwrap();
                     let target = mode.characters().get(target_id);
@@ -1596,8 +1679,7 @@ impl CoreGame {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability,
-                            target: Some(target_id),
-                            area_at: None,
+                            target: Some(ConcreteAbilityTarget::SingleCharacter(target_id)),
                         })
                         .await;
                     }
@@ -1639,8 +1721,10 @@ impl CoreGame {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability,
-                            target: None,
-                            area_at: Some((area_effect.shape, target_pos)),
+                            target: Some(ConcreteAbilityTarget::Area(
+                                area_effect.shape,
+                                target_pos,
+                            )),
                         })
                         .await;
                     }
@@ -1666,7 +1750,7 @@ impl CoreGame {
                     });
                 }
 
-                AbilityTarget::Destination { .. } => {
+                AbilityTarget::Movement { .. } => {
                     if let Some(game) = real_game {
                         dbg!(selected_target);
                         let destination = selected_target.unwrap_position();
@@ -1693,7 +1777,6 @@ impl CoreGame {
                             actor: actor_id,
                             ability,
                             target: None,
-                            area_at: None,
                         })
                         .await;
                     }
@@ -3873,7 +3956,7 @@ pub fn predict_ability(
                     },
                 );
             } else if unmodified_roll == 19 {
-                if let Some((dmg, dmg_type)) = result.damage {
+                if let Some((dmg, _dmg_type)) = result.damage {
                     targets
                         .get_mut(&target_id)
                         .unwrap()
@@ -4139,6 +4222,7 @@ pub enum GameOverType {
     Victory,
     Defeat,
 }
+
 #[derive(Debug, Clone)]
 pub enum GameEvent {
     LogLine(String),
@@ -4188,8 +4272,7 @@ pub enum GameEvent {
     AbilityWasInitiated {
         actor: CharacterId,
         ability: &'static Ability,
-        target: Option<CharacterId>,
-        area_at: Option<(AreaShape, Position)>,
+        target: Option<ConcreteAbilityTarget>,
     },
     AbilityResolved(AbilityResolvedEvent),
     ConsumableWasUsed {
@@ -4227,6 +4310,13 @@ pub enum GameEvent {
         character: CharacterId,
         direction: (i32, i32),
     },
+}
+
+#[derive(Debug, Clone)]
+pub enum ConcreteAbilityTarget {
+    SingleCharacter(CharacterId),
+    Area(AreaShape, Position),
+    Projectile(Position),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5223,6 +5313,7 @@ impl Action {
 pub enum ActionTarget {
     Character(CharacterId, Option<Vec<Position>>),
     Position(Position),
+    Projectile(Position, Option<CharacterId>),
     None,
 }
 
@@ -5245,6 +5336,13 @@ impl ActionTarget {
         match self {
             Self::Character(ch_id, pos) => (ch_id, pos),
             unexpected => panic!("Not character target: {:?}", unexpected),
+        }
+    }
+
+    pub fn unwrap_projectile(&self) -> (Position, Option<CharacterId>) {
+        match self {
+            Self::Projectile(pos, ch_id) => (*pos, *ch_id),
+            unexpected => panic!("Not projectile target: {:?}", unexpected),
         }
     }
 }
@@ -5388,11 +5486,13 @@ impl Ability {
     }
 
     pub fn requires_target(&self) -> bool {
+        // either a character target or a positional / directional target
         match self.target {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
             AbilityTarget::Area { .. } => true,
-            AbilityTarget::Destination { .. } => true,
+            AbilityTarget::Movement { .. } => true,
+            AbilityTarget::Projectile { .. } => true,
             AbilityTarget::None { .. } => false,
         }
     }
@@ -5422,11 +5522,16 @@ impl Ability {
                 },
                 AbilityEffect::Positive(..) => None,
             },
-            AbilityTarget::Destination { .. } => None,
+            AbilityTarget::Movement { .. } => None,
             AbilityTarget::None { self_area, .. } => self_area
                 .as_ref()
                 .map(|a| a.effect.defense_type())
                 .flatten(),
+            AbilityTarget::Projectile {
+                range,
+                impact_effect,
+                impact_circle,
+            } => impact_effect.defense_type(),
         }
     }
 
@@ -5438,7 +5543,7 @@ impl Ability {
                 AbilityEffect::Negative(ane) => Some(ane),
                 AbilityEffect::Positive(..) => None,
             },
-            AbilityTarget::Destination { .. } => None,
+            AbilityTarget::Movement { .. } => None,
             AbilityTarget::None { self_area, .. } => match self_area {
                 Some(area_effect) => match &area_effect.effect {
                     AbilityEffect::Negative(ane) => Some(ane),
@@ -5446,6 +5551,11 @@ impl Ability {
                 },
                 None => None,
             },
+            AbilityTarget::Projectile {
+                range,
+                impact_effect,
+                impact_circle,
+            } => Some(impact_effect),
         }?;
 
         match effect {
@@ -5484,6 +5594,7 @@ pub enum AbilityId {
     Inspire,
     Haste,
     Fireball,
+    Fireball2,
     LightningBolt,
     SearingLight,
     Execute,
@@ -5672,7 +5783,13 @@ pub enum AbilityTarget {
         area_effect: AreaEffect,
     },
 
-    Destination {
+    Projectile {
+        range: Range,
+        impact_effect: AbilityNegativeEffect,
+        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
+    },
+
+    Movement {
         range: Range,
     },
 
@@ -5722,8 +5839,9 @@ impl AbilityTarget {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
             AbilityTarget::Area { .. } => false,
-            AbilityTarget::Destination { .. } => false,
+            AbilityTarget::Movement { .. } => false,
             AbilityTarget::None { .. } => false,
+            AbilityTarget::Projectile { .. } => false,
         }
     }
 
@@ -5735,8 +5853,9 @@ impl AbilityTarget {
             },
             AbilityTarget::Ally { range, .. } => Some(*range),
             AbilityTarget::Area { range, .. } => Some(*range),
-            AbilityTarget::Destination { range } => Some(*range),
+            AbilityTarget::Movement { range } => Some(*range),
             AbilityTarget::None { .. } => None,
+            AbilityTarget::Projectile { range, .. } => Some(*range),
         }
     }
 
@@ -5784,9 +5903,12 @@ impl AbilityTarget {
         match self {
             AbilityTarget::Enemy { .. } => Some(AreaTargetAcquisition::Enemies),
             AbilityTarget::Ally { .. } => Some(AreaTargetAcquisition::Allies),
-            AbilityTarget::Area { range, area_effect } => Some(area_effect.acquisition),
-            AbilityTarget::Destination { .. } => None,
+            AbilityTarget::Area { area_effect, .. } => Some(area_effect.acquisition),
+            AbilityTarget::Movement { .. } => None,
             AbilityTarget::None { self_area, .. } => self_area.as_ref().map(|a| a.acquisition),
+            AbilityTarget::Projectile { impact_circle, .. } => impact_circle
+                .as_ref()
+                .map(|(_range, acquisition, _effect)| *acquisition),
         }
     }
 }
@@ -7006,12 +7128,17 @@ impl Character {
             AbilityTarget::Area { .. } => {
                 within_range_squared(range.squared(), self.position.get(), target_pos)
             }
-            AbilityTarget::Destination { .. } => {
+            AbilityTarget::Movement { .. } => {
                 within_range_squared(range.squared(), self.position.get(), target_pos)
             }
             AbilityTarget::None { .. } => {
                 panic!("Ability that has no target always reaches. Shouldn't be checked")
             }
+            AbilityTarget::Projectile {
+                range,
+                impact_effect,
+                impact_circle,
+            } => within_range_squared(range.squared(), self.position.get(), target_pos),
         }
     }
 
