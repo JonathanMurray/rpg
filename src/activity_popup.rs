@@ -111,10 +111,11 @@ impl ActivityPopup {
     }
 
     pub fn draw(&mut self, x: f32, y: f32) {
-        if matches!(
+        let wrong_state = matches!(
             &*self.ui_state.borrow(),
             UiState::Idle { .. } | UiState::ChoosingAction
-        ) {
+        );
+        if (self.base_lines.is_empty() && self.choice_buttons.is_empty()) || wrong_state {
             self.last_drawn_rectangle = Rect {
                 x,
                 y,
@@ -144,13 +145,18 @@ impl ActivityPopup {
 
         let mut measured_lines = vec![];
 
-        let header_dimensions = measure_text_with_font_tags(
-            &self.base_lines[0],
-            header_params.font,
-            header_params.font_size,
-            1.0,
-        );
-        measured_lines.push((&self.base_lines[0], header_dimensions));
+        let (header_offset_y, header_w) = if !self.base_lines.is_empty() {
+            let dim = measure_text_with_font_tags(
+                &self.base_lines[0],
+                header_params.font,
+                header_params.font_size,
+                1.0,
+            );
+            measured_lines.push((&self.base_lines[0], dim));
+            (dim.offset_y, dim.width)
+        } else {
+            (0.0, 0.0)
+        };
 
         for line in self.base_lines.iter().skip(1) {
             let dimensions = measure_text_with_font_tags(
@@ -201,37 +207,24 @@ impl ActivityPopup {
             }
         }
 
-        let draw_proceed_button = false;
-        /*
-        let draw_proceed_button = !matches!(
-            &*self.ui_state.borrow(),
-            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
-        );
-         */
-
-        let detail_rect_pad = 10.0;
+        let detail_rect_pad = if detail_text_w > 0.0 { 10.0 } else { 0.0 };
 
         let height: f32 = (tooltip_pad * 2.0
-            + header_dimensions.offset_y as f32
+            + header_offset_y
             + margin_under_header
             + detail_rect_pad * 2.0
             + detail_text_h)
-            .max(74.0);
+            .max(88.0);
 
-        let buttons_hor_pad = 20.0;
+        let buttons_hor_pad = if detail_text_w > 0.0 { 20.0 } else { 0.0 };
         let button_margin = 10.0;
-        let margin_between_choices_and_proceed = 15.0;
 
         let detail_rect_w = detail_text_w + detail_rect_pad * 2.0;
 
-        let mut width = tooltip_pad + detail_rect_w.max(measured_lines[0].1.width);
-
-        if draw_proceed_button {
-            width += self.proceed_button.size.0;
-        }
+        let mut width = tooltip_pad + detail_rect_w.max(header_w);
 
         if !self.choice_buttons.is_empty() {
-            width += buttons_hor_pad * 2.0;
+            width += buttons_hor_pad + tooltip_pad;
             for btn in self.choice_buttons.values() {
                 width += btn.size.0;
             }
@@ -239,12 +232,6 @@ impl ActivityPopup {
         } else {
             width += tooltip_pad;
         }
-        if !self.choice_buttons.is_empty() && draw_proceed_button {
-            width += margin_between_choices_and_proceed;
-        }
-
-        // Prevent warning text (drawn in top-right corner) from colliding with header, when no enhancements
-        //width = width.max(340.0);
 
         draw_rectangle(x, y - height, width, height, BG_COLOR);
 
@@ -271,15 +258,14 @@ impl ActivityPopup {
 
         let x0 = x + tooltip_pad;
 
-        let header_y = y - height + tooltip_pad + header_dimensions.offset_y;
-        draw_text_rounded(&measured_lines[0].0, x0, header_y, header_params.clone());
-
-        //dbg!(&measured_lines);
+        if !measured_lines.is_empty() {
+            let header_y = y - height + tooltip_pad + header_offset_y;
+            draw_text_rounded(&measured_lines[0].0, x0, header_y, header_params.clone());
+        }
 
         if measured_lines.len() > 1 {
             let rect_x = x + tooltip_pad;
-            let rect_y =
-                y - height + tooltip_pad + header_dimensions.offset_y + margin_under_header;
+            let rect_y = y - height + tooltip_pad + header_offset_y + margin_under_header;
 
             let rect_h = detail_text_h + detail_rect_pad * 2.0;
             draw_rectangle(
@@ -299,17 +285,7 @@ impl ActivityPopup {
                 4.0,
                 Some((BG_COLOR, 3.0)),
             );
-            //draw_rounded_rectangle_lines(x, y, w, h, thickness, color, inner_rounding, outer);
-            /*
-            draw_line(
-                x0,
-                rect_y + detail_rect_pad,
-                x0 + 100.0,
-                rect_y + detail_rect_pad,
-                1.0,
-                YELLOW,
-            );
-             */
+
             let mut text_y = rect_y + detail_rect_pad + measured_lines[1].1.offset_y;
             for (line, _dim) in measured_lines.iter().skip(1) {
                 //draw_line(x0, text_y, x0 + 100.0, text_y, 1.0, MAGENTA);
@@ -326,16 +302,6 @@ impl ActivityPopup {
                     text_y += detail_line_h + detail_line_margin;
                 }
             }
-            /*
-            draw_line(
-                x0,
-                rect_y + rect_h - detail_rect_pad,
-                x0 + 100.0,
-                rect_y + rect_h - detail_rect_pad,
-                1.0,
-                YELLOW,
-            );
-             */
         }
 
         //draw_line(vert_line_x, y0+8.0, vert_line_x, y ,1.0, Color::new(0.51, 0.51, 0.51, 0.6));
@@ -349,6 +315,7 @@ impl ActivityPopup {
 
         let configuring_action = matches!(&*self.ui_state.borrow(), UiState::ConfiguringAction(..));
 
+        /*
         if !self.choice_buttons.is_empty() && configuring_action {
             let buttons_w = self.choice_buttons.len() as f32 * REGULAR_ACTION_BUTTON_SIZE.0
                 + (self.choice_buttons.len() - 1) as f32 * button_margin;
@@ -379,36 +346,33 @@ impl ActivityPopup {
                 Color::new(1.0, 1.0, 1.0, 0.3),
             );
         }
+         */
 
         for btn in self.choice_buttons.values() {
             btn.draw(btn_x, btn_y);
             btn_x += btn.size.0 + button_margin;
         }
 
-        if let Some(usability_msg) = &self.usability_msg {
+        if configuring_action {
             let font_size = 12;
             let font = &self.big_font;
-            let text_dim =
-                measure_text_with_font_tags(&usability_msg.text, Some(&font), font_size, 1.0);
-            let error_x = x + width - text_dim.width - 7.0;
-            let error_y = y - height - 7.0;
+            let msg = "Enhancement";
+            let text_dim = measure_text_with_font_tags(msg, Some(&font), font_size, 1.0);
+            let msg_x = x + width / 2.0 - text_dim.width / 2.0;
+            let msg_y = y - height - 7.0;
             let pad = 2.0;
             draw_rectangle(
-                error_x - pad,
-                error_y - text_dim.offset_y - pad,
+                msg_x - pad,
+                msg_y - text_dim.offset_y - pad,
                 text_dim.width + pad * 2.0,
                 text_dim.height + pad * 2.0,
                 Color::new(0.0, 0.0, 0.0, 0.7),
             );
-            let color = if usability_msg.is_warning {
-                COL_ERROR
-            } else {
-                WHITE
-            };
+            let color = WHITE;
             draw_text_with_font_tags(
-                &usability_msg.text,
-                error_x,
-                error_y,
+                msg,
+                msg_x,
+                msg_y,
                 TextParams {
                     font: Some(&font),
                     font_size,
@@ -417,15 +381,6 @@ impl ActivityPopup {
                 },
                 true,
             );
-        }
-
-        if draw_proceed_button {
-            if !self.choice_buttons.is_empty() {
-                btn_x += margin_between_choices_and_proceed;
-            }
-            if self.usability_msg.is_none() {
-                self.proceed_button.draw(btn_x, btn_y + 6.0);
-            }
         }
 
         btn_x = first_btn_x; // step back to render tooltips in the right positions
@@ -758,17 +713,23 @@ impl ActivityPopup {
         self.selected_choice_button_ids.clear();
         self.hovered_choice_button_id = None;
 
-        println!("on_new_state");
+        //println!("on_new_state");
         //dbg!(self.ui_state.borrow());
 
         match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {
+                /*
                 let tooltip = tooltip.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
+                if let Some(description) = tooltip.description {
+                    lines.push(description.to_string());
+                }
+
                 if !tooltip.technical_description.is_empty() {
                     //lines.push("".to_string());
                     lines.extend_from_slice(&tooltip.technical_description);
                 }
+                 */
 
                 match configured_action {
                     ConfiguredAction::Attack {

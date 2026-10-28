@@ -973,6 +973,7 @@ impl ActionTooltip {
 
                     let mut t = Tooltip {
                         header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
+                        //description: "Deal |"
                         technical_description,
                         ..Default::default()
                     };
