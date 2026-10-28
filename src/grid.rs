@@ -5568,9 +5568,10 @@ impl GameGrid {
                 let mut armor_color = TinyFontColor::Black;
                 if let Some(preview) = self.target_effect_previews.get(&character.id()) {
                     if let Some(effective_armor) = preview.prediction.effective_armor_value {
+                        if effective_armor < armor {
+                            armor_color = TinyFontColor::Red;
+                        }
                         armor = effective_armor;
-                        // Assume that the armor was reduced, and signal that with red
-                        armor_color = TinyFontColor::Red;
                     }
                 }
 

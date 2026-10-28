@@ -450,7 +450,7 @@ impl ActivityPopup {
     }
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
-        let mut changed_on_attacked_reaction = false;
+        let mut changed_reaction = false;
         let mut changed_ability_enhancements = false;
         let mut changed_attack_enhancements = false;
         let mut clicked_invalid = false;
@@ -519,20 +519,23 @@ impl ActivityPopup {
                             *selected = selected_button_actions
                                 .first()
                                 .map(|action| action.unwrap_on_attacked_reaction());
-                            changed_on_attacked_reaction = true;
+                            changed_reaction = true;
                         }
                         UiState::ReactingToHit { selected, .. } => {
                             *selected = selected_button_actions
                                 .first()
                                 .map(|action| action.unwrap_on_hit_reaction());
+                            changed_reaction = true;
                         }
                         UiState::ReactingToMovementAttackOpportunity { selected, .. } => {
                             // It's a binary choice of 'use opportunity attack or not'
                             *selected = !selected_button_actions.is_empty();
+                            changed_reaction = true;
                         }
                         UiState::ReactingToRangedAttackOpportunity { selected, .. } => {
                             // It's a binary choice of 'use opportunity attack or not'
                             *selected = !selected_button_actions.is_empty();
+                            changed_reaction = true;
                         }
                         UiState::ChoosingAction | UiState::Idle { .. } => unreachable!(),
                     }
@@ -559,7 +562,7 @@ impl ActivityPopup {
             }
         }
 
-        if changed_on_attacked_reaction {
+        if changed_reaction {
             return Some(ActivityPopupOutcome::ChangedReaction);
         }
         if changed_ability_enhancements {

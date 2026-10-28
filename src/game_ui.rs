@@ -1522,9 +1522,7 @@ impl UserInterface {
             self.set_allowed_to_use_action_buttons(false);
             self.player_portraits.set_selected_id(reactor);
 
-            if is_reacting_to_attack {
-                self.refresh_reaction_state();
-            }
+            self.refresh_reaction_state();
         }
 
         self.player_portraits.set_reacting_character(is_reacting);
@@ -1542,35 +1540,73 @@ impl UserInterface {
     }
 
     fn refresh_reaction_state(&mut self) {
-        let UiState::ReactingToAttack {
-            hand,
-            attacker,
-            defender,
-            reactor,
-            is_within_melee,
-            selected,
-        } = &*self.state.borrow()
-        else {
-            unreachable!()
-        };
-        let attacker = self.characters.get_rc(*attacker);
-        let defender = self.characters.get_rc(*defender);
+        let attacker_char;
+        let defender_char;
+        let mut defender_reaction = None;
+        let mut attack_hand = HandType::MainHand;
 
-        //dbg!(&selected);
+        self.game_grid.clear_target_effect_previews();
+
+        match &*self.state.borrow() {
+            UiState::ReactingToAttack {
+                attacker,
+                defender,
+                reactor,
+                hand,
+                selected,
+                ..
+            } => {
+                attacker_char = self.characters.get_rc(*attacker);
+                defender_char = self.characters.get_rc(*defender);
+                attack_hand = *hand;
+                defender_reaction = selected.map(|r| (*reactor, r));
+            }
+            UiState::ReactingToMovementAttackOpportunity {
+                reactor,
+                target,
+                selected,
+                ..
+            } => {
+                if !selected {
+                    // No attack
+                    return;
+                }
+                attacker_char = self.characters.get_rc(*reactor);
+                defender_char = self.characters.get_rc(*target);
+            }
+            UiState::ReactingToRangedAttackOpportunity {
+                reactor,
+                attacker,
+                selected,
+                ..
+            } => {
+                if !selected {
+                    // No attack
+                    return;
+                }
+                attacker_char = self.characters.get_rc(*reactor);
+                defender_char = self.characters.get_rc(*attacker);
+            }
+            UiState::ReactingToHit { .. } => {
+                // No attack
+                return;
+            }
+            _ => unreachable!(),
+        }
+
         let prediction = predict_attack(
             &self.game_grid.pathfind_grid,
             &self.characters,
-            attacker,
-            *hand,
+            attacker_char,
+            attack_hand,
             &[],
-            defender,
-            selected.map(|r| (*reactor, r)),
+            defender_char,
+            defender_reaction,
             0,
         );
-        //dbg!(&prediction);
         self.game_grid
             .set_target_effect_preview(TargetEffectPreview {
-                character_id: defender.id(),
+                character_id: defender_char.id(),
                 prediction: TargetPrediction::from(prediction),
             });
     }
