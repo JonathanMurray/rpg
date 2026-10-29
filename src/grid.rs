@@ -3565,6 +3565,8 @@ impl GameGrid {
                         }
                     }
                     PointTargetKind::Movement => {
+                        // Show clearly the terrain boundaries, when using Dash
+                        self.draw_occupation(OccupationFilter::Terrain);
                         let mut has_locked_target = false;
                         let mut target_pos = if can_use_mouse_pos {
                             Some(mouse_grid_pos)
