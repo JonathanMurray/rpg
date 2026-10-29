@@ -51,7 +51,7 @@ pub struct DiceRollBonus {
 impl DiceRollBonus {
     pub fn expected_outcome(&self) -> f32 {
         let expected_roll = expected_roll_with_adv(self.advantage);
-        dbg!(self.advantage, expected_roll);
+        //dbg!(self.advantage, expected_roll);
         expected_roll + self.flat_amount as f32
     }
 }

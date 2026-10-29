@@ -672,7 +672,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             }
         }
 
-        AbilityTarget::Circle {
+        AbilityTarget::PositionCircle {
             range,
             circle_effect,
         } => describe_area_effect(
@@ -694,7 +694,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             let def = def_suffix(impact_effect.defense_type());
 
             t.technical_description.push(format!(
-                "(todo) |<single_target>| {}{}",
+                "|<faded>Projectile| |<single_target>| {}{}",
                 range.range_with_icon(),
                 def
             ));

@@ -49,8 +49,8 @@ use crate::{
         within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
         AreaShape, AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction, Character,
-        CharacterFacing, CircleEffect, ConcreteAbilityTarget, Condition, Goodness, HitType,
-        MovementType, Position, TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType, Position,
+        TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -1056,25 +1056,18 @@ impl GameGrid {
         &mut self,
         actor: CharacterId,
         ability: &Ability,
-        target: Option<ConcreteAbilityTarget>,
+        destination: Option<Position>,
     ) -> (f32, f32) {
         let actor = self.characters.get(&actor).unwrap();
 
-        let mut shape: Option<AreaShape> = None;
-
-        let target_pos = target.map(|target| match target {
-            ConcreteAbilityTarget::SingleCharacter(ch_id) => {
-                self.characters.get(&ch_id).unwrap().pos()
+        let shape = match &ability.target {
+            AbilityTarget::PositionCircle { circle_effect, .. } => {
+                Some(AreaShape::Circle(circle_effect.radius))
             }
-            ConcreteAbilityTarget::Circle(circle_radius, pos) => {
-                shape = Some(AreaShape::Circle(circle_radius));
-                pos
-            }
-            ConcreteAbilityTarget::ProjectileOrLine(pos) => {
-                shape = Some(AreaShape::Line);
-                pos
-            }
-        });
+            //AbilityTarget::Projectile { .. } => Some(AreaShape::Line),
+            AbilityTarget::Line { .. } => Some(AreaShape::Line),
+            _ => None,
+        };
 
         let mut delay = 0.0;
 
@@ -1082,7 +1075,7 @@ impl GameGrid {
 
         // Don't show preview for player ability; they issued it and it should feel snappy.
         if !actor.player_controlled() {
-            if let Some(target_pos) = target_pos {
+            if let Some(target_pos) = destination {
                 delay = 0.5;
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
@@ -1120,12 +1113,12 @@ impl GameGrid {
                 panic!("animate_initiating_ability shouldn't be called for Dash");
             }
             AbilityAnimation::MeleeWeaponAttack => {
-                self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), false);
+                self.animate_melee_weapon_attack(actor.id(), delay, destination.unwrap(), false);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 0.1
             }
             AbilityAnimation::ShieldAttack => {
-                self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), true);
+                self.animate_melee_weapon_attack(actor.id(), delay, destination.unwrap(), true);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 0.1
             }
@@ -1133,13 +1126,13 @@ impl GameGrid {
                 aim_duration = self.animate_initiating_ranged_weapon_attack(
                     actor.id(),
                     delay,
-                    target_pos.unwrap(),
+                    destination.unwrap(),
                 );
                 let mut effect_duration = 0.0;
                 if let Some(shape) = shape {
                     effect_duration = self.animate_ability_area_effect(
                         actor_pos,
-                        target_pos.unwrap(),
+                        destination.unwrap(),
                         shape,
                         ability,
                         delay + aim_duration,
@@ -1149,7 +1142,7 @@ impl GameGrid {
                 aim_duration + effect_duration
             }
             AbilityAnimation::Throw(color) => {
-                let target_pos = target_pos.unwrap();
+                let target_pos = destination.unwrap();
 
                 let attacker_pos = self.active_char().pos();
                 aim_duration = self.animate_throw_projectile(actor.id(), target_pos, delay, color);
@@ -1294,13 +1287,13 @@ impl GameGrid {
                 if let Some(shape) = shape {
                     let duration = self.animate_ability_area_effect(
                         actor_pos,
-                        target_pos.unwrap(),
+                        destination.unwrap(),
                         shape,
                         ability,
                         delay + casting_duration,
                     );
                     casting_duration + duration
-                } else if let Some(target_pos) = target_pos {
+                } else if let Some(target_pos) = destination {
                     let duration = 0.04 * distance_between(actor_pos, target_pos);
 
                     self.add_circle_projectile_effect(
@@ -3256,12 +3249,12 @@ impl GameGrid {
 
                     match &ability.target {
                         AbilityTarget::Enemy {
-                            impact_circle: impact_area,
+                            impact_circle,
                             reach,
                             ..
                         } => {
                             let mut area_radius = None;
-                            if let Some((radius, _acquisition, _effect)) = impact_area {
+                            if let Some((radius, _acquisition, _effect)) = impact_circle {
                                 area_radius = Some(radius.plus_tenths(increased_radius_tenths));
                             }
                             if *target == ActionTarget::None {
@@ -3278,7 +3271,7 @@ impl GameGrid {
                             }
                         }
                         AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                        AbilityTarget::Circle {
+                        AbilityTarget::PositionCircle {
                             circle_effect,
                             range,
                         } => {
@@ -3302,14 +3295,16 @@ impl GameGrid {
                         }
                         AbilityTarget::Projectile {
                             range,
-                            impact_effect,
                             impact_circle,
+                            ..
                         } => {
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
-                            let circle_radius =
-                                impact_circle.map(|(range, _acquisition, _effect)| range);
+                            let circle_radius = impact_circle.map(|(radius, _a, _e)| {
+                                radius.plus_tenths(increased_radius_tenths)
+                            });
+
                             MouseState::RequiresPointTarget {
                                 kind: PointTargetKind::Projectile { circle_radius },
                                 range: range.plus_tenths(increased_range_tenths),
@@ -3514,9 +3509,26 @@ impl GameGrid {
                         }
                     }
                     PointTargetKind::Projectile { circle_radius } => {
-                        if let ActionTarget::Projectile(tl) = ui_state.players_action_target() {
+                        let mut has_locked_target = false;
+                        if let ActionTarget::Projectile(mut tl) = ui_state.players_action_target() {
+                            if tl.based_on_range != range {
+                                println!(
+                                    "Recalculating target line; range changed from {:?} to {:?}",
+                                    tl.based_on_range, range
+                                );
+                                tl = self.calculate_target_line(
+                                    range,
+                                    &self.characters[&self.active_character_id],
+                                    tl.destination,
+                                    kind,
+                                );
+                                ui_state.set_target(ActionTarget::Projectile(tl.clone()));
+                                outcome.switched_players_action_target = true;
+                            }
+
                             self.draw_target_line(&tl, true);
                             target_line = Some(tl);
+                            has_locked_target = true;
                         } else if can_use_mouse_pos {
                             let tl = self.calculate_target_line(
                                 range,
@@ -3525,14 +3537,16 @@ impl GameGrid {
                                 kind,
                             );
                             self.draw_target_line(&tl, false);
-                            if let Some(radius) = circle_radius {
+                            target_line = Some(tl);
+                        }
+                        if let Some(radius) = circle_radius {
+                            if let Some(tl) = target_line.as_ref() {
                                 self.draw_range_indicator(
                                     tl.destination,
                                     radius,
-                                    RangeIndicatorType::TargetAreaEffect(true),
+                                    RangeIndicatorType::TargetAreaEffect(has_locked_target),
                                 );
                             }
-                            target_line = Some(tl);
                         }
                     }
                     PointTargetKind::Movement => {

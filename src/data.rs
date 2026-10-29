@@ -796,7 +796,7 @@ pub const LIQUID_FIRE: Consumable = Consumable {
 pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Liquid fire",
-    AbilityTarget::Circle {
+    AbilityTarget::PositionCircle {
         range: Range::Tenths(135),
         circle_effect: CircleEffect::new(
             Range::Melee,
@@ -1689,7 +1689,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
-    target: AbilityTarget::Circle {
+    target: AbilityTarget::PositionCircle {
         range: Range::f32(7.5),
         circle_effect: CircleEffect::new(
             Range::f32(2.5),
@@ -2295,7 +2295,7 @@ pub const SPIKE_TRAP: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
 
-    target: AbilityTarget::Circle {
+    target: AbilityTarget::PositionCircle {
         range: Range::f32(6.5),
         circle_effect: CircleEffect::new(
             Range::f32(3.5),
@@ -2461,11 +2461,11 @@ pub const FIREBALL: Ability = Ability {
     }),
 };
 
-pub const FIREBALL2: Ability = Ability {
-    id: AbilityId::Fireball2,
-    name: "Fireball 2",
+pub const FIRE_BOLT: Ability = Ability {
+    id: AbilityId::FireBolt,
+    name: "Fire bolt",
     speech: "",
-    description: "todo",
+    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first enemy hit, and |<value>4| to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 0,
     mana_cost: 0,
@@ -2481,7 +2481,7 @@ pub const FIREBALL2: Ability = Ability {
             ..SpellNegativeEffect::default()
         }),
         impact_circle: Some((
-            Range::f32(2.5),
+            Range::f32(1.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),

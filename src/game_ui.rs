@@ -136,8 +136,6 @@ impl UiState {
     }
 
     pub fn set_target(&mut self, new_target: ActionTarget) {
-        println!("ui state set target: {:?}", new_target);
-
         match self {
             UiState::ConfiguringAction(configured_action) => match configured_action {
                 ConfiguredAction::Attack { target, .. } => {
@@ -254,7 +252,7 @@ fn ability_usability_problem(
         ActionTarget::Position(target_pos) => {
             assert!(matches!(
                 ability.target,
-                AbilityTarget::Circle { .. } | AbilityTarget::Movement { .. }
+                AbilityTarget::PositionCircle { .. } | AbilityTarget::Movement { .. }
             ));
             usability_check_reach_and_line_of_sight(*target_pos)
         }
@@ -274,7 +272,7 @@ fn ability_usability_problem(
             AbilityTarget::None { .. } => None,
             AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
             AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
-            AbilityTarget::Circle { .. }
+            AbilityTarget::PositionCircle { .. }
             | AbilityTarget::Line { .. }
             | AbilityTarget::Projectile { .. } => Some(UsabilityProblem::SelectArea),
             AbilityTarget::Movement { .. } => Some(UsabilityProblem::SelectDestination),
@@ -1668,12 +1666,12 @@ impl UserInterface {
             GameEvent::AbilityWasInitiated {
                 actor,
                 ability,
-                target,
+                destination,
             } => {
                 println!("Ability was initiated: {}", ability.name);
-                let (delay, duration) = self
-                    .game_grid
-                    .animate_initiating_ability(actor, &ability, target);
+                let (delay, duration) =
+                    self.game_grid
+                        .animate_initiating_ability(actor, &ability, destination);
 
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.play_delayed(sound_id, delay);
@@ -2046,6 +2044,7 @@ impl UserInterface {
         let area_duration = 1.5;
 
         if let Some(circle) = circle {
+            // TODO: This type of rendering code should be moved to grid along with the ability initation rendering code
             if show_area_circle {
                 self.game_grid.add_effect(
                     circle.center,
@@ -2060,7 +2059,8 @@ impl UserInterface {
                                 end_radius: Some(
                                     f32::from(circle.radius) * self.game_grid.cell_w(),
                                 ),
-                                fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
+                                //fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
+                                fill: Some(animation_color.with_alpha(0.5)),
                                 //fill: Some(fill_color),
                                 stroke: None,
                                 fade: true,
