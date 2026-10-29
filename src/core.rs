@@ -1540,7 +1540,7 @@ impl CoreGame {
 
                     let before = SystemTime::now();
 
-                    let outcome = Self::perform_ability_enemy_effect(
+                    let outcome = Self::perform_ability_target_effect(
                         actor,
                         ability.name,
                         roll_instruction.as_ref().unwrap(),
@@ -1555,7 +1555,7 @@ impl CoreGame {
                     .await;
                     target_outcome = Some((*target_id, outcome));
 
-                    if let Some((radius, acquisition, negative_effect)) = impact_circle {
+                    if let Some((radius, acquisition, effect)) = impact_circle {
                         detail_lines.push("".to_string());
                         detail_lines.push("|<faded>Area of effect:|".to_string());
 
@@ -1569,7 +1569,7 @@ impl CoreGame {
                                 shape: AreaShape::Circle(*radius),
                                 area_effect: AreaEffect {
                                     acquisition: *acquisition,
-                                    target_effect: AbilityTargetEffect::Negative(*negative_effect),
+                                    target_effect: *effect,
                                     create_surface: None,
                                 },
                             },
@@ -1615,7 +1615,7 @@ impl CoreGame {
 
                     if let Some(target_id) = target_line.obstructing_character {
                         let target = mode.characters().get_rc(target_id);
-                        let outcome = Self::perform_ability_enemy_effect(
+                        let outcome = Self::perform_ability_target_effect(
                             actor,
                             ability.name,
                             roll_instruction.as_ref().unwrap(),
@@ -1631,12 +1631,12 @@ impl CoreGame {
                         target_outcome = Some((target_id, outcome));
                     }
 
-                    if let Some((radius, acquisition, negative_effect)) = impact_circle {
+                    if let Some((radius, acquisition, effect)) = impact_circle {
                         detail_lines.push("|<faded>Area of effect:|".to_string());
 
                         let area_effect = AreaEffect {
                             acquisition: *acquisition,
-                            target_effect: AbilityTargetEffect::Negative(*negative_effect),
+                            target_effect: *effect,
                             create_surface: None,
                         };
 
@@ -1661,7 +1661,7 @@ impl CoreGame {
 
                 AbilityTarget::Ally { range: _, effect } => {
                     let target_id = selected_target.character_target_id().unwrap();
-                    let target = mode.characters().get(target_id);
+                    let target = mode.characters().get_rc(target_id);
 
                     if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
@@ -1677,17 +1677,21 @@ impl CoreGame {
                         .await;
                     }
 
-                    let outcome = Self::perform_ability_ally_effect(
+                    let outcome = Self::perform_ability_target_effect(
+                        actor,
                         ability.name,
+                        roll_instruction.as_ref().unwrap(),
                         enhancements,
-                        &effect,
+                        effect,
                         target,
+                        0,
                         &mut detail_lines,
-                        roll_instruction.as_ref(),
+                        Some(target.pos()),
                         mode,
-                    );
+                    )
+                    .await;
 
-                    target_outcome = Some((target_id, Box::new(outcome)));
+                    target_outcome = Some((target_id, outcome));
                 }
 
                 AbilityTarget::Line {
@@ -1807,16 +1811,20 @@ impl CoreGame {
                     }
 
                     if let Some(effect) = self_effect {
-                        let outcome = Self::perform_ability_ally_effect(
+                        let outcome = Self::perform_ability_target_effect(
+                            actor,
                             ability.name,
+                            roll_instruction.as_ref().unwrap(),
                             enhancements,
                             &effect,
                             actor,
+                            0,
                             &mut detail_lines,
-                            roll_instruction.as_ref(),
+                            Some(actor.pos()),
                             mode,
-                        );
-                        target_outcome = Some((actor_id, Box::new(outcome)));
+                        )
+                        .await;
+                        target_outcome = Some((actor_id, outcome));
                     }
 
                     if let Some(circle_effect) = self_circle {
@@ -1994,230 +2002,9 @@ impl CoreGame {
             *radius = Self::modified_radius(*radius, enhancements);
         }
 
-        let outcomes = match &shaped_effect.area_effect.target_effect {
-            AbilityTargetEffect::Negative(effect) => {
-                Self::perform_ability_area_enemy_effect(
-                    shaped_effect.shape,
-                    name,
-                    roll_instruction,
-                    enhancements,
-                    caster,
-                    area_pos,
-                    detail_lines,
-                    effect,
-                    shaped_effect.area_effect.acquisition,
-                    mode,
-                )
-                .await
-            }
-
-            AbilityTargetEffect::Positive(effect) => {
-                assert!(shaped_effect.area_effect.acquisition == AreaTargetAcquisition::Allies);
-
-                Self::perform_ability_area_ally_effect(
-                    shaped_effect.shape,
-                    name,
-                    enhancements,
-                    caster,
-                    area_pos,
-                    detail_lines,
-                    roll_instruction,
-                    effect,
-                    mode,
-                )
-            }
-        };
-
-        if let Some(surface) = shaped_effect.area_effect.create_surface {
-            if let Some(game) = mode.real_game() {
-                game.perform_environment_effect(
-                    EnvironmentEffect::CreateSurface(surface, shaped_effect.shape),
-                    area_pos,
-                    detail_lines,
-                )
-                .await;
-            }
-        }
-
-        let circle = match shaped_effect.shape {
-            AreaShape::Circle(radius) => Some(ConcreteCircle {
-                center: area_pos,
-                radius,
-            }),
-            AreaShape::Line => None,
-        };
-
-        AbilityAreaOutcome {
-            targets: outcomes,
-            circle,
-        }
-    }
-
-    fn perform_ability_area_ally_effect(
-        mut shape: AreaShape,
-        name: &'static str,
-        enhancements: &[AbilityEnhancement],
-        caster: &Character,
-        area_pos: Position,
-        detail_lines: &mut Vec<String>,
-        roll_instruction: &RollInstruction,
-        effect: &AbilityPositiveEffect,
-        mode: ActionPerformanceMode,
-    ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
-        let mut target_outcomes = vec![];
-
-        for enhancement in enhancements {
-            let e = enhancement.spell_effect.unwrap();
-            if e.increased_radius_tenths > 0 {
-                let AreaShape::Circle(radius) = &mut shape else {
-                    panic!()
-                };
-                *radius = radius.plus_tenths(e.increased_radius_tenths);
-            }
-        }
-
-        let targets =
-            Self::acquire_targets(mode, caster, area_pos, shape, AreaTargetAcquisition::Allies);
-
-        for target_id in targets {
-            let other_char = mode.characters().get(target_id);
-            detail_lines.push(format!("|{}|", other_char.name_tag()));
-
-            let outcome = Self::perform_ability_ally_effect(
-                name,
-                enhancements,
-                effect,
-                other_char,
-                detail_lines,
-                Some(roll_instruction),
-                mode,
-            );
-
-            target_outcomes.push((other_char.id(), Box::new(outcome)));
-        }
-
-        target_outcomes
-    }
-
-    fn perform_ability_ally_effect(
-        name: &'static str,
-        enhancements: &[AbilityEnhancement],
-        ally_effect: &AbilityPositiveEffect,
-        target: &Character,
-        detail_lines: &mut Vec<String>,
-        roll_instruction: Option<&RollInstruction>,
-        mode: ActionPerformanceMode,
-    ) -> AbilityTargetOutcome {
-        let mut applied_effects = vec![];
-
-        let real_game = mode.real_game();
-
-        let mut degree_of_success: u32 = 0;
-        if let Some(roll_instruction) = roll_instruction {
-            let ability_roll = roll_instruction.execute(mode, None, detail_lines);
-
-            degree_of_success = (ability_roll.result / 10).max(0) as u32;
-            if degree_of_success > 0 {
-                detail_lines.push(format!("Fortune: {}", degree_of_success));
-            }
-        }
-
-        if ally_effect.healing > 0 {
-            let mut healing = ally_effect.healing;
-
-            let mut line = format!("  Healing: {} ({})", ally_effect.healing, name);
-
-            if degree_of_success > 0 {
-                line.push_str(&format!(" +{} (fortune)", degree_of_success));
-                healing += degree_of_success;
-            }
-            line.push_str(&format!(" = {}", healing));
-            detail_lines.push(line);
-
-            if let Some(game) = real_game {
-                let health_gained = game.character_gain_health(target, healing);
-                detail_lines.push(format!(
-                    "  |{}| was healed for {}",
-                    target.name_tag(),
-                    health_gained
-                ));
-                applied_effects.push(ApplyEffect::GainHealth(health_gained));
-            } else {
-                // This might include over-heal, but hey.
-                applied_effects.push(ApplyEffect::GainHealth(healing));
-            }
-        };
-
-        if let Some(game) = real_game {
-            let effects = ally_effect.apply.iter().copied();
-
-            for mut effect in effects {
-                match effect {
-                    ApplyEffect::LoseActionPoints(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::GainActionPoints(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::LoseHealth(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::GainMana(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::Condition(ref apply_condition) => {
-                        /*
-                        if let Some(stacks) = condition.stacks() {
-                            *stacks += degree_of_success;
-                        }
-                         */
-                    }
-                    ApplyEffect::LoseCondition { .. } => {}
-                    ApplyEffect::Pushed { .. } => {}
-                    ApplyEffect::Escape => {}
-                }
-
-                let (applied, log_line) = game.do_apply_effect(effect, None, None, target);
-                if let Some(applied) = applied {
-                    applied_effects.push(applied);
-                    detail_lines.push(log_line);
-                }
-            }
-
-            for enhancement in enhancements {
-                let effect = enhancement.spell_effect.unwrap();
-                for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-                    let (applied, log_line) =
-                        game.do_apply_effect(*apply_effect, None, None, target);
-                    if let Some(applied) = applied {
-                        applied_effects.push(applied);
-                        detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
-                    }
-                }
-            }
-        }
-
-        AbilityTargetOutcome::AffectedAlly { applied_effects }
-    }
-
-    fn modified_radius(mut radius: Range, enhancements: &[AbilityEnhancement]) -> Range {
-        for enhancement in enhancements {
-            if let Some(e) = enhancement.spell_effect {
-                if e.increased_radius_tenths > 0 {
-                    radius = radius.plus_tenths(e.increased_radius_tenths);
-                }
-            }
-        }
-        return radius;
-    }
-
-    async fn perform_ability_area_enemy_effect(
-        shape: AreaShape,
-        name: &'static str,
-        roll_instruction: &RollInstruction,
-        enhancements: &[AbilityEnhancement],
-        caster: &Rc<Character>,
-        area_pos: Position,
-        detail_lines: &mut Vec<String>,
-        effect: &AbilityNegativeEffect,
-        acquisition: AreaTargetAcquisition,
-        mode: ActionPerformanceMode<'_>,
-    ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
-        assert!(acquisition != AreaTargetAcquisition::Allies);
+        let shape = shaped_effect.shape;
+        let effect = &shaped_effect.area_effect.target_effect;
+        let acquisition = shaped_effect.area_effect.acquisition;
 
         let mut target_outcomes = vec![];
 
@@ -2228,7 +2015,7 @@ impl CoreGame {
             //println!("perform ability AoE on target: {}", target.name);
             detail_lines.push("".to_string());
             detail_lines.push(format!("|{}|:", target.name_tag()));
-            let outcome = Self::perform_ability_enemy_effect(
+            let outcome = Self::perform_ability_target_effect(
                 caster,
                 name,
                 roll_instruction,
@@ -2286,23 +2073,57 @@ impl CoreGame {
                 }
             }
         }
-        target_outcomes
+
+        if let Some(surface) = shaped_effect.area_effect.create_surface {
+            if let Some(game) = mode.real_game() {
+                game.perform_environment_effect(
+                    EnvironmentEffect::CreateSurface(surface, shaped_effect.shape),
+                    area_pos,
+                    detail_lines,
+                )
+                .await;
+            }
+        }
+
+        let circle = match shaped_effect.shape {
+            AreaShape::Circle(radius) => Some(ConcreteCircle {
+                center: area_pos,
+                radius,
+            }),
+            AreaShape::Line => None,
+        };
+
+        AbilityAreaOutcome {
+            targets: target_outcomes,
+            circle,
+        }
     }
 
-    async fn perform_ability_enemy_effect(
+    fn modified_radius(mut radius: Range, enhancements: &[AbilityEnhancement]) -> Range {
+        for enhancement in enhancements {
+            if let Some(e) = enhancement.spell_effect {
+                if e.increased_radius_tenths > 0 {
+                    radius = radius.plus_tenths(e.increased_radius_tenths);
+                }
+            }
+        }
+        return radius;
+    }
+
+    async fn perform_ability_target_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
         roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
-        enemy_effect: &AbilityNegativeEffect,
+        target_effect: &AbilityTargetEffect,
         target: &Rc<Character>,
         num_prior_targets: u32,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
         mode: ActionPerformanceMode<'_>,
     ) -> Box<AbilityTargetOutcome> {
-        let outcome = match enemy_effect {
-            AbilityNegativeEffect::Spell(spell_enemy_effect) => {
+        let outcome = match target_effect {
+            AbilityTargetEffect::Spell(spell_enemy_effect) => {
                 Self::perform_spell_enemy_effect(
                     caster,
                     ability_name,
@@ -2316,7 +2137,7 @@ impl CoreGame {
                 )
                 .await
             }
-            AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
+            AbilityTargetEffect::PerformAttack(ability_attack_effect) => {
                 let attack_enhancement_effects: Vec<(&str, AttackEnhancementEffect)> = enhancements
                     .iter()
                     .filter_map(|e| e.attack_enhancement_effect())
@@ -2385,7 +2206,7 @@ impl CoreGame {
         ability_name: &'static str,
         roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
-        spell_enemy_effect: &SpellNegativeEffect,
+        spell_enemy_effect: &SpellNeutralEffect,
         target: &Rc<Character>,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
@@ -5552,15 +5373,9 @@ impl Ability {
             AbilityTarget::Enemy { effect, .. } => effect.defense_type(),
             AbilityTarget::Ally { .. } => None,
             AbilityTarget::PositionCircle { circle_effect, .. } => {
-                match circle_effect.area_effect.target_effect {
-                    AbilityTargetEffect::Negative(ane) => ane.defense_type(),
-                    AbilityTargetEffect::Positive(..) => None,
-                }
+                circle_effect.area_effect.target_effect.defense_type()
             }
-            AbilityTarget::Line { range, area_effect } => match area_effect.target_effect {
-                AbilityTargetEffect::Negative(ane) => ane.defense_type(),
-                AbilityTargetEffect::Positive(..) => None,
-            },
+            AbilityTarget::Line { range, area_effect } => area_effect.target_effect.defense_type(),
             AbilityTarget::Movement { .. } => None,
             AbilityTarget::None {
                 self_circle: self_area,
@@ -5569,51 +5384,31 @@ impl Ability {
                 .as_ref()
                 .map(|a| a.area_effect.target_effect.defense_type())
                 .flatten(),
-            AbilityTarget::Projectile {
-                range,
-                impact_effect,
-                impact_circle,
-            } => impact_effect.defense_type(),
+            AbilityTarget::Projectile { impact_effect, .. } => impact_effect.defense_type(),
         }
     }
 
     pub fn main_damage_type(&self) -> Option<DamageType> {
-        let effect: &AbilityNegativeEffect = match &self.target {
+        let effect: &AbilityTargetEffect = match &self.target {
             AbilityTarget::Enemy { effect, .. } => Some(effect),
             AbilityTarget::Ally { .. } => None,
             AbilityTarget::PositionCircle { circle_effect, .. } => {
-                match &circle_effect.area_effect.target_effect {
-                    AbilityTargetEffect::Negative(ane) => Some(ane),
-                    AbilityTargetEffect::Positive(..) => None,
-                }
+                Some(&circle_effect.area_effect.target_effect)
             }
-            AbilityTarget::Line { range, area_effect } => match &area_effect.target_effect {
-                AbilityTargetEffect::Negative(ane) => Some(ane),
-                AbilityTargetEffect::Positive(..) => None,
-            },
+            AbilityTarget::Line { area_effect, .. } => Some(&area_effect.target_effect),
             AbilityTarget::Movement { .. } => None,
-            AbilityTarget::None {
-                self_circle: self_area,
-                ..
-            } => match self_area {
-                Some(circle_effect) => match &circle_effect.area_effect.target_effect {
-                    AbilityTargetEffect::Negative(ane) => Some(ane),
-                    AbilityTargetEffect::Positive(..) => None,
-                },
+            AbilityTarget::None { self_circle, .. } => match self_circle {
+                Some(circle_effect) => Some(&circle_effect.area_effect.target_effect),
                 None => None,
             },
-            AbilityTarget::Projectile {
-                range,
-                impact_effect,
-                impact_circle,
-            } => Some(impact_effect),
+            AbilityTarget::Projectile { impact_effect, .. } => Some(impact_effect),
         }?;
 
         match effect {
-            AbilityNegativeEffect::Spell(spell_negative_effect) => {
+            AbilityTargetEffect::Spell(spell_negative_effect) => {
                 spell_negative_effect.damage.map(|d| d.damage_type())
             }
-            AbilityNegativeEffect::PerformAttack(..) => Some(DamageType::Regular),
+            AbilityTargetEffect::PerformAttack(..) => Some(DamageType::Regular),
         }
     }
 }
@@ -5685,30 +5480,15 @@ pub enum AbilityRollType {
     RollAbilityWithAttackModifier,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
-pub enum AbilityTargetEffect {
-    Negative(AbilityNegativeEffect),
-    Positive(AbilityPositiveEffect),
-}
-
-impl AbilityTargetEffect {
-    pub fn defense_type(&self) -> Option<DefenseType> {
-        match self {
-            AbilityTargetEffect::Negative(e) => e.defense_type(),
-            AbilityTargetEffect::Positive(..) => None,
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct SpellNegativeEffect {
+pub struct SpellNeutralEffect {
     pub defense_type: Option<DefenseType>,
     pub damage: Option<AbilityDamage>,
     pub on_hit: &'static [ApplyEffect],
     pub environment_effect: Option<EnvironmentEffect>,
 }
 
-impl SpellNegativeEffect {
+impl SpellNeutralEffect {
     pub const fn default() -> Self {
         Self {
             defense_type: None,
@@ -5720,14 +5500,14 @@ impl SpellNegativeEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum AbilityNegativeEffect {
-    Spell(SpellNegativeEffect),
+pub enum AbilityTargetEffect {
+    Spell(SpellNeutralEffect),
     PerformAttack(AbilityAttackEffect),
 }
 
-impl AbilityNegativeEffect {
+impl AbilityTargetEffect {
     pub fn knockback(&self) -> Option<u32> {
-        if let AbilityNegativeEffect::Spell(sne) = self {
+        if let AbilityTargetEffect::Spell(sne) = self {
             for effect in sne.on_hit.iter() {
                 if let ApplyEffect::Pushed(amount) = effect {
                     return Some(*amount);
@@ -5739,8 +5519,8 @@ impl AbilityNegativeEffect {
 
     pub fn defense_type(&self) -> Option<DefenseType> {
         match self {
-            AbilityNegativeEffect::Spell(effect) => effect.defense_type,
-            AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
+            AbilityTargetEffect::Spell(effect) => effect.defense_type,
+            AbilityTargetEffect::PerformAttack(..) => Some(DefenseType::Evasion),
         }
     }
 }
@@ -5808,25 +5588,19 @@ impl AbilityDamage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
-pub struct AbilityPositiveEffect {
-    // TODO: remove healing - can be expressed by ApplyEffect instead
-    pub healing: u32,
-    pub apply: &'static [ApplyEffect],
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbilityTarget {
     Enemy {
         reach: AbilityReach,
-        effect: AbilityNegativeEffect,
-        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
+        effect: AbilityTargetEffect,
+        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityTargetEffect)>,
         environment_effect: Option<EnvironmentEffect>,
     },
 
+    // TODO: merge enemy and ally target; just differentiate with Acquisition ?
     Ally {
         range: Range,
-        effect: AbilityPositiveEffect,
+        effect: AbilityTargetEffect,
     },
 
     PositionCircle {
@@ -5836,8 +5610,8 @@ pub enum AbilityTarget {
 
     Projectile {
         range: Range,
-        impact_effect: AbilityNegativeEffect,
-        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
+        impact_effect: AbilityTargetEffect,
+        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityTargetEffect)>,
     },
 
     Line {
@@ -5851,7 +5625,7 @@ pub enum AbilityTarget {
 
     None {
         self_circle: Option<CircleEffect>,
-        self_effect: Option<AbilityPositiveEffect>,
+        self_effect: Option<AbilityTargetEffect>,
         environment_effect: Option<EnvironmentEffect>,
     },
 }
@@ -6154,6 +5928,7 @@ pub struct SpellEnhancementEffect {
     pub bonus_target_damage: u32,
     pub bonus_area_damage: u32,
     pub cast_twice: bool,
+    // TODO simplify to static slice
     pub target_on_hit: Option<[Option<ApplyEffect>; 2]>,
     pub area_on_hit: Option<[Option<ApplyEffect>; 2]>,
     pub area_create_surface: Option<Surface>,
@@ -6193,14 +5968,6 @@ pub enum DefenseType {
 }
 
 impl DefenseType {
-    fn name(&self) -> &'static str {
-        match self {
-            DefenseType::Will => "will",
-            DefenseType::Evasion => "evasion",
-            DefenseType::Toughness => "toughness",
-        }
-    }
-
     pub fn text_with_icon(&self) -> &'static str {
         match self {
             DefenseType::Will => "|<will>| |<stat>Will|",

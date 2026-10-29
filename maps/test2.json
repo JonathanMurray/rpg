@@ -520,6 +520,17 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        34,
+        7
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

@@ -4826,29 +4826,24 @@ impl GameGrid {
                             AreaShape::Circle(circle_effect.radius),
                             other_char,
                         ) {
-                            if let AbilityTargetEffect::Negative(effect) =
-                                circle_effect.area_effect.target_effect
-                            {
-                                if let Some(base_push_amount) = effect.knockback() {
-                                    //self.draw_filled_occupied_cells();
+                            let effect = circle_effect.area_effect.target_effect;
 
-                                    let push_amount = effective_push_amount(
-                                        base_push_amount,
-                                        &attacker,
-                                        other_char,
-                                    );
+                            if let Some(base_push_amount) = effect.knockback() {
+                                //self.draw_filled_occupied_cells();
 
-                                    let source_pos = if target_char.id() == other_char.id() {
-                                        attacker.pos()
-                                    } else {
-                                        target_char.pos()
-                                    };
+                                let push_amount =
+                                    effective_push_amount(base_push_amount, &attacker, other_char);
 
-                                    let pushed_vec =
-                                        pushed_vector(source_pos, other_char.pos(), push_amount);
+                                let source_pos = if target_char.id() == other_char.id() {
+                                    attacker.pos()
+                                } else {
+                                    target_char.pos()
+                                };
 
-                                    pushed_targets.push((other_char.id(), pushed_vec));
-                                }
+                                let pushed_vec =
+                                    pushed_vector(source_pos, other_char.pos(), push_amount);
+
+                                pushed_targets.push((other_char.id(), pushed_vec));
                             }
                         }
                     }

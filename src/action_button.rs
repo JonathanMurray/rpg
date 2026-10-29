@@ -20,13 +20,12 @@ use crate::{
         LayoutDirection, Style, TextLine,
     },
     core::{
-        Ability, AbilityDamage, AbilityEnhancement, AbilityNegativeEffect, AbilityPositiveEffect,
-        AbilityReach, AbilityRollType, AbilityTarget, AbilityTargetEffect, ApplyEffect, AreaEffect,
-        AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, CircleEffect,
-        Condition, DamageType, DefenseType, EnvironmentEffect, EquipEffect, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
-        MOVE_DISTANCE_PER_RESOURCE, OPPORTUNITY_ATTACK_STAMINA_COST,
+        Ability, AbilityDamage, AbilityEnhancement, AbilityReach, AbilityRollType, AbilityTarget,
+        AbilityTargetEffect, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition,
+        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
+        BaseAction, Character, CircleEffect, Condition, DamageType, DefenseType, EnvironmentEffect,
+        EquipEffect, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, Weapon, MOVE_DISTANCE_PER_RESOURCE, OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -603,14 +602,14 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 range.range_with_icon(),
                 def
             ));
-            describe_ability_negative_effect(&effect, &mut t);
+            describe_ability_neutral_effect(&effect, &mut t);
 
             if let Some((range, acquisition, effect)) = area {
                 t.technical_description.push("".to_string());
                 let def = def_suffix(effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
-                describe_ability_negative_effect(&effect, &mut t);
+                describe_ability_neutral_effect(&effect, &mut t);
             }
 
             if let Some(env_effect) = environment_effect {
@@ -621,7 +620,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         AbilityTarget::Ally { range, effect } => {
             t.technical_description
                 .push(format!("|<single_target>| {}|", range.range_with_icon()));
-            describe_ability_ally_effect(&effect, &mut t);
+            describe_ability_neutral_effect(effect, &mut t);
         }
 
         AbilityTarget::None {
@@ -632,7 +631,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             if let Some(effect) = self_effect {
                 t.technical_description
                     .push("|<single_target>| |<faded>(self):|".to_string());
-                describe_ability_ally_effect(&effect, &mut t);
+                describe_ability_neutral_effect(&effect, &mut t);
             }
 
             if let Some(CircleEffect {
@@ -653,14 +652,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 let def = def_suffix(target_effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| {radius_str}{def}"));
-                match target_effect {
-                    AbilityTargetEffect::Negative(effect) => {
-                        describe_ability_negative_effect(&effect, &mut t);
-                    }
-                    AbilityTargetEffect::Positive(effect) => {
-                        describe_ability_ally_effect(&effect, &mut t);
-                    }
-                }
+                describe_ability_neutral_effect(target_effect, &mut t);
 
                 if let Some(surface) = create_surface {
                     describe_create_surface(*surface, &mut t);
@@ -698,14 +690,14 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 range.range_with_icon(),
                 def
             ));
-            describe_ability_negative_effect(&*impact_effect, &mut t);
+            describe_ability_neutral_effect(&*impact_effect, &mut t);
 
             if let Some((range, acquisition, effect)) = impact_circle {
                 t.technical_description.push("".to_string());
                 let def = def_suffix(effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
-                describe_ability_negative_effect(&effect, &mut t);
+                describe_ability_neutral_effect(&effect, &mut t);
             }
         }
 
@@ -761,72 +753,45 @@ pub fn describe_area_effect(
     area_effect: &AreaEffect,
     t: &mut Tooltip,
 ) {
-    match &area_effect.target_effect {
-        AbilityTargetEffect::Negative(effect) => {
-            let def = def_suffix(effect.defense_type());
-            let targets_str = match area_effect.acquisition {
-                AreaTargetAcquisition::Enemies => "|<multi_target>|",
-                AreaTargetAcquisition::Everyone => "|<multi_target>| EVERYONE",
-                AreaTargetAcquisition::Allies => unreachable!(),
-            };
-            let mut line = if let Some(range) = range {
-                match shape {
-                    AreaShape::Circle(radius) => {
-                        format!(
-                            "{} {} {}",
-                            targets_str,
-                            range.range_with_icon(),
-                            radius.radius_with_icon()
-                        )
-                    }
-                    AreaShape::Line => format!("{} {}", targets_str, range.range_with_icon()),
-                }
-            } else {
-                match shape {
-                    AreaShape::Circle(radius) => {
-                        format!("{} {}", targets_str, radius.radius_with_icon())
-                    }
-                    AreaShape::Line => format!("{}", targets_str),
-                }
-            };
-            line.push_str(&def);
-            t.technical_description.push(line);
-            describe_ability_negative_effect(effect, t);
+    let effect = area_effect.target_effect;
+    let def = def_suffix(effect.defense_type());
+    let targets_str = match area_effect.acquisition {
+        AreaTargetAcquisition::Enemies => "|<multi_target>|",
+        AreaTargetAcquisition::Everyone => "|<multi_target>| EVERYONE",
+        AreaTargetAcquisition::Allies => unreachable!(),
+    };
+    let mut line = if let Some(range) = range {
+        match shape {
+            AreaShape::Circle(radius) => {
+                format!(
+                    "{} {} {}",
+                    targets_str,
+                    range.range_with_icon(),
+                    radius.radius_with_icon()
+                )
+            }
+            AreaShape::Line => format!("{} {}", targets_str, range.range_with_icon()),
         }
-        AbilityTargetEffect::Positive(effect) => {
-            assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
-            let line = if let Some(range) = range {
-                match shape {
-                    AreaShape::Circle(radius) => {
-                        format!(
-                            "|<multi_target>| {} {}",
-                            range.range_with_icon(),
-                            radius.radius_with_icon()
-                        )
-                    }
-                    AreaShape::Line => format!("|<multi_target>| {}", range.range_with_icon()),
-                }
-            } else {
-                match shape {
-                    AreaShape::Circle(radius) => {
-                        format!("|<multi_target>| {}", radius.radius_with_icon())
-                    }
-                    AreaShape::Line => "|<multi_target>|".to_string(),
-                }
-            };
-            t.technical_description.push(line);
-            describe_ability_ally_effect(effect, t);
+    } else {
+        match shape {
+            AreaShape::Circle(radius) => {
+                format!("{} {}", targets_str, radius.radius_with_icon())
+            }
+            AreaShape::Line => format!("{}", targets_str),
         }
-    }
+    };
+    line.push_str(&def);
+    t.technical_description.push(line);
+    describe_ability_neutral_effect(&effect, t);
 
     if let Some(surface) = area_effect.create_surface {
         describe_create_surface(surface, t);
     }
 }
 
-fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tooltip) {
+fn describe_ability_neutral_effect(effect: &AbilityTargetEffect, t: &mut Tooltip) {
     match effect {
-        AbilityNegativeEffect::Spell(effect) => {
+        AbilityTargetEffect::Spell(effect) => {
             if let Some(ability_dmg) = effect.damage {
                 let (value, dmg_type) = match ability_dmg {
                     AbilityDamage::Fixed(n, dmg_type) => (n, dmg_type),
@@ -844,7 +809,7 @@ fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tool
             }
         }
 
-        AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
+        AbilityTargetEffect::PerformAttack(ability_attack_effect) => {
             let dmg_str = match ability_attack_effect.override_weapon_damage {
                 Some(override_dmg) => override_dmg.to_string(),
                 None => {
@@ -878,17 +843,6 @@ fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tool
                 describe_apply_effect(apply_effect, t);
             }
         }
-    }
-}
-
-fn describe_ability_ally_effect(effect: &AbilityPositiveEffect, t: &mut Tooltip) {
-    if effect.healing > 0 {
-        t.technical_description
-            .push(format!("  |<heart>| |<value>{}| healing", effect.healing));
-    }
-
-    for apply in effect.apply.iter().copied() {
-        describe_apply_effect(apply, t);
     }
 }
 
