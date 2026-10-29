@@ -3,15 +3,16 @@ use macroquad::color::{Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED
 use crate::{
     core::{
         Ability, AbilityAnimation, AbilityAttackEffect, AbilityChargeFx, AbilityDamage,
-        AbilityEffect, AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect,
-        AbilityReach, AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect,
-        AreaShape, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
-        AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
-        Circumstance, Condition, Consumable, DamageType, DefenseType, EnvironmentEffect,
-        EquipEffect, EquipmentRequirement, Fraction, HandType, OnAttackedReaction,
-        OnAttackedReactionEffect, OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction,
-        OnHitReactionEffect, Range, Shield, SpellEnhancementEffect, SpellNegativeEffect, Trinket,
-        Weapon, WeaponGrip, WeaponRange, WeaponType,
+        AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach,
+        AbilityRollType, AbilityTarget, AbilityTargetEffect, ApplyCondition, ApplyEffect,
+        AreaEffect, AreaShape, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute,
+        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
+        AttackType, CircleEffect, Circumstance, Condition, Consumable, DamageType, DefenseType,
+        EnvironmentEffect, EquipEffect, EquipmentRequirement, Fraction, HandType,
+        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
+        OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
+        SpellEnhancementEffect, SpellNegativeEffect, Trinket, Weapon, WeaponGrip, WeaponRange,
+        WeaponType,
     },
     grid::ParticleShape,
     pathfind::Surface,
@@ -619,7 +620,7 @@ pub const PENETRATING_ARROWS: Arrow = Arrow {
     icon: EquipmentIconId::PenetratingArrow,
     bonus_penetration: 3,
     on_damage_apply: None,
-    area_effect: None,
+    circle_effect: None,
 };
 
 pub const BARBED_ARROWS: Arrow = Arrow {
@@ -632,7 +633,7 @@ pub const BARBED_ARROWS: Arrow = Arrow {
         stacks: Some(3),
         duration_rounds: None,
     })),
-    area_effect: None,
+    circle_effect: None,
 };
 
 pub const COLD_ARROWS: Arrow = Arrow {
@@ -645,7 +646,7 @@ pub const COLD_ARROWS: Arrow = Arrow {
         stacks: None,
         duration_rounds: Some(1),
     })),
-    area_effect: None,
+    circle_effect: None,
 };
 
 pub const FIRE_ARROWS: Arrow = Arrow {
@@ -654,21 +655,15 @@ pub const FIRE_ARROWS: Arrow = Arrow {
     icon: EquipmentIconId::FireArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
-    area_effect: Some(AreaEffect {
-        shape: AreaShape::Circle(Range::Melee),
-        create_surface: Some(Surface::Fire),
-        acquisition: AreaTargetAcquisition::Everyone,
-        effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+    circle_effect: Some(CircleEffect::new(
+        Range::Melee,
+        AreaTargetAcquisition::Everyone,
+        AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
-            /*
-            environment_effect: Some(EnvironmentEffect::CreateSurface(
-                Surface::Fire,
-                AreaShape::Circle(Range::Melee),
-            )),
-             */
             ..SpellNegativeEffect::default()
         })),
-    }),
+        Some(Surface::Fire),
+    )),
 };
 
 pub const EXPLODING_ARROWS: Arrow = Arrow {
@@ -677,17 +672,18 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
     icon: EquipmentIconId::ExplodingArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
-    area_effect: Some(AreaEffect {
-        shape: AreaShape::Circle(Range::Melee),
-        create_surface: None,
-        acquisition: AreaTargetAcquisition::Everyone,
-        effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+
+    circle_effect: Some(CircleEffect::new(
+        Range::Melee,
+        AreaTargetAcquisition::Everyone,
+        AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             defense_type: Some(DefenseType::Toughness),
             on_hit: Some([Some(ApplyEffect::Pushed(2)), None]),
             ..SpellNegativeEffect::default()
         })),
-    }),
+        None,
+    )),
 };
 
 pub const ARCANE_RING: Trinket = Trinket {
@@ -800,19 +796,19 @@ pub const LIQUID_FIRE: Consumable = Consumable {
 pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Liquid fire",
-    AbilityTarget::Area {
+    AbilityTarget::Circle {
         range: Range::Tenths(135),
-        area_effect: AreaEffect {
-            shape: AreaShape::Circle(Range::Melee),
-            acquisition: AreaTargetAcquisition::Everyone,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        circle_effect: CircleEffect::new(
+            Range::Melee,
+            AreaTargetAcquisition::Everyone,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
                 damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
                 on_hit: None,
                 environment_effect: None,
             })),
-            create_surface: Some(Surface::Fire),
-        },
+            Some(Surface::Fire),
+        ),
     },
     COL_RED,
 );
@@ -1277,18 +1273,17 @@ pub const SWEEP_ATTACK: Ability = Ability {
     roll: Some(AbilityRollType::RollDuringAttack(0)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), Some(SWEEP_ATTACK_PUSH), None],
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            // Melee
-            shape: AreaShape::Circle(Range::f32(2.5)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
+        self_circle: Some(CircleEffect::new(
+            Range::f32(2.5),
+            AreaTargetAcquisition::Enemies,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::PerformAttack(
                 AbilityAttackEffect {
                     damage_delta: -1,
                     ..AbilityAttackEffect::default()
                 },
             )),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -1429,7 +1424,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     roll: None,
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
             apply: &[ApplyEffect::Condition(ApplyCondition {
@@ -1460,7 +1455,7 @@ pub const BRACE: Ability = Ability {
     roll: None,
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
             apply: &[ApplyEffect::Condition(ApplyCondition {
@@ -1507,11 +1502,10 @@ pub const SCREAM: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::of(7)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        self_circle: Some(CircleEffect::new(
+            Range::of(7),
+            AreaTargetAcquisition::Enemies,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
 
                 on_hit: Some([
@@ -1524,7 +1518,8 @@ pub const SCREAM: Ability = Ability {
                 ]),
                 ..SpellNegativeEffect::default()
             })),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -1694,13 +1689,12 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
-    target: AbilityTarget::Area {
+    target: AbilityTarget::Circle {
         range: Range::f32(7.5),
-        area_effect: AreaEffect {
-            shape: AreaShape::Circle(Range::f32(2.5)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        circle_effect: CircleEffect::new(
+            Range::f32(2.5),
+            AreaTargetAcquisition::Enemies,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
                 on_hit: Some([
@@ -1713,7 +1707,8 @@ pub const INFLICT_WOUNDS: Ability = Ability {
                 ]),
                 ..SpellNegativeEffect::default()
             })),
-        },
+            None,
+        ),
     },
     animation_color: BROWN,
     animation: AbilityAnimation::CastSpell,
@@ -1822,7 +1817,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     roll: None,
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
             apply: &[ApplyEffect::Escape],
@@ -2087,11 +2082,10 @@ pub const INSPIRE: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INSPIRE_RUTHLESS), None, None],
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::f32(12.5)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Allies,
-            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+        self_circle: Some(CircleEffect::new(
+            Range::f32(12.5),
+            AreaTargetAcquisition::Allies,
+            AbilityTargetEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
                 apply: &[ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Inspired,
@@ -2099,7 +2093,8 @@ pub const INSPIRE: Ability = Ability {
                     duration_rounds: Some(3),
                 })],
             }),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -2127,11 +2122,10 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::f32(12.5)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Allies,
-            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+        self_circle: Some(CircleEffect::new(
+            Range::f32(12.5),
+            AreaTargetAcquisition::Allies,
+            AbilityTargetEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
                 apply: &[ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Inspired,
@@ -2139,7 +2133,8 @@ pub const ENEMY_INSPIRE: Ability = Ability {
                     duration_rounds: Some(2),
                 })],
             }),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -2164,15 +2159,15 @@ pub const HEALING_NOVA: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::of(12)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Allies,
-            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+        self_circle: Some(CircleEffect::new(
+            Range::of(12),
+            AreaTargetAcquisition::Allies,
+            AbilityTargetEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
                 apply: &[],
             }),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -2200,7 +2195,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
             apply: &[ApplyEffect::Condition(ApplyCondition {
@@ -2232,7 +2227,7 @@ pub const SELF_HEAL: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
             apply: &[ApplyEffect::Condition(ApplyCondition {
@@ -2266,17 +2261,15 @@ pub const HEALING_RAIN: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
-    target: AbilityTarget::Area {
-        range: Range::f32(15.5),
+    target: AbilityTarget::Line {
+        range: Range::f32(10.0),
         area_effect: AreaEffect {
-            //shape: AreaShape::Circle(Range::Float(5.5)),
-            shape: AreaShape::Line,
-            create_surface: None,
             acquisition: AreaTargetAcquisition::Allies,
-            effect: AbilityEffect::Positive(AbilityPositiveEffect {
-                healing: 1,
+            target_effect: AbilityTargetEffect::Positive(AbilityPositiveEffect {
+                healing: 2,
                 apply: &[],
             }),
+            create_surface: None,
         },
     },
     animation_color: GREEN,
@@ -2302,17 +2295,18 @@ pub const SPIKE_TRAP: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
 
-    target: AbilityTarget::Area {
+    target: AbilityTarget::Circle {
         range: Range::f32(6.5),
-        area_effect: AreaEffect {
-            shape: AreaShape::Circle(Range::f32(3.5)),
-            acquisition: AreaTargetAcquisition::Everyone,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        circle_effect: CircleEffect::new(
+            Range::f32(3.5),
+            AreaTargetAcquisition::Everyone,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 damage: Some(AbilityDamage::Fixed(1, DamageType::Regular)),
                 ..SpellNegativeEffect::default()
             })),
-            create_surface: Some(Surface::Spikes),
-        },
+            Some(Surface::Spikes),
+        )
+        ,
     },
     animation_color: GRAY,
     animation: AbilityAnimation::CastSpell,
@@ -2359,20 +2353,21 @@ pub const PIERCING_SHOT: Ability = Ability {
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
     possible_enhancements: [None, None, None],
-    target: AbilityTarget::Area {
+
+    target: AbilityTarget::Line {
         range: Range::f32(15.5),
         area_effect: AreaEffect {
-            shape: AreaShape::Line,
-            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
+            target_effect: AbilityTargetEffect::Negative(AbilityNegativeEffect::PerformAttack(
                 AbilityAttackEffect {
                     damage_penalty_per_consecutive_target: 1,
                     ..AbilityAttackEffect::default()
                 },
             )),
+            create_surface: None,
         },
     },
+
     animation_color: YELLOW,
     animation: AbilityAnimation::RangedWeaponAttack,
     initiate_sound: Some(SoundId::ShootArrow),
@@ -2579,20 +2574,23 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Area {
+
+    target: AbilityTarget::Line {
         range: Range::f32(12.0),
         area_effect: AreaEffect {
-            shape: AreaShape::Line,
-            create_surface: None,
             acquisition: AreaTargetAcquisition::Everyone,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
-                defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::Dynamic(7, DamageType::Lightning)),
+            target_effect: AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(
+                SpellNegativeEffect {
+                    defense_type: Some(DefenseType::Toughness),
+                    damage: Some(AbilityDamage::Dynamic(7, DamageType::Lightning)),
 
-                ..SpellNegativeEffect::default()
-            })),
+                    ..SpellNegativeEffect::default()
+                },
+            )),
+            create_surface: None,
         },
     },
+
     possible_enhancements: [Some(LIGHTNING_BOLT_REACH), None, None],
 
     // TODO: unique animation/sound
@@ -2620,15 +2618,15 @@ pub const KILL: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::of(50)),
-            create_surface: None,
-            acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        self_circle: Some(CircleEffect::new(
+            Range::of(50),
+            AreaTargetAcquisition::Enemies,
+            AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 damage: Some(AbilityDamage::Fixed(99, DamageType::Regular)),
                 ..SpellNegativeEffect::default()
             })),
-        }),
+            None,
+        )),
         self_effect: None,
         environment_effect: None,
     },
@@ -2656,7 +2654,7 @@ pub const KILL_SELF: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
             apply: &[ApplyEffect::LoseHealth(99)],
@@ -2687,7 +2685,7 @@ pub const MANATEST: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
             apply: &[ApplyEffect::GainMana(1)],
@@ -2718,7 +2716,7 @@ pub const SPIKETEST: Ability = Ability {
     roll: None,
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
-        self_area: None,
+        self_circle: None,
         self_effect: None,
         environment_effect: Some(EnvironmentEffect::CreateSurface(
             Surface::Spikes,
@@ -2846,7 +2844,7 @@ const fn potion_ability(
         roll: None,
         possible_enhancements: [None, None, None],
         target: AbilityTarget::None {
-            self_area: None,
+            self_circle: None,
             self_effect: Some(self_effect),
             environment_effect: None,
         },

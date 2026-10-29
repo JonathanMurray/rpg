@@ -16,7 +16,6 @@ use macroquad::{
     texture::draw_texture,
     window::{screen_height, screen_width},
 };
-use serde::de;
 
 use crate::{
     action_button::{
@@ -33,10 +32,10 @@ use crate::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
-        AreaEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
-        AttackOutcome, AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId,
-        Characters, Condition, CoreGame, DamageInterval, DamageSource, GameEvent, GameOverType,
-        HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
+        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
+        AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId, Characters,
+        CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval, DamageSource, GameEvent,
+        GameOverType, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
         TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
@@ -62,7 +61,7 @@ use crate::{
         KEYWORD_TOOLTIP_COUNTER,
     },
     util::{
-        are_entities_within_melee, line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0,
+        are_entities_within_melee, extend_to_range, line_visitor, COL_BLUE, COL_DARK, COL_GREEN_0,
         COL_GREEN_1, COL_GREEN_2, COL_LIGHT_BLUE, COL_RED,
     },
 };
@@ -137,6 +136,8 @@ impl UiState {
     }
 
     pub fn set_target(&mut self, new_target: ActionTarget) {
+        println!("ui state set target: {:?}", new_target);
+
         match self {
             UiState::ConfiguringAction(configured_action) => match configured_action {
                 ConfiguredAction::Attack { target, .. } => {
@@ -146,11 +147,14 @@ impl UiState {
                         _ => panic!(),
                     };
                 }
-                ConfiguredAction::UseAbility { target, .. } => *target = new_target,
+                ConfiguredAction::UseAbility { target, .. } => {
+                    println!("Previous ui target: {:?}", target);
+                    *target = new_target
+                }
 
-                action => panic!("Action has no target: {:?}", action),
+                unexpected => panic!("Action has no target: {:?}", unexpected),
             },
-            state => panic!("State has no target: {:?}", state),
+            unexpected => panic!("State has no target: {:?}", unexpected),
         }
     }
 }
@@ -250,14 +254,18 @@ fn ability_usability_problem(
         ActionTarget::Position(target_pos) => {
             assert!(matches!(
                 ability.target,
-                AbilityTarget::Area { .. } | AbilityTarget::Movement { .. }
+                AbilityTarget::Circle { .. } | AbilityTarget::Movement { .. }
             ));
             usability_check_reach_and_line_of_sight(*target_pos)
         }
 
-        ActionTarget::Projectile(target_pos, impact_ch_id) => {
+        ActionTarget::Projectile(tl) => {
             assert!(matches!(ability.target, AbilityTarget::Projectile { .. }));
-            usability_check_reach_and_line_of_sight(*target_pos)
+            usability_check_reach_and_line_of_sight(tl.destination)
+        }
+        ActionTarget::Line(tl) => {
+            assert!(matches!(ability.target, AbilityTarget::Line { .. }));
+            usability_check_reach_and_line_of_sight(tl.destination)
         }
 
         // There is a usability problem; we will not be able to call predict_ability for example,
@@ -266,9 +274,10 @@ fn ability_usability_problem(
             AbilityTarget::None { .. } => None,
             AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
             AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
-            AbilityTarget::Area { .. } => Some(UsabilityProblem::SelectArea),
+            AbilityTarget::Circle { .. }
+            | AbilityTarget::Line { .. }
+            | AbilityTarget::Projectile { .. } => Some(UsabilityProblem::SelectArea),
             AbilityTarget::Movement { .. } => Some(UsabilityProblem::SelectDestination),
-            AbilityTarget::Projectile { .. } => Some(UsabilityProblem::SelectArea),
         },
     }
 }
@@ -1096,7 +1105,8 @@ impl UserInterface {
                             Some(self.characters.get(*character_id).pos())
                         }
                         ActionTarget::Position(pos) => Some(*pos),
-                        ActionTarget::Projectile(pos, _ch_id) => Some(*pos),
+                        ActionTarget::Projectile(tl) => Some(tl.destination),
+                        ActionTarget::Line(tl) => Some(tl.destination),
                         ActionTarget::None => None,
                     },
                     _ => None,
@@ -1206,7 +1216,8 @@ impl UserInterface {
     }
 
     fn refresh_use_ability_state(&mut self) {
-        self.refresh_line_ability_target();
+        // TODO we shouldn't need to "refresh" the line length - that should be handled correctly from inside grid.rs already?
+        //self.refresh_line_ability_target();
 
         let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() else {
             panic!()
@@ -1245,62 +1256,6 @@ impl UserInterface {
                         character_id: target_id,
                         prediction,
                     });
-            }
-        }
-    }
-
-    fn refresh_line_ability_target(&self) {
-        let UiState::ConfiguringAction(configured_action) = &mut *self.state.borrow_mut() else {
-            panic!()
-        };
-
-        let ConfiguredAction::UseAbility {
-            ability,
-            selected_enhancements,
-            target,
-            ..
-        } = configured_action
-        else {
-            panic!()
-        };
-
-        if let AbilityTarget::Area {
-            mut range,
-            area_effect,
-        } = &ability.target
-        {
-            if area_effect.shape == AreaShape::Line {
-                if let ActionTarget::Position(pos) = target {
-                    let mut increased_range_tenths = 0;
-                    for effect in selected_enhancements.iter().filter_map(|e| e.spell_effect) {
-                        if effect.increased_range_tenths > 0 {
-                            increased_range_tenths += effect.increased_range_tenths;
-                        }
-                    }
-
-                    if increased_range_tenths > 0 {
-                        range = range.plus_tenths(increased_range_tenths);
-                    }
-
-                    let from = self.active_character().pos();
-                    let mut to = *pos;
-                    modify_line_len(from, &mut to, range, true);
-
-                    *pos = to;
-                    let mut prev = from;
-                    line_visitor(from, to, |x, y| {
-                        if matches!(
-                            self.game_grid.pathfind_grid.occupation(&(x, y)),
-                            Some(Occupation::Terrain(TerrainId::StoneWall(..)))
-                        ) {
-                            *pos = prev;
-                            true
-                        } else {
-                            prev = (x, y);
-                            false
-                        }
-                    });
-                }
             }
         }
     }
@@ -2083,27 +2038,28 @@ impl UserInterface {
         &mut self,
         start_time: f32,
         animation_color: Color,
-        area_center_pos: &(i32, i32),
-        shape: Option<AreaShape>,
+        circle: Option<ConcreteCircle>,
         outcomes: &[(CharacterId, Box<AbilityTargetOutcome>)],
         show_area_circle: bool,
         ability: Option<&'static Ability>,
     ) {
         let area_duration = 1.5;
 
-        if let Some(AreaShape::Circle(radius)) = shape {
+        if let Some(circle) = circle {
             if show_area_circle {
                 self.game_grid.add_effect(
-                    *area_center_pos,
-                    *area_center_pos,
+                    circle.center,
+                    circle.center,
                     EffectData {
                         start_time,
                         end_time: start_time + area_duration,
                         variant: EffectVariant::At(
                             EffectPosition::Destination,
                             EffectGraphics::Circle {
-                                radius: f32::from(radius) * self.game_grid.cell_w() * 0.1,
-                                end_radius: Some(f32::from(radius) * self.game_grid.cell_w()),
+                                radius: f32::from(circle.radius) * self.game_grid.cell_w() * 0.1,
+                                end_radius: Some(
+                                    f32::from(circle.radius) * self.game_grid.cell_w(),
+                                ),
                                 fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
                                 //fill: Some(fill_color),
                                 stroke: None,
@@ -2123,7 +2079,7 @@ impl UserInterface {
             let end = start + 0.2;
 
             self.game_grid.add_effect(
-                (area_center_pos.0, area_center_pos.1),
+                target_pos,
                 target_pos,
                 EffectData {
                     start_time: start,
@@ -2266,18 +2222,12 @@ impl UserInterface {
             self.animation_stopwatch.set_to_at_least(0.15);
         }
 
-        if let Some(AbilityAreaOutcome {
-            center,
-            targets,
-            shape,
-        }) = &area_outcome
-        {
+        if let Some(AbilityAreaOutcome { targets, circle }) = &area_outcome {
             let show_area_circle = ability != &INSPIRE;
             self.add_effects_for_area_outcomes(
                 0.0,
                 animation_color,
-                center,
-                Some(*shape),
+                *circle,
                 targets,
                 show_area_circle,
                 Some(ability),
@@ -2402,12 +2352,14 @@ impl UserInterface {
             self.game_grid.animate_character_shaking(target, start_time);
         }
 
-        if let Some((shape, outcomes)) = &event.area_outcomes {
+        if let Some((radius, outcomes)) = &event.circle_outcome {
             self.add_effects_for_area_outcomes(
                 start_time,
                 RED,
-                &target_pos,
-                Some(*shape),
+                Some(ConcreteCircle {
+                    center: target_pos,
+                    radius: *radius,
+                }),
                 outcomes,
                 true,
                 None,

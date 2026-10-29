@@ -748,7 +748,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.learn_passive(PassiveSkill::CriticalCharge);
     clara.learn_ability(&FIREBALL2);
     clara.learn_ability(&FIREBALL);
-    clara.learn_ability(&SHACKLED_MIND);
+    clara.learn_ability(&DASH);
     clara.learn_ability(&INFLICT_WOUNDS);
     clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(&LIGHTNING_BOLT);

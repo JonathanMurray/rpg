@@ -20,13 +20,13 @@ use crate::{
         LayoutDirection, Style, TextLine,
     },
     core::{
-        Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
-        AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
-        AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, Condition,
-        DamageType, DefenseType, EnvironmentEffect, EquipEffect, HandType, OnAttackedReaction,
-        OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon, MOVE_DISTANCE_PER_RESOURCE,
-        OPPORTUNITY_ATTACK_STAMINA_COST,
+        Ability, AbilityDamage, AbilityEnhancement, AbilityNegativeEffect, AbilityPositiveEffect,
+        AbilityReach, AbilityRollType, AbilityTarget, AbilityTargetEffect, ApplyEffect, AreaEffect,
+        AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, CircleEffect,
+        Condition, DamageType, DefenseType, EnvironmentEffect, EquipEffect, HandType,
+        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
+        MOVE_DISTANCE_PER_RESOURCE, OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -625,7 +625,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         }
 
         AbilityTarget::None {
-            self_area,
+            self_circle,
             self_effect,
             environment_effect,
         } => {
@@ -635,29 +635,29 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 describe_ability_ally_effect(&effect, &mut t);
             }
 
-            if let Some(AreaEffect {
-                shape,
-                acquisition,
-                effect,
-                create_surface,
-            }) = self_area
+            if let Some(CircleEffect {
+                radius,
+                area_effect:
+                    AreaEffect {
+                        acquisition,
+                        target_effect,
+                        create_surface,
+                    },
+            }) = self_circle
             {
                 // There's no use-case for this yet (?)
                 assert!(acquisition != &AreaTargetAcquisition::Everyone);
 
-                let radius_str = match shape {
-                    AreaShape::Circle(r) => r.radius_with_icon(),
-                    AreaShape::Line => "line".to_string(),
-                };
+                let radius_str = radius.radius_with_icon();
 
-                let def = def_suffix(effect.defense_type());
+                let def = def_suffix(target_effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| {radius_str}{def}"));
-                match effect {
-                    AbilityEffect::Negative(effect) => {
+                match target_effect {
+                    AbilityTargetEffect::Negative(effect) => {
                         describe_ability_negative_effect(&effect, &mut t);
                     }
-                    AbilityEffect::Positive(effect) => {
+                    AbilityTargetEffect::Positive(effect) => {
                         describe_ability_ally_effect(&effect, &mut t);
                     }
                 }
@@ -672,8 +672,18 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             }
         }
 
-        AbilityTarget::Area { range, area_effect } => {
-            describe_area_effect(Some(*range), &area_effect, &mut t)
+        AbilityTarget::Circle {
+            range,
+            circle_effect,
+        } => describe_area_effect(
+            Some(*range),
+            AreaShape::Circle(circle_effect.radius),
+            &circle_effect.area_effect,
+            &mut t,
+        ),
+
+        AbilityTarget::Line { range, area_effect } => {
+            describe_area_effect(Some(*range), AreaShape::Line, area_effect, &mut t)
         }
 
         AbilityTarget::Projectile {
@@ -745,9 +755,14 @@ fn describe_create_surface(surface: Surface, t: &mut Tooltip) {
     }
 }
 
-pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &mut Tooltip) {
-    match &area_effect.effect {
-        AbilityEffect::Negative(effect) => {
+pub fn describe_area_effect(
+    range: Option<Range>,
+    shape: AreaShape,
+    area_effect: &AreaEffect,
+    t: &mut Tooltip,
+) {
+    match &area_effect.target_effect {
+        AbilityTargetEffect::Negative(effect) => {
             let def = def_suffix(effect.defense_type());
             let targets_str = match area_effect.acquisition {
                 AreaTargetAcquisition::Enemies => "|<multi_target>|",
@@ -755,7 +770,7 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &
                 AreaTargetAcquisition::Allies => unreachable!(),
             };
             let mut line = if let Some(range) = range {
-                match area_effect.shape {
+                match shape {
                     AreaShape::Circle(radius) => {
                         format!(
                             "{} {} {}",
@@ -767,7 +782,7 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &
                     AreaShape::Line => format!("{} {}", targets_str, range.range_with_icon()),
                 }
             } else {
-                match area_effect.shape {
+                match shape {
                     AreaShape::Circle(radius) => {
                         format!("{} {}", targets_str, radius.radius_with_icon())
                     }
@@ -778,10 +793,10 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &
             t.technical_description.push(line);
             describe_ability_negative_effect(effect, t);
         }
-        AbilityEffect::Positive(effect) => {
+        AbilityTargetEffect::Positive(effect) => {
             assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
             let line = if let Some(range) = range {
-                match area_effect.shape {
+                match shape {
                     AreaShape::Circle(radius) => {
                         format!(
                             "|<multi_target>| {} {}",
@@ -792,7 +807,7 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: &AreaEffect, t: &
                     AreaShape::Line => format!("|<multi_target>| {}", range.range_with_icon()),
                 }
             } else {
-                match area_effect.shape {
+                match shape {
                     AreaShape::Circle(radius) => {
                         format!("|<multi_target>| {}", radius.radius_with_icon())
                     }

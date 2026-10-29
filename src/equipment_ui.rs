@@ -25,9 +25,9 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Circumstance, Condition,
-        Consumable, EquipEffect, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket,
-        Weapon, WeaponGrip, WeaponRange,
+        ApplyEffect, AreaShape, ArmorPiece, ArrowStack, AttackHitEffect, Character, Circumstance,
+        Condition, Consumable, EquipEffect, EquipmentEntry, EquipmentSlotRole, HandType, Shield,
+        Trinket, Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     game_ui::draw_rectangle_lines2,
@@ -64,8 +64,13 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
             .push("|<single_target>| |<faded>(target):|".to_string());
         describe_apply_effect(effect, &mut t);
     }
-    if let Some(area_effect) = &stack.arrow.area_effect {
-        describe_area_effect(None, area_effect, &mut t);
+    if let Some(circle_effect) = &stack.arrow.circle_effect {
+        describe_area_effect(
+            None,
+            AreaShape::Circle(circle_effect.radius),
+            &circle_effect.area_effect,
+            &mut t,
+        );
     }
     t
 }

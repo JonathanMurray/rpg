@@ -11,6 +11,7 @@ use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
+use macroquad::math::Circle;
 use macroquad::miniquad::CompareFunc::Always;
 use macroquad::miniquad::CursorIcon::Move;
 use rand::Rng;
@@ -1571,12 +1572,15 @@ impl CoreGame {
                         )
                         .await;
 
-                        let shape = &mut AreaShape::Circle(*radius);
-                        Self::modify_shape_radius(shape, enhancements);
+                        let mut radius = *radius;
+
+                        Self::modify_radius(&mut radius, enhancements);
                         area_outcome = Some(AbilityAreaOutcome {
-                            center: target.position.get(),
                             targets: area_target_outcomes,
-                            shape: *shape,
+                            circle: Some(ConcreteCircle {
+                                center: target.pos(),
+                                radius,
+                            }),
                         });
                     }
 
@@ -1588,13 +1592,9 @@ impl CoreGame {
                     impact_effect,
                     impact_circle,
                 } => {
-                    /*
-                    dbg!(selected_target);
-                    dbg!(impact_effect);
-                    dbg!(impact_circle);
-                     */
+                    let target_line = selected_target.unwrap_projectile();
 
-                    let (target_pos, target_id) = selected_target.unwrap_projectile();
+                    let target_pos = target_line.destination;
 
                     if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
@@ -1611,12 +1611,12 @@ impl CoreGame {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability,
-                            target: Some(ConcreteAbilityTarget::Projectile(target_pos)),
+                            target: Some(ConcreteAbilityTarget::ProjectileOrLine(target_pos)),
                         })
                         .await;
                     }
 
-                    if let Some(target_id) = target_id {
+                    if let Some(target_id) = target_line.obstructing_character {
                         let target = mode.characters().get_rc(target_id);
                         let outcome = Self::perform_ability_enemy_effect(
                             actor,
@@ -1635,14 +1635,11 @@ impl CoreGame {
                     }
 
                     if let Some((radius, acquisition, negative_effect)) = impact_circle {
-                        let shape = AreaShape::Circle(*radius);
-
                         detail_lines.push("|<faded>Area of effect:|".to_string());
 
                         let area_effect = AreaEffect {
-                            shape,
                             acquisition: *acquisition,
-                            effect: AbilityEffect::Negative(*negative_effect),
+                            target_effect: AbilityTargetEffect::Negative(*negative_effect),
                             create_surface: None,
                         };
 
@@ -1652,16 +1649,21 @@ impl CoreGame {
                             enhancements,
                             actor,
                             target_pos,
-                            &area_effect,
+                            &ShapedEffect {
+                                shape: AreaShape::Circle(*radius),
+                                area_effect,
+                            },
                             &mut detail_lines,
                             mode,
                         )
                         .await;
 
                         area_outcome = Some(AbilityAreaOutcome {
-                            center: target_pos,
                             targets: outcomes,
-                            shape: area_effect.shape,
+                            circle: Some(ConcreteCircle {
+                                center: target_pos,
+                                radius: *radius,
+                            }),
                         });
                     }
                 }
@@ -1697,32 +1699,74 @@ impl CoreGame {
                     target_outcome = Some((target_id, Box::new(outcome)));
                 }
 
-                AbilityTarget::Area {
+                AbilityTarget::Line {
                     range: _,
                     area_effect,
                 } => {
-                    let target_pos = selected_target.unwrap_position();
+                    let tl = selected_target.unwrap_line();
+
+                    let target_pos = tl.destination;
 
                     if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
-                        if !matches!(area_effect.shape, AreaShape::Line) {
-                            // Line can be aimed through obstruction, since it always extends to max range
-                            assert!(
-                                !game
-                                    .pathfind_grid
-                                    .obstructed_line_of_sight(actor.pos(), target_pos),
-                                "{:?} {:?}",
-                                actor.pos(),
-                                target_pos
-                            );
-                        }
 
                         actor.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability,
-                            target: Some(ConcreteAbilityTarget::Area(
-                                area_effect.shape,
+                            target: Some(ConcreteAbilityTarget::ProjectileOrLine(target_pos)),
+                        })
+                        .await;
+                    }
+
+                    detail_lines.push("|<faded>Area of effect:|".to_string());
+
+                    let outcomes = Self::perform_ability_area_effect(
+                        ability.name,
+                        roll_instruction.as_ref().unwrap(),
+                        enhancements,
+                        actor,
+                        target_pos,
+                        // TODO: Pass the list of line cells instead, so that we don't need to rerun line_visitor
+                        // and recompute the cells (which introduces the risk of ending up with a different result somehow)
+                        &ShapedEffect {
+                            shape: AreaShape::Line,
+                            area_effect: area_effect.clone(),
+                        },
+                        &mut detail_lines,
+                        mode,
+                    )
+                    .await;
+
+                    area_outcome = Some(AbilityAreaOutcome {
+                        targets: outcomes,
+                        circle: None,
+                    });
+                }
+
+                AbilityTarget::Circle {
+                    range: _,
+                    circle_effect,
+                } => {
+                    let target_pos = selected_target.unwrap_position();
+
+                    if let Some(game) = real_game {
+                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(
+                            !game
+                                .pathfind_grid
+                                .obstructed_line_of_sight(actor.pos(), target_pos),
+                            "{:?} {:?}",
+                            actor.pos(),
+                            target_pos
+                        );
+
+                        actor.set_facing_toward(target_pos);
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: actor_id,
+                            ability,
+                            target: Some(ConcreteAbilityTarget::Circle(
+                                circle_effect.radius,
                                 target_pos,
                             )),
                         })
@@ -1737,16 +1781,21 @@ impl CoreGame {
                         enhancements,
                         actor,
                         target_pos,
-                        &area_effect,
+                        &ShapedEffect {
+                            shape: AreaShape::Circle(circle_effect.radius),
+                            area_effect: circle_effect.area_effect.clone(),
+                        },
                         &mut detail_lines,
                         mode,
                     )
                     .await;
 
                     area_outcome = Some(AbilityAreaOutcome {
-                        center: target_pos,
                         targets: outcomes,
-                        shape: area_effect.shape,
+                        circle: Some(ConcreteCircle {
+                            center: target_pos,
+                            radius: circle_effect.radius,
+                        }),
                     });
                 }
 
@@ -1768,7 +1817,7 @@ impl CoreGame {
                 }
 
                 AbilityTarget::None {
-                    self_area,
+                    self_circle,
                     self_effect,
                     environment_effect,
                 } => {
@@ -1794,22 +1843,24 @@ impl CoreGame {
                         target_outcome = Some((actor_id, Box::new(outcome)));
                     }
 
-                    if let Some(area_effect) = self_area {
+                    if let Some(circle_effect) = self_circle {
                         let outcomes = Self::perform_ability_area_effect(
                             ability.name,
                             roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             actor.position.get(),
-                            &area_effect,
+                            &ShapedEffect::from_circle_effect(circle_effect.clone()),
                             &mut detail_lines,
                             mode,
                         )
                         .await;
                         area_outcome = Some(AbilityAreaOutcome {
-                            center: actor.position.get(),
                             targets: outcomes,
-                            shape: area_effect.shape,
+                            circle: Some(ConcreteCircle {
+                                center: actor.pos(),
+                                radius: circle_effect.radius,
+                            }),
                         });
                     }
 
@@ -1964,37 +2015,37 @@ impl CoreGame {
         roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
         caster: &Rc<Character>,
-        area_center: Position,
-        area_effect: &AreaEffect,
+        area_pos: Position,
+        shaped_effect: &ShapedEffect,
         detail_lines: &mut Vec<String>,
         mode: ActionPerformanceMode<'_>,
     ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
-        let outcomes = match &area_effect.effect {
-            AbilityEffect::Negative(effect) => {
+        let outcomes = match &shaped_effect.area_effect.target_effect {
+            AbilityTargetEffect::Negative(effect) => {
                 Self::perform_ability_area_enemy_effect(
-                    area_effect.shape,
+                    shaped_effect.shape,
                     name,
                     roll_instruction,
                     enhancements,
                     caster,
-                    area_center,
+                    area_pos,
                     detail_lines,
                     effect,
-                    area_effect.acquisition,
+                    shaped_effect.area_effect.acquisition,
                     mode,
                 )
                 .await
             }
 
-            AbilityEffect::Positive(effect) => {
-                assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
+            AbilityTargetEffect::Positive(effect) => {
+                assert!(shaped_effect.area_effect.acquisition == AreaTargetAcquisition::Allies);
 
                 Self::perform_ability_area_ally_effect(
-                    area_effect.shape,
+                    shaped_effect.shape,
                     name,
                     enhancements,
                     caster,
-                    area_center,
+                    area_pos,
                     detail_lines,
                     roll_instruction,
                     effect,
@@ -2003,11 +2054,11 @@ impl CoreGame {
             }
         };
 
-        if let Some(surface) = area_effect.create_surface {
+        if let Some(surface) = shaped_effect.area_effect.create_surface {
             if let Some(game) = mode.real_game() {
                 game.perform_environment_effect(
-                    EnvironmentEffect::CreateSurface(surface, area_effect.shape),
-                    area_center,
+                    EnvironmentEffect::CreateSurface(surface, shaped_effect.shape),
+                    area_pos,
                     detail_lines,
                 )
                 .await;
@@ -2166,6 +2217,16 @@ impl CoreGame {
                         panic!()
                     };
 
+                    *radius = radius.plus_tenths(e.increased_radius_tenths);
+                }
+            }
+        }
+    }
+
+    fn modify_radius(radius: &mut Range, enhancements: &[AbilityEnhancement]) {
+        for enhancement in enhancements {
+            if let Some(e) = enhancement.spell_effect {
+                if e.increased_radius_tenths > 0 {
                     *radius = radius.plus_tenths(e.increased_radius_tenths);
                 }
             }
@@ -3271,7 +3332,7 @@ impl CoreGame {
             }
         };
 
-        let mut area_outcomes = None;
+        let mut circle_outcome = None;
         if let Some(game) = game {
             if defender.lose_condition(Condition::Distracted) {
                 detail_lines.push(format!("|{}| lost Distracted", defender.name_tag()));
@@ -3291,7 +3352,7 @@ impl CoreGame {
         }
 
         if let Some(arrow) = used_arrow.as_ref() {
-            if let Some(area_effect) = &arrow.area_effect {
+            if let Some(circle_effect) = &arrow.circle_effect {
                 detail_lines.push("".to_string());
                 detail_lines.push(format!("{}:", arrow.name));
 
@@ -3306,12 +3367,12 @@ impl CoreGame {
                     &[],
                     attacker,
                     defender.pos(),
-                    &area_effect,
+                    &ShapedEffect::from_circle_effect(circle_effect.clone()),
                     &mut detail_lines,
                     mode,
                 ))
                 .await;
-                area_outcomes = Some((area_effect.shape, area_target_outcomes));
+                circle_outcome = Some((circle_effect.radius, area_target_outcomes));
             }
         }
 
@@ -3320,7 +3381,7 @@ impl CoreGame {
             target: defender.id(),
             outcome,
             detail_lines,
-            area_outcomes,
+            circle_outcome,
             effective_armor_value: armor_value,
         }
     }
@@ -4033,7 +4094,7 @@ pub fn predict_attack(
         } = event.outcome;
 
         if area_targets.is_empty() {
-            if let Some((_shape, outcomes)) = &event.area_outcomes {
+            if let Some((_shape, outcomes)) = &event.circle_outcome {
                 for (target_id, outcome) in outcomes {
                     let damage = outcome.damage().map(|(d, dmg_type)| DamageInterval {
                         min: d,
@@ -4315,8 +4376,8 @@ pub enum GameEvent {
 #[derive(Debug, Clone)]
 pub enum ConcreteAbilityTarget {
     SingleCharacter(CharacterId),
-    Area(AreaShape, Position),
-    Projectile(Position),
+    Circle(Range, Position),
+    ProjectileOrLine(Position),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -4353,9 +4414,14 @@ pub struct AbilityResolvedEvent {
 
 #[derive(Debug, Clone)]
 pub struct AbilityAreaOutcome {
-    pub center: Position,
     pub targets: Vec<(CharacterId, Box<AbilityTargetOutcome>)>,
-    pub shape: AreaShape,
+    pub circle: Option<ConcreteCircle>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ConcreteCircle {
+    pub center: Position,
+    pub radius: Range,
 }
 
 impl AbilityResolvedEvent {
@@ -4427,7 +4493,7 @@ pub struct AttackedEvent {
     pub target: CharacterId,
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
-    pub area_outcomes: Option<(AreaShape, Vec<(CharacterId, Box<AbilityTargetOutcome>)>)>,
+    pub circle_outcome: Option<(Range, Vec<(CharacterId, Box<AbilityTargetOutcome>)>)>,
     effective_armor_value: u32,
 }
 
@@ -5310,10 +5376,20 @@ impl Action {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
+pub struct TargetLine {
+    pub line: Vec<Position>,
+    pub destination: Position,
+    pub obstructing_character: Option<CharacterId>,
+    pub reached_full_range: bool,
+    pub based_on_range: Range,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum ActionTarget {
     Character(CharacterId, Option<Vec<Position>>),
     Position(Position),
-    Projectile(Position, Option<CharacterId>),
+    Line(TargetLine),
+    Projectile(TargetLine),
     None,
 }
 
@@ -5339,10 +5415,17 @@ impl ActionTarget {
         }
     }
 
-    pub fn unwrap_projectile(&self) -> (Position, Option<CharacterId>) {
+    pub fn unwrap_projectile(&self) -> &TargetLine {
         match self {
-            Self::Projectile(pos, ch_id) => (*pos, *ch_id),
+            Self::Projectile(tl) => tl,
             unexpected => panic!("Not projectile target: {:?}", unexpected),
+        }
+    }
+
+    pub fn unwrap_line(&self) -> &TargetLine {
+        match self {
+            Self::Line(tl) => tl,
+            unexpected => panic!("Not line target: {:?}", unexpected),
         }
     }
 }
@@ -5490,7 +5573,8 @@ impl Ability {
         match self.target {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
-            AbilityTarget::Area { .. } => true,
+            AbilityTarget::Circle { .. } => true,
+            AbilityTarget::Line { .. } => true,
             AbilityTarget::Movement { .. } => true,
             AbilityTarget::Projectile { .. } => true,
             AbilityTarget::None { .. } => false,
@@ -5506,26 +5590,25 @@ impl Ability {
 
     pub fn target_defense(&self) -> Option<DefenseType> {
         match &self.target {
-            AbilityTarget::Enemy { effect, .. } => match effect {
-                AbilityNegativeEffect::Spell(spell_negative_effect) => {
-                    spell_negative_effect.defense_type
-                }
-                AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
-            },
+            AbilityTarget::Enemy { effect, .. } => effect.defense_type(),
             AbilityTarget::Ally { .. } => None,
-            AbilityTarget::Area { area_effect, .. } => match area_effect.effect {
-                AbilityEffect::Negative(ability_negative_effect) => match ability_negative_effect {
-                    AbilityNegativeEffect::Spell(spell_negative_effect) => {
-                        spell_negative_effect.defense_type
-                    }
-                    AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
-                },
-                AbilityEffect::Positive(..) => None,
+            AbilityTarget::Circle { circle_effect, .. } => {
+                match circle_effect.area_effect.target_effect {
+                    AbilityTargetEffect::Negative(ane) => ane.defense_type(),
+                    AbilityTargetEffect::Positive(..) => None,
+                }
+            }
+            AbilityTarget::Line { range, area_effect } => match area_effect.target_effect {
+                AbilityTargetEffect::Negative(ane) => ane.defense_type(),
+                AbilityTargetEffect::Positive(..) => None,
             },
             AbilityTarget::Movement { .. } => None,
-            AbilityTarget::None { self_area, .. } => self_area
+            AbilityTarget::None {
+                self_circle: self_area,
+                ..
+            } => self_area
                 .as_ref()
-                .map(|a| a.effect.defense_type())
+                .map(|a| a.area_effect.target_effect.defense_type())
                 .flatten(),
             AbilityTarget::Projectile {
                 range,
@@ -5539,15 +5622,24 @@ impl Ability {
         let effect: &AbilityNegativeEffect = match &self.target {
             AbilityTarget::Enemy { effect, .. } => Some(effect),
             AbilityTarget::Ally { .. } => None,
-            AbilityTarget::Area { area_effect, .. } => match &area_effect.effect {
-                AbilityEffect::Negative(ane) => Some(ane),
-                AbilityEffect::Positive(..) => None,
+            AbilityTarget::Circle { circle_effect, .. } => {
+                match &circle_effect.area_effect.target_effect {
+                    AbilityTargetEffect::Negative(ane) => Some(ane),
+                    AbilityTargetEffect::Positive(..) => None,
+                }
+            }
+            AbilityTarget::Line { range, area_effect } => match &area_effect.target_effect {
+                AbilityTargetEffect::Negative(ane) => Some(ane),
+                AbilityTargetEffect::Positive(..) => None,
             },
             AbilityTarget::Movement { .. } => None,
-            AbilityTarget::None { self_area, .. } => match self_area {
-                Some(area_effect) => match &area_effect.effect {
-                    AbilityEffect::Negative(ane) => Some(ane),
-                    AbilityEffect::Positive(..) => None,
+            AbilityTarget::None {
+                self_circle: self_area,
+                ..
+            } => match self_area {
+                Some(circle_effect) => match &circle_effect.area_effect.target_effect {
+                    AbilityTargetEffect::Negative(ane) => Some(ane),
+                    AbilityTargetEffect::Positive(..) => None,
                 },
                 None => None,
             },
@@ -5635,16 +5727,16 @@ pub enum AbilityRollType {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
-pub enum AbilityEffect {
+pub enum AbilityTargetEffect {
     Negative(AbilityNegativeEffect),
     Positive(AbilityPositiveEffect),
 }
 
-impl AbilityEffect {
+impl AbilityTargetEffect {
     pub fn defense_type(&self) -> Option<DefenseType> {
         match self {
-            AbilityEffect::Negative(e) => e.defense_type(),
-            AbilityEffect::Positive(..) => None,
+            AbilityTargetEffect::Negative(e) => e.defense_type(),
+            AbilityTargetEffect::Positive(..) => None,
         }
     }
 }
@@ -5778,9 +5870,9 @@ pub enum AbilityTarget {
         effect: AbilityPositiveEffect,
     },
 
-    Area {
+    Circle {
         range: Range,
-        area_effect: AreaEffect,
+        circle_effect: CircleEffect,
     },
 
     Projectile {
@@ -5789,12 +5881,17 @@ pub enum AbilityTarget {
         impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
     },
 
+    Line {
+        range: Range,
+        area_effect: AreaEffect,
+    },
+
     Movement {
         range: Range,
     },
 
     None {
-        self_area: Option<AreaEffect>,
+        self_circle: Option<CircleEffect>,
         self_effect: Option<AbilityPositiveEffect>,
         environment_effect: Option<EnvironmentEffect>,
     },
@@ -5807,10 +5904,48 @@ pub enum EnvironmentEffect {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ShapedEffect {
+    shape: AreaShape,
+    area_effect: AreaEffect,
+}
+
+impl ShapedEffect {
+    fn from_circle_effect(e: CircleEffect) -> Self {
+        Self {
+            shape: AreaShape::Circle(e.radius),
+            area_effect: e.area_effect,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircleEffect {
+    pub radius: Range,
+    pub area_effect: AreaEffect,
+}
+
+impl CircleEffect {
+    pub const fn new(
+        radius: Range,
+        acquisition: AreaTargetAcquisition,
+        target_effect: AbilityTargetEffect,
+        create_surface: Option<Surface>,
+    ) -> Self {
+        Self {
+            radius,
+            area_effect: AreaEffect {
+                acquisition,
+                target_effect,
+                create_surface,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct AreaEffect {
-    pub shape: AreaShape,
     pub acquisition: AreaTargetAcquisition,
-    pub effect: AbilityEffect,
+    pub target_effect: AbilityTargetEffect,
     pub create_surface: Option<Surface>,
 }
 
@@ -5838,10 +5973,7 @@ impl AbilityTarget {
         match self {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
-            AbilityTarget::Area { .. } => false,
-            AbilityTarget::Movement { .. } => false,
-            AbilityTarget::None { .. } => false,
-            AbilityTarget::Projectile { .. } => false,
+            _ => false,
         }
     }
 
@@ -5852,7 +5984,8 @@ impl AbilityTarget {
                 AbilityReach::MoveIntoMelee(range) => Some(*range),
             },
             AbilityTarget::Ally { range, .. } => Some(*range),
-            AbilityTarget::Area { range, .. } => Some(*range),
+            AbilityTarget::Circle { range, .. } => Some(*range),
+            AbilityTarget::Line { range, .. } => Some(*range),
             AbilityTarget::Movement { range } => Some(*range),
             AbilityTarget::None { .. } => None,
             AbilityTarget::Projectile { range, .. } => Some(*range),
@@ -5861,14 +5994,9 @@ impl AbilityTarget {
 
     fn base_radius(&self) -> Option<Range> {
         match self {
-            AbilityTarget::None { self_area, .. } => {
-                self_area
-                    .as_ref()
-                    .and_then(|area_effect| match area_effect.shape {
-                        AreaShape::Circle(range) => Some(range),
-                        AreaShape::Line => None,
-                    })
-            }
+            AbilityTarget::None { self_circle, .. } => self_circle
+                .as_ref()
+                .and_then(|circle_effect| Some(circle_effect.radius)),
             _ => None,
         }
     }
@@ -5903,9 +6031,14 @@ impl AbilityTarget {
         match self {
             AbilityTarget::Enemy { .. } => Some(AreaTargetAcquisition::Enemies),
             AbilityTarget::Ally { .. } => Some(AreaTargetAcquisition::Allies),
-            AbilityTarget::Area { area_effect, .. } => Some(area_effect.acquisition),
+            AbilityTarget::Circle { circle_effect, .. } => {
+                Some(circle_effect.area_effect.acquisition)
+            }
+            AbilityTarget::Line { area_effect, .. } => Some(area_effect.acquisition),
             AbilityTarget::Movement { .. } => None,
-            AbilityTarget::None { self_area, .. } => self_area.as_ref().map(|a| a.acquisition),
+            AbilityTarget::None { self_circle, .. } => {
+                self_circle.as_ref().map(|a| a.area_effect.acquisition)
+            }
             AbilityTarget::Projectile { impact_circle, .. } => impact_circle
                 .as_ref()
                 .map(|(_range, acquisition, _effect)| *acquisition),
@@ -7121,13 +7254,16 @@ impl Character {
         target_pos: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
+        target_within_range_squared(range.squared(), self.position.get(), target_pos)
+        /*
         match ability.target {
             AbilityTarget::Enemy { .. } | AbilityTarget::Ally { .. } => {
                 target_within_range_squared(range.squared(), self.position.get(), target_pos)
             }
-            AbilityTarget::Area { .. } => {
+            AbilityTarget::Circle { .. } => {
                 within_range_squared(range.squared(), self.position.get(), target_pos)
             }
+            AbilityTarget::Line { .. } =>
             AbilityTarget::Movement { .. } => {
                 within_range_squared(range.squared(), self.position.get(), target_pos)
             }
@@ -7135,11 +7271,10 @@ impl Character {
                 panic!("Ability that has no target always reaches. Shouldn't be checked")
             }
             AbilityTarget::Projectile {
-                range,
-                impact_effect,
-                impact_circle,
+                ..
             } => within_range_squared(range.squared(), self.position.get(), target_pos),
         }
+         */
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
@@ -8414,7 +8549,7 @@ pub struct Arrow {
     pub icon: EquipmentIconId,
     pub bonus_penetration: u32,
     pub on_damage_apply: Option<ApplyEffect>,
-    pub area_effect: Option<AreaEffect>,
+    pub circle_effect: Option<CircleEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
