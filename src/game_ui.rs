@@ -36,7 +36,7 @@ use crate::{
         AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId, Characters,
         CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval, DamageSource, GameEvent,
         GameOverType, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
-        TargetAcquisition, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
     drawing::draw_dashed_line_ex,
@@ -225,18 +225,17 @@ fn ability_usability_problem(
         return Some(UsabilityProblem::NotEnoughAp);
     }
 
-    let usability_check_reach_and_line_of_sight =
-        |target_pos: Position| -> Option<UsabilityProblem> {
-            if relevant_character.reaches_with_ability(ability, selected_enhancements, target_pos) {
-                if pathfind_grid.obstructed_line_of_sight(relevant_character.pos(), target_pos) {
-                    Some(UsabilityProblem::NoLineOfSight)
-                } else {
-                    None
-                }
+    let usability_check_reach_and_line_of_sight = |point: TargetPoint| -> Option<UsabilityProblem> {
+        if relevant_character.reaches_with_ability(ability, selected_enhancements, point) {
+            if pathfind_grid.obstructed_line_of_sight(relevant_character.pos(), point.pos()) {
+                Some(UsabilityProblem::NoLineOfSight)
             } else {
-                Some(UsabilityProblem::OutOfReach)
+                None
             }
-        };
+        } else {
+            Some(UsabilityProblem::OutOfReach)
+        }
+    };
 
     match target {
         ActionTarget::Character(target_id, movement) => {
@@ -246,7 +245,7 @@ fn ability_usability_problem(
                 }
             }
             let target_char = characters.get(*target_id);
-            usability_check_reach_and_line_of_sight(target_char.pos())
+            usability_check_reach_and_line_of_sight(TargetPoint::Char(target_char))
         }
 
         ActionTarget::Position(target_pos) => {
@@ -254,16 +253,16 @@ fn ability_usability_problem(
                 ability.target,
                 AbilityTarget::PositionCircle { .. } | AbilityTarget::Movement { .. }
             ));
-            usability_check_reach_and_line_of_sight(*target_pos)
+            usability_check_reach_and_line_of_sight(TargetPoint::Pos(*target_pos))
         }
 
         ActionTarget::Projectile(tl) => {
             assert!(matches!(ability.target, AbilityTarget::Projectile { .. }));
-            usability_check_reach_and_line_of_sight(tl.destination)
+            usability_check_reach_and_line_of_sight(TargetPoint::Pos(*&tl.destination))
         }
         ActionTarget::Line(tl) => {
             assert!(matches!(ability.target, AbilityTarget::Line { .. }));
-            usability_check_reach_and_line_of_sight(tl.destination)
+            usability_check_reach_and_line_of_sight(TargetPoint::Pos(*&tl.destination))
         }
 
         // There is a usability problem; we will not be able to call predict_ability for example,
@@ -349,10 +348,7 @@ impl ConfiguredAction {
                 target,
                 selected_enhancements,
             ),
-            ConfiguredAction::Move {
-                selected_movement_path,
-                ..
-            } => {
+            ConfiguredAction::Move { .. } => {
                 None
                 /*
                 if selected_movement_path.is_empty() {

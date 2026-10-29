@@ -1107,6 +1107,7 @@ fn build_settings(
     show_grid: Rc<Cell<bool>>,
     snap_to_grid: Rc<Cell<bool>>,
 ) -> Container {
+    let checkbox_size = (32.0, 32.0);
     Container {
         layout_dir: LayoutDirection::Vertical,
         align: Align::Center,
@@ -1134,8 +1135,9 @@ fn build_settings(
                                 WHITE,
                                 Some(simple_font.clone()),
                             )),
+                            Element::Empty(0.0, 0.0),
                             Element::Box(Box::new(Checkbox::new(
-                                (16.0, 16.0),
+                                checkbox_size,
                                 sound_player.clone(),
                                 snap_to_grid,
                             ))),
@@ -1153,8 +1155,9 @@ fn build_settings(
                                 WHITE,
                                 Some(simple_font.clone()),
                             )),
+                            Element::Empty(0.0, 0.0),
                             Element::Box(Box::new(Checkbox::new(
-                                (16.0, 16.0),
+                                checkbox_size,
                                 sound_player.clone(),
                                 show_grid,
                             ))),

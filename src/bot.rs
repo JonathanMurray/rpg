@@ -13,7 +13,7 @@ use crate::{
     core::{
         distance_between, sq_distance_between, Ability, AbilityId, AbilityTarget, Action,
         ActionReach, ActionTarget, Character, CharacterId, Condition, CoreGame, HandType,
-        OnAttackedReaction, OnHitReaction, Position, Range, TargetAcquisition,
+        OnAttackedReaction, OnHitReaction, Position, Range, TargetAcquisition, TargetPoint,
         CENTER_MELEE_RANGE_SQUARED,
     },
     data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
@@ -681,7 +681,7 @@ fn ability_reaches(
     pathfind_grid: &PathfindGrid,
 ) -> bool {
     println!("bot::ability_reaches()...");
-    bot.reaches_with_ability(ability, &[], target.pos())
+    bot.reaches_with_ability(ability, &[], TargetPoint::Char(target))
         && !pathfind_grid.obstructed_line_of_sight(bot.pos(), target.pos())
 }
 

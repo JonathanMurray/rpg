@@ -1515,7 +1515,11 @@ impl CoreGame {
                             }
                         }
 
-                        assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
+                        assert!(actor.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            TargetPoint::Char(target)
+                        ));
                         assert!(!game
                             .pathfind_grid
                             .obstructed_line_of_sight(actor.pos(), target.pos()));
@@ -1587,7 +1591,11 @@ impl CoreGame {
                     let target_pos = target_line.destination;
 
                     if let Some(game) = real_game {
-                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(actor.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            TargetPoint::Pos(target_pos)
+                        ));
                         assert!(
                             !game
                                 .pathfind_grid
@@ -1652,7 +1660,11 @@ impl CoreGame {
                     let target_pos = tl.destination;
 
                     if let Some(game) = real_game {
-                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(actor.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            TargetPoint::Pos(target_pos)
+                        ));
 
                         actor.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
@@ -1692,7 +1704,11 @@ impl CoreGame {
                     let target_pos = selected_target.unwrap_position();
 
                     if let Some(game) = real_game {
-                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(actor.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            TargetPoint::Pos(target_pos)
+                        ));
                         assert!(
                             !game
                                 .pathfind_grid
@@ -2372,7 +2388,7 @@ impl CoreGame {
             AreaShape::Circle(radius) => {
                 for other_char in characters.iter() {
                     if is_valid_area_target(actor, other_char, acquisition)
-                        && target_within_range_squared(
+                        && target_char_within_range_squared(
                             (f32::from(radius)).powf(2.0),
                             area_pos,
                             other_char.pos(),
@@ -6033,6 +6049,21 @@ impl Party {
     }
 }
 
+#[derive(Copy, Clone)]
+pub enum TargetPoint<'a> {
+    Char(&'a Character),
+    Pos(Position),
+}
+
+impl<'a> TargetPoint<'a> {
+    pub fn pos(&self) -> Position {
+        match self {
+            TargetPoint::Char(character) => character.pos(),
+            TargetPoint::Pos(pos) => *pos,
+        }
+    }
+}
+
 #[derive(Copy, Debug, Clone)]
 pub enum CharacterFacing {
     East,
@@ -6876,8 +6907,11 @@ impl Character {
 
         match weapon_range {
             WeaponRange::Melee => {
-                if target_within_range_squared(weapon_range.squared(), self.pos(), target_position)
-                {
+                if target_char_within_range_squared(
+                    weapon_range.squared(),
+                    self.pos(),
+                    target_position,
+                ) {
                     (weapon_range.into_range(), ActionReach::Yes)
                 } else {
                     (weapon_range.into_range(), ActionReach::No)
@@ -6889,12 +6923,12 @@ impl Character {
                     modifier += enhancement.range_bonus;
                 }
 
-                if target_within_range_squared(
+                if target_char_within_range_squared(
                     (range + modifier as f32).powf(2.0),
                     self.position.get(),
                     target_position,
                 ) {
-                    if target_within_range_squared(
+                    if target_char_within_range_squared(
                         Range::Melee.squared(),
                         self.pos(),
                         target_position,
@@ -6914,10 +6948,15 @@ impl Character {
         &self,
         ability: &Ability,
         enhancements: &[&AbilityEnhancement],
-        target_pos: Position,
+        target: TargetPoint,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
-        target_within_range_squared(range.squared(), self.pos(), target_pos)
+        match target {
+            TargetPoint::Char(character) => {
+                target_char_within_range_squared(range.squared(), self.pos(), character.pos())
+            }
+            TargetPoint::Pos(point) => within_range_squared(range.squared(), self.pos(), point),
+        }
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
@@ -7978,7 +8017,7 @@ pub fn is_target_within_shape(
     match shape {
         AreaShape::Circle(radius) => {
             //let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
-            target_within_range_squared((f32::from(radius)).powf(2.0), area_pos, target.pos())
+            target_char_within_range_squared((f32::from(radius)).powf(2.0), area_pos, target.pos())
         }
         AreaShape::Line => {
             if target.pos() == caster_pos {
@@ -7995,9 +8034,13 @@ pub fn within_range_squared(range_squared: f32, source: Position, destination: P
     sq_distance_between(source, destination) <= range_squared
 }
 
-pub fn target_within_range_squared(range_squared: f32, source: Position, target: Position) -> bool {
-    for x in target.0 - 1..=target.0 + 1 {
-        for y in target.1 - 1..=target.1 + 1 {
+pub fn target_char_within_range_squared(
+    range_squared: f32,
+    source: Position,
+    target_char_pos: Position,
+) -> bool {
+    for x in target_char_pos.0 - 1..=target_char_pos.0 + 1 {
+        for y in target_char_pos.1 - 1..=target_char_pos.1 + 1 {
             let distance_squared = (x - source.0).pow(2) + (y - source.1).pow(2);
             if distance_squared as f32 <= range_squared {
                 return true;

@@ -45,12 +45,13 @@ use crate::{
     },
     core::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
-        is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
-        within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
-        AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
-        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction,
-        Character, CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType,
-        Position, TargetAcquisition, TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        is_target_within_shape, is_valid_area_target, pushed_vector,
+        target_char_within_range_squared, within_range_squared, Ability, AbilityAnimation,
+        AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, ActionReach, ActionTarget,
+        ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
+        AttackEnhancementOnHitEffect, BaseAction, Character, CharacterFacing, CircleEffect,
+        Condition, Goodness, HitType, MovementType, Position, TargetAcquisition, TargetLine,
+        TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -3415,7 +3416,7 @@ impl GameGrid {
             self.draw_range_indicator(char_pos, range, indicator);
 
             for character in self.characters.values() {
-                if target_within_range_squared(range.squared(), char_pos, character.pos()) {
+                if target_char_within_range_squared(range.squared(), char_pos, character.pos()) {
                     // If the range indicator belongs to an ability with target acquisition, exclude invalid targets
                     if let Some(a) = acquisition {
                         if !is_valid_area_target(&self.characters[&char_id], character, a) {
@@ -3895,6 +3896,8 @@ impl GameGrid {
                         //println!("requires point target...");
                         //dbg!(&range_indicator);
                         if let Some((_char_id, range, _indicator, _acquisition)) = range_indicator {
+                            // TODO
+                            dbg!(range);
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -4771,8 +4774,6 @@ impl GameGrid {
         selected_enhancements: &[&AbilityEnhancement],
         pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
     ) {
-        dbg!(&pushed_targets);
-        println!("Acquiring pushed target from ability....");
         let active_char_pos = self.characters[&self.active_character_id].pos();
 
         let mut ability_knockback = ability.knockback();
@@ -4817,8 +4818,6 @@ impl GameGrid {
                 pushed_targets.push((*target_id, pushed_vec));
             }
         }
-
-        dbg!(&pushed_targets);
     }
 
     fn acquire_pushed_targets_from_attack(
@@ -5373,18 +5372,18 @@ impl GameGrid {
                     target,
                     ..
                 } => {
-                    let target_pos = match target {
+                    let target_point: Option<TargetPoint> = match target {
                         ActionTarget::Character(target_char_id, _movement) => {
-                            Some(self.characters[target_char_id].pos())
+                            Some(TargetPoint::Char(&self.characters[target_char_id]))
                         }
-                        ActionTarget::Position(pos) => Some(*pos),
-                        ActionTarget::Projectile(tl) => Some(tl.destination),
-                        ActionTarget::Line(tl) => Some(tl.destination),
+                        ActionTarget::Position(pos) => Some(TargetPoint::Pos(*pos)),
+                        ActionTarget::Projectile(tl) => Some(TargetPoint::Pos(tl.destination)),
+                        ActionTarget::Line(tl) => Some(TargetPoint::Pos(tl.destination)),
                         ActionTarget::None => {
                             let mut pos = None;
                             if let Some(hovered_id) = self.hovered_character {
                                 if ability.targets_single_character() {
-                                    pos = Some(self.characters[&hovered_id].pos())
+                                    pos = Some(TargetPoint::Char(&self.characters[&hovered_id]))
                                 }
                             }
                             pos
@@ -5393,11 +5392,11 @@ impl GameGrid {
 
                     let active_char = &self.characters[&self.active_character_id];
 
-                    if let Some(target_pos) = target_pos {
+                    if let Some(point) = target_point {
                         let indicator = if active_char.reaches_with_ability(
                             ability,
                             selected_enhancements,
-                            target_pos,
+                            point,
                         ) {
                             RangeIndicatorType::ActionTargetRange
                         } else {
@@ -6273,6 +6272,11 @@ impl GameGrid {
             animated,
         );
 
+        let crosshair_rotation = if animated {
+            oscillate_loop(1.0, 0.0, PI * 2.0)
+        } else {
+            0.0
+        };
         draw_rectangle_lines_ex(
             target_x,
             target_y,
@@ -6281,7 +6285,7 @@ impl GameGrid {
             4.0,
             DrawRectangleParams {
                 color: crosshair_color,
-                rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
+                rotation: crosshair_rotation,
                 offset: (0.5, 0.5).into(),
                 ..Default::default()
             },

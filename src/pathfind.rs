@@ -66,11 +66,11 @@ impl TerrainType {
 struct CacheKey {
     from: Position,
     range: f32,
-    target: Option<Target>,
+    target: Option<PathfindTarget>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
-pub struct Target {
+pub struct PathfindTarget {
     pos: Position,
     proximity_squared: f32,
 }
@@ -549,7 +549,7 @@ impl PathfindGrid {
             character_id,
             start,
             exploration_range,
-            Some(Target {
+            Some(PathfindTarget {
                 pos: target,
                 proximity_squared,
             }),
@@ -615,7 +615,7 @@ impl PathfindGrid {
         character_id: CharacterId,
         start: Position,
         range: f32,
-        target: Option<Target>,
+        target: Option<PathfindTarget>,
         traversal_type: TraversalType,
     ) -> Ref<'_, IndexMap<Position, ChartNode>> {
         /*
@@ -646,7 +646,7 @@ impl PathfindGrid {
             *self.cached_exploration_chart.borrow_mut() = Default::default();
             self.cached_unexplored.borrow_mut().clear();
         }
-        if let Some(Target {
+        if let Some(PathfindTarget {
             pos: target_pos,
             proximity_squared,
         }) = target
@@ -739,7 +739,7 @@ impl PathfindGrid {
                 }
             }
 
-            if let Some(Target {
+            if let Some(PathfindTarget {
                 pos: target_pos, ..
             }) = target
             {
@@ -766,7 +766,7 @@ impl PathfindGrid {
 
                     let mut should_explore_neighbor = true;
 
-                    if let Some(Target {
+                    if let Some(PathfindTarget {
                         pos: target_pos,
                         proximity_squared,
                     }) = target
@@ -806,7 +806,7 @@ impl PathfindGrid {
                 }
             }
 
-            if let Some(Target {
+            if let Some(PathfindTarget {
                 pos: target_pos,
                 proximity_squared,
             }) = target
