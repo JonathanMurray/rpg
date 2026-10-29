@@ -588,7 +588,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
     match &ability.target {
         AbilityTarget::Enemy {
             effect,
-            impact_circle: area,
+            circle: impact_circle,
             reach,
             environment_effect,
         } => {
@@ -602,14 +602,14 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 range.range_with_icon(),
                 def
             ));
-            describe_ability_neutral_effect(&effect, &mut t);
+            describe_ability_target_effect(&effect, &mut t);
 
-            if let Some((range, acquisition, effect)) = area {
+            if let Some(c) = impact_circle {
                 t.technical_description.push("".to_string());
-                let def = def_suffix(effect.defense_type());
+                let def = def_suffix(c.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
-                describe_ability_neutral_effect(&effect, &mut t);
+                describe_ability_target_effect(&c.area_effect.target_effect, &mut t);
             }
 
             if let Some(env_effect) = environment_effect {
@@ -620,7 +620,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         AbilityTarget::Ally { range, effect } => {
             t.technical_description
                 .push(format!("|<single_target>| {}|", range.range_with_icon()));
-            describe_ability_neutral_effect(effect, &mut t);
+            describe_ability_target_effect(effect, &mut t);
         }
 
         AbilityTarget::None {
@@ -631,7 +631,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             if let Some(effect) = self_effect {
                 t.technical_description
                     .push("|<single_target>| |<faded>(self):|".to_string());
-                describe_ability_neutral_effect(&effect, &mut t);
+                describe_ability_target_effect(&effect, &mut t);
             }
 
             if let Some(CircleEffect {
@@ -652,7 +652,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 let def = def_suffix(target_effect.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| {radius_str}{def}"));
-                describe_ability_neutral_effect(target_effect, &mut t);
+                describe_ability_target_effect(target_effect, &mut t);
 
                 if let Some(surface) = create_surface {
                     describe_create_surface(*surface, &mut t);
@@ -690,14 +690,14 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
                 range.range_with_icon(),
                 def
             ));
-            describe_ability_neutral_effect(&*impact_effect, &mut t);
+            describe_ability_target_effect(&*impact_effect, &mut t);
 
-            if let Some((range, acquisition, effect)) = impact_circle {
+            if let Some(c) = impact_circle {
                 t.technical_description.push("".to_string());
-                let def = def_suffix(effect.defense_type());
+                let def = def_suffix(c.defense_type());
                 t.technical_description
                     .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
-                describe_ability_neutral_effect(&effect, &mut t);
+                describe_ability_target_effect(&c.area_effect.target_effect, &mut t);
             }
         }
 
@@ -782,14 +782,14 @@ pub fn describe_area_effect(
     };
     line.push_str(&def);
     t.technical_description.push(line);
-    describe_ability_neutral_effect(&effect, t);
+    describe_ability_target_effect(&effect, t);
 
     if let Some(surface) = area_effect.create_surface {
         describe_create_surface(surface, t);
     }
 }
 
-fn describe_ability_neutral_effect(effect: &AbilityTargetEffect, t: &mut Tooltip) {
+fn describe_ability_target_effect(effect: &AbilityTargetEffect, t: &mut Tooltip) {
     match effect {
         AbilityTargetEffect::Spell(effect) => {
             if let Some(ability_dmg) = effect.damage {

@@ -3249,13 +3249,13 @@ impl GameGrid {
 
                     match &ability.target {
                         AbilityTarget::Enemy {
-                            impact_circle,
+                            circle: impact_circle,
                             reach,
                             ..
                         } => {
                             let mut area_radius = None;
-                            if let Some((radius, _acquisition, _effect)) = impact_circle {
-                                area_radius = Some(radius.plus_tenths(increased_radius_tenths));
+                            if let Some(c) = impact_circle {
+                                area_radius = Some(c.radius.plus_tenths(increased_radius_tenths));
                             }
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
@@ -3301,9 +3301,9 @@ impl GameGrid {
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
-                            let circle_radius = impact_circle.map(|(radius, _a, _e)| {
-                                radius.plus_tenths(increased_radius_tenths)
-                            });
+                            let circle_radius = impact_circle
+                                .as_ref()
+                                .map(|c| c.radius.plus_tenths(increased_radius_tenths));
 
                             MouseState::RequiresPointTarget {
                                 kind: PointTargetKind::Projectile { circle_radius },

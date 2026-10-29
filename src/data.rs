@@ -11,7 +11,7 @@ use crate::{
         EnvironmentEffect, EquipEffect, EquipmentRequirement, Fraction, HandType,
         OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
         OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellNeutralEffect, Trinket, Weapon, WeaponGrip, WeaponRange,
+        SpellEnhancementEffect, SpellTargetEffect, Trinket, Weapon, WeaponGrip, WeaponRange,
         WeaponType,
     },
     grid::ParticleShape,
@@ -658,9 +658,9 @@ pub const FIRE_ARROWS: Arrow = Arrow {
     circle_effect: Some(CircleEffect::new(
         Range::Melee,
         AreaTargetAcquisition::Everyone,
-        AbilityTargetEffect::Spell(SpellNeutralEffect {
+        AbilityTargetEffect::Spell(SpellTargetEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
         Some(Surface::Fire),
     )),
@@ -676,11 +676,11 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
     circle_effect: Some(CircleEffect::new(
         Range::Melee,
         AreaTargetAcquisition::Everyone,
-        AbilityTargetEffect::Spell(SpellNeutralEffect {
+        AbilityTargetEffect::Spell(SpellTargetEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             defense_type: Some(DefenseType::Toughness),
             on_hit: &[ApplyEffect::Pushed(2)],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
         None,
     )),
@@ -801,7 +801,7 @@ pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
         circle_effect: CircleEffect::new(
             Range::Melee,
             AreaTargetAcquisition::Everyone,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: None,
                 damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
                 on_hit: &[],
@@ -825,7 +825,7 @@ pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
     "Toxic grenade",
     AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::f32(13.5)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Fixed(3, DamageType::Regular)),
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -833,9 +833,9 @@ pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
                 stacks: None,
                 duration_rounds: Some(2),
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     COL_GREEN_3,
@@ -912,7 +912,7 @@ pub const SHIELD_BASH: Ability = Ability {
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -920,9 +920,9 @@ pub const SHIELD_BASH: Ability = Ability {
                 duration_rounds: Some(1),
                 stacks: None,
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: GRAY,
@@ -946,7 +946,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
 
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: &[
@@ -958,9 +958,9 @@ pub const ENEMY_TACKLE: Ability = Ability {
                 // Better keep this somewhat low. Critting while knocking into an obstacle can lead to crazy numbers.
                 ApplyEffect::Pushed(2),
             ],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: GRAY,
@@ -995,7 +995,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
             })),
             ..AbilityAttackEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: GRAY,
@@ -1342,7 +1342,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     target: AbilityTarget::Enemy {
         reach: AbilityReach::MoveIntoMelee(Range::f32(10.0)),
         effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect::default()),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: GRAY,
@@ -1390,7 +1390,7 @@ pub const EXECUTE: Ability = Ability {
             on_kill_apply_self: Some(ApplyEffect::GainActionPoints(2)),
             ..AbilityAttackEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: GRAY,
@@ -1418,7 +1418,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     target: AbilityTarget::None {
         self_circle: None,
 
-        self_effect: Some(AbilityTargetEffect::Spell(SpellNeutralEffect {
+        self_effect: Some(AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: None,
             damage: None,
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1500,7 +1500,7 @@ pub const SCREAM: Ability = Ability {
         self_circle: Some(CircleEffect::new(
             Range::of(7),
             AreaTargetAcquisition::Enemies,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Will),
 
                 on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1509,7 +1509,7 @@ pub const SCREAM: Ability = Ability {
                     duration_rounds: Some(1),
                 })],
 
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
             None,
         )),
@@ -1542,7 +1542,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::f32(12.5)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
 
             on_hit: &[
@@ -1557,9 +1557,9 @@ pub const SHACKLED_MIND: Ability = Ability {
                     duration_rounds: Some(2),
                 }),
             ],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     possible_enhancements: [
@@ -1633,13 +1633,13 @@ pub const MIND_BLAST: Ability = Ability {
     ],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::f32(13.5)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Fixed(4, DamageType::Regular)),
             on_hit: &[ApplyEffect::LoseActionPoints(1)],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: PURPLE,
@@ -1687,7 +1687,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
         circle_effect: CircleEffect::new(
             Range::f32(2.5),
             AreaTargetAcquisition::Enemies,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
                 on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1695,7 +1695,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
                     stacks: Some(1), //Some(5),
                     duration_rounds: None,
                 })],
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
             None,
         ),
@@ -1726,13 +1726,13 @@ pub const DRAUG_HAUNT: Ability = Ability {
 
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
-            ..SpellNeutralEffect::default()
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: Some((
+        circle: Some(CircleEffect::new(
             Range::of(4),
             AreaTargetAcquisition::Enemies,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
                 on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1740,8 +1740,9 @@ pub const DRAUG_HAUNT: Ability = Ability {
                     stacks: None,
                     duration_rounds: Some(1),
                 })],
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
+            None,
         )),
         environment_effect: None,
     },
@@ -1767,7 +1768,7 @@ pub const DRAUG_CLAW: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1775,9 +1776,9 @@ pub const DRAUG_CLAW: Ability = Ability {
                 stacks: None,
                 duration_rounds: Some(1),
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: PURPLE,
@@ -1802,7 +1803,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_circle: None,
-        self_effect: Some(AbilityTargetEffect::Spell(SpellNeutralEffect {
+        self_effect: Some(AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: None,
             damage: None,
             on_hit: &[ApplyEffect::Escape],
@@ -1831,7 +1832,7 @@ pub const HULDRA_INFECT: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1839,9 +1840,9 @@ pub const HULDRA_INFECT: Ability = Ability {
                 stacks: None,
                 duration_rounds: Some(1),
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
         reach: AbilityReach::Range(Range::f32(15.5)),
     },
@@ -1867,7 +1868,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::of(22)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
 
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -1875,9 +1876,9 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
                 stacks: None,
                 duration_rounds: Some(1),
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: PURPLE,
@@ -2080,7 +2081,7 @@ pub const INSPIRE: Ability = Ability {
 };
 
 const fn uncontested_spell_effect(apply: &'static [ApplyEffect]) -> AbilityTargetEffect {
-    AbilityTargetEffect::Spell(SpellNeutralEffect {
+    AbilityTargetEffect::Spell(SpellTargetEffect {
         defense_type: None,
         damage: None,
         on_hit: apply,
@@ -2240,9 +2241,9 @@ pub const SPIKE_TRAP: Ability = Ability {
         circle_effect: CircleEffect::new(
             Range::f32(3.5),
             AreaTargetAcquisition::Everyone,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(1, DamageType::Regular)),
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
             Some(Surface::Spikes),
         )
@@ -2368,18 +2369,19 @@ pub const FIREBALL: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::f32(12.5)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Fire)),
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: Some((
+        circle: Some(CircleEffect::new(
             Range::f32(3.5),
             AreaTargetAcquisition::Everyone,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
+            None,
         )),
         environment_effect: None,
     },
@@ -2413,18 +2415,19 @@ pub const FIRE_BOLT: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Projectile {
         range: Range::f32(12.5),
-        impact_effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        impact_effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Fire)),
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: Some((
+        impact_circle: Some(CircleEffect::new(
             Range::f32(1.5),
             AreaTargetAcquisition::Everyone,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
+            None
         )),
     },
     possible_enhancements: [
@@ -2457,20 +2460,21 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::f32(12.5)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: Some((
+        circle: Some(CircleEffect::new(
             Range::f32(3.5),
             AreaTargetAcquisition::Everyone,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(2, DamageType::Fire)),
 
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
+            None,
         )),
         environment_effect: None,
     },
@@ -2517,11 +2521,11 @@ pub const LIGHTNING_BOLT: Ability = Ability {
         range: Range::f32(12.0),
         area_effect: AreaEffect {
             acquisition: AreaTargetAcquisition::Everyone,
-            target_effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+            target_effect: AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(7, DamageType::Lightning)),
 
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
             create_surface: None,
         },
@@ -2557,9 +2561,9 @@ pub const KILL: Ability = Ability {
         self_circle: Some(CircleEffect::new(
             Range::of(50),
             AreaTargetAcquisition::Enemies,
-            AbilityTargetEffect::Spell(SpellNeutralEffect {
+            AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(99, DamageType::Regular)),
-                ..SpellNeutralEffect::default()
+                ..SpellTargetEffect::default()
             }),
             None,
         )),
@@ -2638,7 +2642,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     possible_enhancements: [Some(SEARING_LIGHT_BURN), None, None],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::of(9)),
-        effect: AbilityTargetEffect::Spell(SpellNeutralEffect {
+        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: &[ApplyEffect::Condition(ApplyCondition {
@@ -2646,9 +2650,9 @@ pub const SEARING_LIGHT: Ability = Ability {
                 stacks: None,
                 duration_rounds: Some(1),
             })],
-            ..SpellNeutralEffect::default()
+            ..SpellTargetEffect::default()
         }),
-        impact_circle: None,
+        circle: None,
         environment_effect: None,
     },
     animation_color: YELLOW,
@@ -2707,7 +2711,7 @@ const fn potion_ability(
         possible_enhancements: [None, None, None],
         target: AbilityTarget::None {
             self_circle: None,
-            self_effect: Some(AbilityTargetEffect::Spell(SpellNeutralEffect {
+            self_effect: Some(AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: None,
                 damage: None,
                 on_hit: apply,
