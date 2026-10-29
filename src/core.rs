@@ -1989,8 +1989,6 @@ impl CoreGame {
                     .apply_on_self_per_area_target_hit
                     .iter()
                     .copied()
-                    .flatten()
-                    .flatten()
                 {
                     if num_targets_hit > 0 {
                         apply_effect.multiply(num_targets_hit);
@@ -2323,7 +2321,7 @@ impl CoreGame {
                 } else {
                     e.target_on_hit
                 };
-                for effect in effects.iter().flatten().flatten().copied() {
+                for effect in effects.iter().copied() {
                     let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                         hit_type,
                         effect,
@@ -5327,8 +5325,7 @@ impl Ability {
                 ..
             } => self_area
                 .as_ref()
-                .map(|a| a.area_effect.target_effect.defense_type())
-                .flatten(),
+                .and_then(|a| a.area_effect.target_effect.defense_type()),
             AbilityTarget::Projectile { impact_effect, .. } => impact_effect.defense_type(),
         }
     }
@@ -5765,7 +5762,7 @@ pub struct AbilityEnhancement {
     pub spell_effect: Option<SpellEnhancementEffect>,
     pub attack_effect: Option<AttackEnhancementEffect>,
 
-    pub apply_on_self_per_area_target_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub apply_on_self_per_area_target_hit: &'static [ApplyEffect],
 }
 
 impl AbilityEnhancement {
@@ -5784,7 +5781,7 @@ impl AbilityEnhancement {
             stamina_cost: 0,
             spell_effect: None,
             attack_effect: None,
-            apply_on_self_per_area_target_hit: None,
+            apply_on_self_per_area_target_hit: &[],
         }
     }
 }
@@ -5868,9 +5865,8 @@ pub struct SpellEnhancementEffect {
     pub bonus_target_damage: u32,
     pub bonus_area_damage: u32,
     pub cast_twice: bool,
-    // TODO simplify to static slice
-    pub target_on_hit: Option<[Option<ApplyEffect>; 2]>,
-    pub area_on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub target_on_hit: &'static [ApplyEffect],
+    pub area_on_hit: &'static [ApplyEffect],
     pub area_create_surface: Option<Surface>,
     pub increased_range_tenths: u32,
     pub increased_radius_tenths: u32,
@@ -5885,8 +5881,8 @@ impl SpellEnhancementEffect {
             bonus_target_damage: 0,
             bonus_area_damage: 0,
             cast_twice: false,
-            target_on_hit: None,
-            area_on_hit: None,
+            target_on_hit: &[],
+            area_on_hit: &[],
             area_create_surface: None,
             increased_range_tenths: 0,
             increased_radius_tenths: 0,

@@ -390,12 +390,12 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
             ));
         }
 
-        for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
+        for apply_effect in effect.target_on_hit.iter() {
             t.technical_description
                 .push("|<single_target>|:".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
-        for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
+        for apply_effect in effect.area_on_hit.iter() {
             t.technical_description
                 .push("|<multi_target>| |<radius>|:".to_string());
             describe_apply_effect(*apply_effect, &mut t);
@@ -423,15 +423,10 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         describe_attack_enhancement_effect(&effect, &mut t);
     }
 
-    if enhancement.apply_on_self_per_area_target_hit.is_some() {
+    if !enhancement.apply_on_self_per_area_target_hit.is_empty() {
         t.technical_description
             .push("|<single_target>| self |<faded>(per target hit)|:".to_string());
-        for apply_effect in enhancement
-            .apply_on_self_per_area_target_hit
-            .iter()
-            .flatten()
-            .flatten()
-        {
+        for apply_effect in enhancement.apply_on_self_per_area_target_hit.iter() {
             describe_apply_effect(*apply_effect, &mut t);
         }
     }

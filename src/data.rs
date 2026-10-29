@@ -892,7 +892,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Extend,
     stamina_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([Some(ApplyEffect::Pushed(3)), None]),
+        target_on_hit: &[ApplyEffect::Pushed(3)],
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -1655,14 +1655,14 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
     icon: IconId::NecroticInfluence,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect::default()),
-    apply_on_self_per_area_target_hit: Some([
-        Some(ApplyEffect::GainHealth(1)),
-        Some(ApplyEffect::Condition(ApplyCondition {
+    apply_on_self_per_area_target_hit: &[
+        ApplyEffect::GainHealth(1),
+        ApplyEffect::Condition(ApplyCondition {
             condition: Condition::ArcaneSurge,
             stacks: Some(1),
             duration_rounds: None,
-        })),
-    ]),
+        }),
+    ],
     ..AbilityEnhancement::default()
 };
 pub const INFLICT_WOUNDS: Ability = Ability {
@@ -1935,7 +1935,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Energize,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([Some(ApplyEffect::GainStamina(4)), None]),
+        target_on_hit: &[ApplyEffect::GainStamina(4)],
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -2028,22 +2028,16 @@ pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
     name: "Ruthless",
     description: "Also make targets |<keyword>Ruthless|",
     icon: IconId::Rage,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([
-            Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Ruthless,
-                stacks: None,
-                duration_rounds: Some(2),
-            })),
-            None,
-        ]),
+        target_on_hit: &[ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::Ruthless,
+            stacks: None,
+            duration_rounds: Some(2),
+        })],
         ..SpellEnhancementEffect::default()
     }),
-    attack_effect: None,
-    apply_on_self_per_area_target_hit: None,
+    ..AbilityEnhancement::default()
 };
 
 pub const INSPIRE: Ability = Ability {
@@ -2610,14 +2604,11 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Inferno,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([
-            Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Burning,
-                stacks: Some(2),
-                duration_rounds: None,
-            })),
-            None,
-        ]),
+        target_on_hit: &[ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::Burning,
+            stacks: Some(2),
+            duration_rounds: None,
+        })],
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()

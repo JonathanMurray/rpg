@@ -467,17 +467,6 @@
       "name": null
     },
     {
-      "type_": "Clara",
-      "pos": [
-        33,
-        12
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "SkeletonBoss",
       "pos": [
         28,
@@ -525,7 +514,7 @@
       "type_": "Alice",
       "pos": [
         34,
-        7
+        10
       ],
       "health": null,
       "main_hand": null,

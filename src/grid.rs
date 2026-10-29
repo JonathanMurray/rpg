@@ -48,9 +48,9 @@ use crate::{
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
         within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
-        AreaShape, AttackAction, AttackEnhancement, BaseAction, Character, CharacterFacing,
-        CircleEffect, Condition, Goodness, HitType, MovementType, Position, TargetAcquisition,
-        TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction,
+        Character, CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType,
+        Position, TargetAcquisition, TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -3387,6 +3387,7 @@ impl GameGrid {
         let mut detail_labelled_char_ids: HashSet<CharacterId> = Default::default();
 
         if !pushed_targets.is_empty() {
+            self.draw_occupation(OccupationFilter::Terrain);
             should_highlight_character_occupations = true;
         }
 
@@ -4770,29 +4771,37 @@ impl GameGrid {
         selected_enhancements: &[&AbilityEnhancement],
         pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
     ) {
+        dbg!(&pushed_targets);
+        println!("Acquiring pushed target from ability....");
         let active_char_pos = self.characters[&self.active_character_id].pos();
 
         let mut ability_knockback = ability.knockback();
 
         for enhancement in selected_enhancements {
+            dbg!(enhancement);
             if let Some(e) = enhancement.spell_effect {
-                for apply_effect in e.target_on_hit.iter().flatten().flatten() {
+                for apply_effect in e.target_on_hit.iter() {
                     if let ApplyEffect::Pushed(amount) = *apply_effect {
                         ability_knockback = Some(amount);
                     }
                 }
             }
             if let Some(e) = enhancement.attack_effect {
-                if let Some(apply_effect) = e.on_target {
-                    if let ApplyEffect::Pushed(amount) = apply_effect {
-                        ability_knockback = Some(amount);
-                    }
+                if let Some(ApplyEffect::Pushed(amount)) = e.on_target {
+                    ability_knockback = Some(amount);
+                }
+                if let Some(AttackEnhancementOnHitEffect::Target(
+                    _def,
+                    ApplyEffect::Pushed(amount),
+                )) = e.on_damage_effect
+                {
+                    ability_knockback = Some(amount);
                 }
             }
         }
 
         if let Some(base_push_amount) = ability_knockback {
-            self.draw_occupation(OccupationFilter::Terrain);
+            //self.draw_occupation(OccupationFilter::Terrain);
 
             // We assume that any character with a target effect preview is affected by the ability push
             for target_id in self.target_effect_previews.keys() {
@@ -4808,6 +4817,8 @@ impl GameGrid {
                 pushed_targets.push((*target_id, pushed_vec));
             }
         }
+
+        dbg!(&pushed_targets);
     }
 
     fn acquire_pushed_targets_from_attack(
