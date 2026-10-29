@@ -196,7 +196,7 @@ pub async fn run_transition_loop(
                             let ability: &'static Ability = char
                                 .known_abilities()
                                 .iter()
-                                .filter(|a| a.id == enhancement.ability_id)
+                                .filter(|a| a.possible_enhancements.contains(&enhancement))
                                 .next()
                                 .unwrap();
                             Some(ButtonAction::Action(BaseAction::UseAbility(ability)))

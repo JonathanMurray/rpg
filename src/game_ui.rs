@@ -36,7 +36,7 @@ use crate::{
         AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId, Characters,
         CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval, DamageSource, GameEvent,
         GameOverType, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
-        TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        TargetAcquisition, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
     drawing::draw_dashed_line_ex,
@@ -166,7 +166,7 @@ pub enum ConfiguredAction {
     },
     UseAbility {
         ability: &'static Ability,
-        selected_enhancements: Vec<AbilityEnhancement>,
+        selected_enhancements: Vec<&'static AbilityEnhancement>,
         target: ActionTarget,
         equipment_idx_to_consume: Option<usize>,
     },
@@ -218,7 +218,7 @@ fn ability_usability_problem(
     pathfind_grid: &PathfindGrid,
     ability: &'static Ability,
     target: &ActionTarget,
-    selected_enhancements: &[AbilityEnhancement],
+    selected_enhancements: &[&AbilityEnhancement],
 ) -> Option<UsabilityProblem> {
     if !relevant_character.can_use_ability(ability) {
         // TODO There could be other explanations!
@@ -270,8 +270,10 @@ fn ability_usability_problem(
         // but we don't want the usability problem to be shown as a warning text above the activity popup
         ActionTarget::None => match ability.target {
             AbilityTarget::None { .. } => None,
-            AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
-            AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
+            AbilityTarget::Character { acquisition, .. } => match acquisition {
+                TargetAcquisition::Enemies => Some(UsabilityProblem::SelectEnemy),
+                _ => Some(UsabilityProblem::SelectAlly),
+            },
             AbilityTarget::PositionCircle { .. }
             | AbilityTarget::Line { .. }
             | AbilityTarget::Projectile { .. } => Some(UsabilityProblem::SelectArea),
@@ -3000,7 +3002,6 @@ fn build_character_ui(
                 let enhancement_buttons: Vec<Rc<ActionButton>> = ability
                     .possible_enhancements
                     .iter()
-                    .filter_map(|maybe_enhancement| *maybe_enhancement)
                     .filter_map(|enhancement| {
                         if character.knows_ability_enhancement(enhancement) {
                             let enhancement_btn = Rc::new(new_button(

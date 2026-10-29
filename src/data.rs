@@ -4,15 +4,14 @@ use crate::{
     core::{
         Ability, AbilityAnimation, AbilityAttackEffect, AbilityChargeFx, AbilityDamage,
         AbilityEnhancement, AbilityId, AbilityReach, AbilityRollType, AbilityTarget,
-        AbilityTargetEffect, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
-        AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
-        AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
-        CircleEffect, Circumstance, Condition, Consumable, DamageType, DefenseType,
-        EnvironmentEffect, EquipEffect, EquipmentRequirement, Fraction, HandType,
+        AbilityTargetEffect, ApplyCondition, ApplyEffect, AreaEffect, AreaShape, ArmorPiece, Arrow,
+        AttackAttribute, AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect,
+        AttackHitEffect, AttackType, CircleEffect, Circumstance, Condition, Consumable, DamageType,
+        DefenseType, EnvironmentEffect, EquipEffect, EquipmentRequirement, Fraction, HandType,
         OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
         OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellTargetEffect, Trinket, Weapon, WeaponGrip, WeaponRange,
-        WeaponType,
+        SpellEnhancementEffect, SpellTargetEffect, TargetAcquisition, Trinket, Weapon, WeaponGrip,
+        WeaponRange, WeaponType,
     },
     grid::ParticleShape,
     pathfind::Surface,
@@ -657,7 +656,7 @@ pub const FIRE_ARROWS: Arrow = Arrow {
     on_damage_apply: None,
     circle_effect: Some(CircleEffect::new(
         Range::Melee,
-        AreaTargetAcquisition::Everyone,
+        TargetAcquisition::Any,
         AbilityTargetEffect::Spell(SpellTargetEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             ..SpellTargetEffect::default()
@@ -675,7 +674,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
 
     circle_effect: Some(CircleEffect::new(
         Range::Melee,
-        AreaTargetAcquisition::Everyone,
+        TargetAcquisition::Any,
         AbilityTargetEffect::Spell(SpellTargetEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             defense_type: Some(DefenseType::Toughness),
@@ -690,7 +689,7 @@ pub const ARCANE_RING: Trinket = Trinket {
     name: "Arcane ring",
     sprite: None,
     equip: EquipEffect {
-        bonus_spell_modifier: 2,
+        bonus_spell_modifier: 3,
         ..EquipEffect::default()
     },
     icon: EquipmentIconId::ArcaneRing,
@@ -700,7 +699,7 @@ pub const NECROTIC_BAND: Trinket = Trinket {
     name: "Necrotic band",
     sprite: None,
     equip: EquipEffect {
-        heal_on_kill: 1,
+        heal_on_kill: 2,
         ..EquipEffect::default()
     },
     icon: EquipmentIconId::NecroticBand,
@@ -721,6 +720,7 @@ pub const DRAUG_NECKLACE: Trinket = Trinket {
     name: "Draug necklace",
     sprite: None,
     equip: EquipEffect {
+        // TODO: upon killing or critting a bleeding target, gain some health
         attack_advantage_against_bleeding_target: true,
         ..EquipEffect::default()
     },
@@ -748,7 +748,7 @@ pub const ASSASSINS_VIAL: Trinket = Trinket {
         on_attack_damage_apply: Some(ApplyEffect::Condition(ApplyCondition {
             condition: Condition::Poisoned,
             stacks: None,
-            duration_rounds: Some(2),
+            duration_rounds: Some(3),
         })),
         ..EquipEffect::default()
     },
@@ -800,7 +800,7 @@ pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
         range: Range::Tenths(135),
         circle_effect: CircleEffect::new(
             Range::Melee,
-            AreaTargetAcquisition::Everyone,
+            TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: None,
                 damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
@@ -823,7 +823,8 @@ pub const TOXIC_GRENADE: Consumable = Consumable {
 pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Toxic grenade",
-    AbilityTarget::Enemy {
+    AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(13.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
@@ -859,7 +860,7 @@ const fn grenade_ability(
         requirement: None,
 
         roll: Some(AbilityRollType::Spell),
-        possible_enhancements: [None, None, None],
+        possible_enhancements: &[],
         target: target,
         animation_color: color,
         animation: AbilityAnimation::Throw(color),
@@ -885,7 +886,6 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 };
 
 pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::ShieldBash,
     name: "Knockback",
     description: "|<keyword>Push| the target",
     // TODO: unique icon
@@ -907,10 +907,11 @@ pub const SHIELD_BASH: Ability = Ability {
     stamina_cost: 1,
     mana_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
-    possible_enhancements: [Some(SHIELD_BASH_KNOCKBACK), None, None],
+    possible_enhancements: &[&SHIELD_BASH_KNOCKBACK],
 
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -942,9 +943,10 @@ pub const ENEMY_TACKLE: Ability = Ability {
     stamina_cost: 0,
     mana_cost: 0,
     requirement: None,
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
 
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -981,10 +983,11 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
     stamina_cost: 0,
     mana_cost: 0,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect {
             override_weapon_damage: Some(2),
@@ -1226,7 +1229,6 @@ pub const RAGE: OnHitReaction = OnHitReaction {
 };
 
 pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::SweepAttack,
     name: "Precise",
     description: "Increase your precision",
     icon: IconId::Precision,
@@ -1238,7 +1240,6 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
     ..AbilityEnhancement::default()
 };
 pub const SWEEP_ATTACK_PUSH: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::SweepAttack,
     name: "Push",
     description: "|<keyword>Push| targets away from you",
     icon: IconId::Extend,
@@ -1265,11 +1266,11 @@ pub const SWEEP_ATTACK: Ability = Ability {
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
-    possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), Some(SWEEP_ATTACK_PUSH), None],
+    possible_enhancements: &[&SWEEP_ATTACK_PRECISE, &SWEEP_ATTACK_PUSH],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::f32(2.5),
-            AreaTargetAcquisition::Enemies,
+            TargetAcquisition::Enemies,
             AbilityTargetEffect::PerformAttack(AbilityAttackEffect {
                 damage_delta: -1,
                 ..AbilityAttackEffect::default()
@@ -1290,7 +1291,6 @@ pub const SWEEP_ATTACK: Ability = Ability {
 };
 
 pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::LungeAttack,
     name: "Heavy impact",
     description: "",
     icon: IconId::CrushingStrike,
@@ -1305,7 +1305,6 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     ..AbilityEnhancement::default()
 };
 pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::LungeAttack,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
@@ -1334,12 +1333,9 @@ pub const LUNGE_ATTACK: Ability = Ability {
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
-    possible_enhancements: [
-        Some(LUNGE_ATTACK_HEAVY_IMPACT),
-        Some(LUNGE_ATTACK_REACH),
-        None,
-    ],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[&LUNGE_ATTACK_HEAVY_IMPACT, &LUNGE_ATTACK_REACH],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::MoveIntoMelee(Range::f32(10.0)),
         effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect::default()),
         circle: None,
@@ -1356,7 +1352,6 @@ pub const LUNGE_ATTACK: Ability = Ability {
 };
 
 pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Execute,
     name: "Bloodlust",
     description: "Also gain |<keyword>Ferocity| if it kills",
     icon: IconId::Rage,
@@ -1383,8 +1378,9 @@ pub const EXECUTE: Ability = Ability {
     stamina_cost: 2,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
     roll: Some(AbilityRollType::RollDuringAttack(1)),
-    possible_enhancements: [Some(EXECUTE_BLOODLUST), None, None],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[&EXECUTE_BLOODLUST],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect {
             on_kill_apply_self: Some(ApplyEffect::GainActionPoints(2)),
@@ -1414,7 +1410,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     stamina_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
     roll: None,
-    possible_enhancements: [None; 3],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
 
@@ -1449,7 +1445,7 @@ pub const BRACE: Ability = Ability {
     stamina_cost: 1,
     requirement: Some(EquipmentRequirement::Shield),
     roll: None,
-    possible_enhancements: [None; 3],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
         self_effect: Some(uncontested_spell_effect(&[ApplyEffect::Condition(
@@ -1472,7 +1468,6 @@ pub const BRACE: Ability = Ability {
 };
 
 pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Scream,
     name: "Shriek",
     description: "Increased range",
     icon: IconId::Banshee,
@@ -1499,7 +1494,7 @@ pub const SCREAM: Ability = Ability {
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::of(7),
-            AreaTargetAcquisition::Enemies,
+            TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Will),
 
@@ -1516,7 +1511,7 @@ pub const SCREAM: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    possible_enhancements: [Some(SCREAM_SHRIEK), None, None],
+    possible_enhancements: &[&SCREAM_SHRIEK],
 
     animation_color: BLUE,
     animation: AbilityAnimation::CastSpell,
@@ -1540,7 +1535,8 @@ pub const SHACKLED_MIND: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
@@ -1562,9 +1558,9 @@ pub const SHACKLED_MIND: Ability = Ability {
         circle: None,
         environment_effect: None,
     },
-    possible_enhancements: [
+    possible_enhancements: &[],
+    /*
         Some(AbilityEnhancement {
-            ability_id: AbilityId::ShackledMind,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
@@ -1577,7 +1573,6 @@ pub const SHACKLED_MIND: Ability = Ability {
             ..AbilityEnhancement::default()
         }),
         Some(AbilityEnhancement {
-            ability_id: AbilityId::ShackledMind,
             name: "Focus",
             description: "",
             icon: IconId::SpellAdvantage,
@@ -1591,7 +1586,7 @@ pub const SHACKLED_MIND: Ability = Ability {
         }),
         None,
     ],
-
+     */
     animation_color: Color::new(0.6, 0.3, 0.8, 1.00),
     animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1614,9 +1609,9 @@ pub const MIND_BLAST: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [
+    possible_enhancements: &[],
+    /*
         Some(AbilityEnhancement {
-            ability_id: AbilityId::MindBlast,
             name: "Dualcast",
             description: "Spell is cast twice",
             icon: IconId::Dualcast,
@@ -1631,7 +1626,9 @@ pub const MIND_BLAST: Ability = Ability {
         None,
         None,
     ],
-    target: AbilityTarget::Enemy {
+     */
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(13.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
@@ -1653,7 +1650,6 @@ pub const MIND_BLAST: Ability = Ability {
 };
 
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::InflictWounds,
     name: "Necrotic influence",
     description: "Heal and grow stronger for each affected target",
     icon: IconId::NecroticInfluence,
@@ -1681,12 +1677,12 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
+    possible_enhancements: &[&INFLICT_WOUNDS_NECROTIC_INFLUENCE],
     target: AbilityTarget::PositionCircle {
         range: Range::f32(7.5),
         circle_effect: CircleEffect::new(
             Range::f32(2.5),
-            AreaTargetAcquisition::Enemies,
+            TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
@@ -1722,16 +1718,17 @@ pub const DRAUG_HAUNT: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
 
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             ..SpellTargetEffect::default()
         }),
         circle: Some(CircleEffect::new(
             Range::of(4),
-            AreaTargetAcquisition::Enemies,
+            TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
@@ -1765,8 +1762,9 @@ pub const DRAUG_CLAW: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
@@ -1800,7 +1798,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     requirement: None,
 
     roll: None,
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
         self_effect: Some(AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -1830,8 +1828,9 @@ pub const HULDRA_INFECT: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
@@ -1865,8 +1864,9 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::of(22)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
@@ -1900,18 +1900,18 @@ pub static HULDRA_HEAL: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Ally {
-        range: Range::f32(15.5),
-        effect: uncontested_spell_effect(&[
+    target: ally_spell_target(
+        Range::f32(15.5),
+        &[
             ApplyEffect::GainHealth(8),
             ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Protected,
                 stacks: Some(6),
                 duration_rounds: Some(1),
             }),
-        ]),
-    },
-    possible_enhancements: [None, None, None],
+        ],
+    ),
+    possible_enhancements: &[],
     animation_color: LIME,
     animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1919,8 +1919,17 @@ pub static HULDRA_HEAL: Ability = Ability {
     charge_fx: None,
 };
 
+const fn ally_spell_target(range: Range, apply: &'static [ApplyEffect]) -> AbilityTarget {
+    AbilityTarget::Character {
+        acquisition: TargetAcquisition::Allies,
+        reach: AbilityReach::Range(range),
+        effect: uncontested_spell_effect(apply),
+        circle: None,
+        environment_effect: None,
+    }
+}
+
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Bless,
     name: "Energize",
     description: "Also restore |<value>4| |<stamina>| stamina",
     icon: IconId::Energize,
@@ -1939,14 +1948,13 @@ pub const BLESS: Ability = Ability {
         "|<keyword>Protect| an ally from the next attack, and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Bless,
     action_point_cost: 2,
-    mana_cost: 2,
+    mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Ally {
-        range: Range::f32(9.5),
-        effect: uncontested_spell_effect(&[
+    target: ally_spell_target(Range::f32(9.5),
+        &[
                 ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
                     stacks: Some(3),
@@ -1959,24 +1967,8 @@ pub const BLESS: Ability = Ability {
                     condition: Condition::Poisoned,
                 },
             ]),
-    },
-    possible_enhancements: [
-        Some(AbilityEnhancement {
-            ability_id: AbilityId::Bless,
-            name: "Reach",
-            description: "",
-            icon: IconId::Extend,
-            mana_cost: 1,
-            spell_effect: Some(SpellEnhancementEffect {
-                increased_range_tenths: 60,
-                ..SpellEnhancementEffect::default()
-            }),
-            ..AbilityEnhancement::default()
-        }),
-        // TODO add enhancement that heals over time (1 per round for 3 turns?)
-        Some(HEAL_ENERGIZE),
-        None,
-    ],
+            // TODO add enhancement that heals over time (1 per round for 3 turns?)
+    possible_enhancements: &[&BLESS_REACH, &HEAL_ENERGIZE],
 
     animation_color: GREEN,
     animation: AbilityAnimation::CastSpell,
@@ -1986,6 +1978,18 @@ pub const BLESS: Ability = Ability {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
     }),
+};
+
+pub const BLESS_REACH: AbilityEnhancement = AbilityEnhancement {
+    name: "Reach",
+    description: "",
+    icon: IconId::Extend,
+    mana_cost: 1,
+    spell_effect: Some(SpellEnhancementEffect {
+        increased_range_tenths: 60,
+        ..SpellEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
 };
 
 pub const HASTE: Ability = Ability {
@@ -2000,15 +2004,15 @@ pub const HASTE: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Ally {
-        range: Range::f32(9.5),
-        effect: uncontested_spell_effect(&[ApplyEffect::Condition(ApplyCondition {
+    target: ally_spell_target(
+        Range::f32(9.5),
+        &[ApplyEffect::Condition(ApplyCondition {
             condition: Condition::Hastened,
             stacks: None,
             duration_rounds: Some(4),
-        })]),
-    },
-    possible_enhancements: [None, None, None],
+        })],
+    ),
+    possible_enhancements: &[],
 
     animation_color: GREEN,
     animation: AbilityAnimation::CastSpell,
@@ -2021,7 +2025,6 @@ pub const HASTE: Ability = Ability {
 };
 
 pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Inspire,
     name: "Ruthless",
     description: "Also make targets |<keyword>Ruthless|",
     icon: IconId::Rage,
@@ -2055,11 +2058,11 @@ pub const INSPIRE: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [Some(INSPIRE_RUTHLESS), None, None],
+    possible_enhancements: &[&INSPIRE_RUTHLESS],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::f32(12.5),
-            AreaTargetAcquisition::Allies,
+            TargetAcquisition::Allies,
             uncontested_spell_effect(&[ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Inspired,
                 stacks: None,
@@ -2101,11 +2104,11 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::f32(12.5),
-            AreaTargetAcquisition::Allies,
+            TargetAcquisition::Allies,
             uncontested_spell_effect(&[ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Inspired,
                 stacks: None,
@@ -2135,11 +2138,11 @@ pub const HEALING_NOVA: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::of(12),
-            AreaTargetAcquisition::Allies,
+            TargetAcquisition::Allies,
             uncontested_spell_effect(&[ApplyEffect::GainHealth(1)]),
             None,
         )),
@@ -2168,7 +2171,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
         self_effect: Some(uncontested_spell_effect(&[
@@ -2200,7 +2203,7 @@ pub const SELF_HEAL: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
         self_effect: Some(uncontested_spell_effect(&[
@@ -2234,13 +2237,13 @@ pub const SPIKE_TRAP: Ability = Ability {
     stamina_cost: 2,
     requirement: None,
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
 
     target: AbilityTarget::PositionCircle {
         range: Range::f32(6.5),
         circle_effect: CircleEffect::new(
             Range::f32(3.5),
-            AreaTargetAcquisition::Everyone,
+            TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(1, DamageType::Regular)),
                 ..SpellTargetEffect::default()
@@ -2270,7 +2273,7 @@ pub const DASH: Ability = Ability {
     stamina_cost: 2,
     requirement: None,
     roll: None,
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
     target: AbilityTarget::Movement {
         range: Range::f32(8.0),
     },
@@ -2293,12 +2296,12 @@ pub const PIERCING_SHOT: Ability = Ability {
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Ranged)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: &[],
 
     target: AbilityTarget::Line {
         range: Range::f32(15.5),
         area_effect: AreaEffect {
-            acquisition: AreaTargetAcquisition::Enemies,
+            acquisition: TargetAcquisition::Enemies,
             target_effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect {
                 damage_penalty_per_consecutive_target: 1,
                 ..AbilityAttackEffect::default()
@@ -2318,7 +2321,6 @@ pub const PIERCING_SHOT: Ability = Ability {
 };
 
 pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireball,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
@@ -2331,7 +2333,6 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
 };
 
 pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireball,
     name: "Massive",
     description: "",
     icon: IconId::Radius,
@@ -2343,7 +2344,6 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     ..AbilityEnhancement::default()
 };
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireball,
     name: "Inferno",
     description: "",
     icon: IconId::Inferno,
@@ -2367,7 +2367,8 @@ pub const FIREBALL: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
@@ -2376,7 +2377,7 @@ pub const FIREBALL: Ability = Ability {
         }),
         circle: Some(CircleEffect::new(
             Range::f32(3.5),
-            AreaTargetAcquisition::Everyone,
+            TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
                 ..SpellTargetEffect::default()
@@ -2385,11 +2386,7 @@ pub const FIREBALL: Ability = Ability {
         )),
         environment_effect: None,
     },
-    possible_enhancements: [
-        Some(FIREBALL_REACH),
-        Some(FIREBALL_MASSIVE),
-        Some(FIREBALL_INFERNO),
-    ],
+    possible_enhancements: &[&FIREBALL_REACH, &FIREBALL_MASSIVE, &FIREBALL_INFERNO],
 
     animation_color: RED,
     animation: AbilityAnimation::CastSpell,
@@ -2407,8 +2404,8 @@ pub const FIRE_BOLT: Ability = Ability {
     speech: "",
     description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first enemy hit, and |<value>4| to its surroundings",
     icon: IconId::Fireball,
-    action_point_cost: 0,
-    mana_cost: 0,
+    action_point_cost: 3,
+    mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
 
@@ -2422,7 +2419,7 @@ pub const FIRE_BOLT: Ability = Ability {
         }),
         impact_circle: Some(CircleEffect::new(
             Range::f32(1.5),
-            AreaTargetAcquisition::Everyone,
+            TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
                 ..SpellTargetEffect::default()
@@ -2430,10 +2427,10 @@ pub const FIRE_BOLT: Ability = Ability {
             None
         )),
     },
-    possible_enhancements: [
-        Some(FIREBALL_REACH),
-        Some(FIREBALL_MASSIVE),
-        Some(FIREBALL_INFERNO),
+    possible_enhancements: &[
+        &FIREBALL_REACH,
+        &FIREBALL_MASSIVE,
+&        FIREBALL_INFERNO,
     ],
 
     animation_color: RED,
@@ -2458,7 +2455,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: AbilityTarget::Enemy {
+    target: AbilityTarget::Character {acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
@@ -2467,7 +2464,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
         }),
         circle: Some(CircleEffect::new(
             Range::f32(3.5),
-            AreaTargetAcquisition::Everyone,
+            TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(2, DamageType::Fire)),
@@ -2478,7 +2475,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
         )),
         environment_effect: None,
     },
-    possible_enhancements: [None; 3],
+    possible_enhancements: &[],
 
     animation_color: RED,
     animation: AbilityAnimation::CastSpell,
@@ -2491,7 +2488,6 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
 };
 
 pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::LightningBolt,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
@@ -2520,7 +2516,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     target: AbilityTarget::Line {
         range: Range::f32(12.0),
         area_effect: AreaEffect {
-            acquisition: AreaTargetAcquisition::Everyone,
+            acquisition: TargetAcquisition::Any,
             target_effect: AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(7, DamageType::Lightning)),
@@ -2531,7 +2527,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
         },
     },
 
-    possible_enhancements: [Some(LIGHTNING_BOLT_REACH), None, None],
+    possible_enhancements: &[&LIGHTNING_BOLT_REACH],
 
     // TODO: unique animation/sound
     animation_color: YELLOW,
@@ -2556,11 +2552,11 @@ pub const KILL: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None; 3],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::of(50),
-            AreaTargetAcquisition::Enemies,
+            TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 damage: Some(AbilityDamage::Fixed(99, DamageType::Regular)),
                 ..SpellTargetEffect::default()
@@ -2592,7 +2588,7 @@ pub const KILL_SELF: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None; 3],
+    possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
         self_effect: Some(uncontested_spell_effect(&[ApplyEffect::LoseHealth(99)])),
@@ -2609,7 +2605,6 @@ pub const KILL_SELF: Ability = Ability {
 };
 
 pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::SearingLight,
     name: "Burn",
     description: "",
     icon: IconId::Inferno,
@@ -2639,8 +2634,9 @@ pub const SEARING_LIGHT: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [Some(SEARING_LIGHT_BURN), None, None],
-    target: AbilityTarget::Enemy {
+    possible_enhancements: &[&SEARING_LIGHT_BURN],
+    target: AbilityTarget::Character {
+        acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::of(9)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -2708,7 +2704,7 @@ const fn potion_ability(
         requirement: None,
 
         roll: None,
-        possible_enhancements: [None, None, None],
+        possible_enhancements: &[],
         target: AbilityTarget::None {
             self_circle: None,
             self_effect: Some(AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -2763,7 +2759,7 @@ pub const ARCANE_POTION: Consumable = Consumable {
         "Arcane potion",
         &[ApplyEffect::Condition(ApplyCondition {
             condition: Condition::ArcaneSurge,
-            stacks: Some(3),
+            stacks: Some(5),
             duration_rounds: None,
         })],
     ),

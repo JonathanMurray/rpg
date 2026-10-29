@@ -13,7 +13,8 @@ use crate::{
     core::{
         distance_between, sq_distance_between, Ability, AbilityId, AbilityTarget, Action,
         ActionReach, ActionTarget, Character, CharacterId, Condition, CoreGame, HandType,
-        OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
+        OnAttackedReaction, OnHitReaction, Position, Range, TargetAcquisition,
+        CENTER_MELEE_RANGE_SQUARED,
     },
     data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
     grid::ControlPoint,
@@ -563,9 +564,14 @@ fn candidate_ability_actions(bot: &Character) -> Vec<BotAction> {
         dbg!(a.name);
         //if may_use(bot, a) {
         let candidate = match &a.target {
-            AbilityTarget::Enemy { .. } => BotAction::SingleEnemyTarget(a),
+            AbilityTarget::Character { acquisition, .. } => {
+                if acquisition == &TargetAcquisition::Enemies {
+                    BotAction::SingleEnemyTarget(a)
+                } else {
+                    BotAction::SingleFriendlyTarget(a)
+                }
+            }
             AbilityTarget::None { .. } => BotAction::NonTarget(a),
-            AbilityTarget::Ally { .. } => BotAction::SingleFriendlyTarget(a),
             unhandled => todo!("{:?}", unhandled),
         };
         candidates.push(candidate);

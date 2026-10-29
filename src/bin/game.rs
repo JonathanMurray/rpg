@@ -172,7 +172,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS)],
+                            vec![ButtonAction::AbilityEnhancement(&INSPIRE_RUTHLESS)],
                             vec![EquipmentEntry::Weapon(ARCANE_BOW)],
                             //vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
                         ),
@@ -196,7 +196,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                     (
                         PlayerId::Clara,
                         CharacterGrowth::of(
-                            vec![ButtonAction::AbilityEnhancement(FIREBALL_MASSIVE)],
+                            vec![ButtonAction::AbilityEnhancement(&FIREBALL_MASSIVE)],
                             vec![EquipmentEntry::Consumable(ARCANE_POTION)],
                         ),
                     ),
@@ -218,7 +218,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![ButtonAction::AbilityEnhancement(HEAL_ENERGIZE)],
+                            vec![ButtonAction::AbilityEnhancement(&HEAL_ENERGIZE)],
                             vec![EquipmentEntry::Arrows(ArrowStack::new(&BARBED_ARROWS, 2))],
                         ),
                     ),
@@ -237,7 +237,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                         CharacterGrowth::of(
                             vec![
                                 ButtonAction::Passive(PassiveSkill::Reaper),
-                                ButtonAction::AbilityEnhancement(SWEEP_ATTACK_PUSH),
+                                ButtonAction::AbilityEnhancement(&SWEEP_ATTACK_PUSH),
                             ],
                             vec![],
                         ),

@@ -209,7 +209,6 @@ impl NonCombatCharacterUi {
                     let enhancement_buttons: Vec<Rc<ActionButton>> = ability
                         .possible_enhancements
                         .iter()
-                        .filter_map(|maybe_enhancement| *maybe_enhancement)
                         .filter_map(|enhancement| {
                             if character.knows_ability_enhancement(enhancement) {
                                 let enhancement_btn = Rc::new(new_button(

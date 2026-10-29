@@ -21,11 +21,12 @@ use crate::{
     },
     core::{
         Ability, AbilityDamage, AbilityEnhancement, AbilityReach, AbilityRollType, AbilityTarget,
-        AbilityTargetEffect, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition,
-        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
-        BaseAction, Character, CircleEffect, Condition, DamageType, DefenseType, EnvironmentEffect,
+        AbilityTargetEffect, ApplyEffect, AreaEffect, AreaShape, AttackEnhancement,
+        AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction,
+        Character, CircleEffect, Condition, DamageType, DefenseType, EnvironmentEffect,
         EquipEffect, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, Weapon, MOVE_DISTANCE_PER_RESOURCE, OPPORTUNITY_ATTACK_STAMINA_COST,
+        Shield, TargetAcquisition, Weapon, MOVE_DISTANCE_PER_RESOURCE,
+        OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -505,7 +506,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 apply_condition.condition.name()
             );
             if let Some(stacks) = apply_condition.stacks {
-                line.push_str(&format!(" x |<value>{}|", stacks));
+                line.push_str(&format!(" |<value>x{}|", stacks));
             }
             if let Some(rounds) = apply_condition.duration_rounds {
                 let suffix = if rounds > 1 { "s" } else { "" };
@@ -586,7 +587,8 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
     }
 
     match &ability.target {
-        AbilityTarget::Enemy {
+        AbilityTarget::Character {
+            acquisition,
             effect,
             circle: impact_circle,
             reach,
@@ -617,12 +619,6 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             }
         }
 
-        AbilityTarget::Ally { range, effect } => {
-            t.technical_description
-                .push(format!("|<single_target>| {}|", range.range_with_icon()));
-            describe_ability_target_effect(effect, &mut t);
-        }
-
         AbilityTarget::None {
             self_circle,
             self_effect,
@@ -645,7 +641,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
             }) = self_circle
             {
                 // There's no use-case for this yet (?)
-                assert!(acquisition != &AreaTargetAcquisition::Everyone);
+                assert!(acquisition != &TargetAcquisition::Any);
 
                 let radius_str = radius.radius_with_icon();
 
@@ -756,9 +752,9 @@ pub fn describe_area_effect(
     let effect = area_effect.target_effect;
     let def = def_suffix(effect.defense_type());
     let targets_str = match area_effect.acquisition {
-        AreaTargetAcquisition::Enemies => "|<multi_target>|",
-        AreaTargetAcquisition::Everyone => "|<multi_target>| EVERYONE",
-        AreaTargetAcquisition::Allies => unreachable!(),
+        TargetAcquisition::Enemies => "|<multi_target>|",
+        TargetAcquisition::Any => "|<multi_target>| EVERYONE",
+        TargetAcquisition::Allies => unreachable!(),
     };
     let mut line = if let Some(range) = range {
         match shape {
@@ -1517,7 +1513,7 @@ pub enum ButtonAction {
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
-    AbilityEnhancement(AbilityEnhancement),
+    AbilityEnhancement(&'static AbilityEnhancement),
     OpportunityAttack,
     Proceed,
     Passive(PassiveSkill),
@@ -1657,9 +1653,9 @@ impl ButtonAction {
         }
     }
 
-    pub fn unwrap_ability_enhancement(&self) -> AbilityEnhancement {
+    pub fn unwrap_ability_enhancement(&self) -> &'static AbilityEnhancement {
         match self {
-            ButtonAction::AbilityEnhancement(enhancement) => *enhancement,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement,
             _ => panic!(),
         }
     }

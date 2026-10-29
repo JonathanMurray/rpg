@@ -1432,7 +1432,7 @@ impl CoreGame {
     async fn perform_ability(
         actor: &Rc<Character>,
         ability: &'static Ability,
-        enhancements: &[AbilityEnhancement],
+        enhancements: &[&AbilityEnhancement],
         selected_target: &ActionTarget,
         mode: ActionPerformanceMode<'_>,
     ) -> Vec<AbilityResolvedEvent> {
@@ -1491,7 +1491,7 @@ impl CoreGame {
             let mut area_outcome = None;
 
             match &ability.target {
-                AbilityTarget::Enemy {
+                AbilityTarget::Character {
                     effect,
                     circle: impact_circle,
                     environment_effect,
@@ -1543,7 +1543,7 @@ impl CoreGame {
                     let outcome = Self::perform_ability_target_effect(
                         actor,
                         ability.name,
-                        roll_instruction.as_ref().unwrap(),
+                        roll_instruction.as_ref(),
                         enhancements,
                         &effect,
                         target,
@@ -1611,7 +1611,7 @@ impl CoreGame {
                         let outcome = Self::perform_ability_target_effect(
                             actor,
                             ability.name,
-                            roll_instruction.as_ref().unwrap(),
+                            roll_instruction.as_ref(),
                             enhancements,
                             impact_effect,
                             target,
@@ -1641,41 +1641,6 @@ impl CoreGame {
 
                         area_outcome = Some(outcomes);
                     }
-                }
-
-                AbilityTarget::Ally { range: _, effect } => {
-                    let target_id = selected_target.character_target_id().unwrap();
-                    let target = mode.characters().get_rc(target_id);
-
-                    if let Some(game) = real_game {
-                        assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
-                        assert!(!game
-                            .pathfind_grid
-                            .obstructed_line_of_sight(actor.pos(), target.pos()));
-                        actor.set_facing_toward(target.pos());
-                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
-                            actor: actor_id,
-                            ability,
-                            destination: Some(target.pos()),
-                        })
-                        .await;
-                    }
-
-                    let outcome = Self::perform_ability_target_effect(
-                        actor,
-                        ability.name,
-                        roll_instruction.as_ref().unwrap(),
-                        enhancements,
-                        effect,
-                        target,
-                        0,
-                        &mut detail_lines,
-                        Some(target.pos()),
-                        mode,
-                    )
-                    .await;
-
-                    target_outcome = Some((target_id, outcome));
                 }
 
                 AbilityTarget::Line {
@@ -1798,7 +1763,7 @@ impl CoreGame {
                         let outcome = Self::perform_ability_target_effect(
                             actor,
                             ability.name,
-                            roll_instruction.as_ref().unwrap(),
+                            roll_instruction.as_ref(),
                             enhancements,
                             &effect,
                             actor,
@@ -1975,7 +1940,7 @@ impl CoreGame {
     async fn perform_ability_area_effect(
         name: &'static str,
         roll_instruction: &RollInstruction,
-        enhancements: &[AbilityEnhancement],
+        enhancements: &[&AbilityEnhancement],
         caster: &Rc<Character>,
         area_pos: Position,
         mut shaped_effect: ShapedEffect,
@@ -2002,7 +1967,7 @@ impl CoreGame {
             let outcome = Self::perform_ability_target_effect(
                 caster,
                 name,
-                roll_instruction,
+                Some(roll_instruction),
                 enhancements,
                 effect,
                 target,
@@ -2083,7 +2048,7 @@ impl CoreGame {
         }
     }
 
-    fn modified_radius(mut radius: Range, enhancements: &[AbilityEnhancement]) -> Range {
+    fn modified_radius(mut radius: Range, enhancements: &[&AbilityEnhancement]) -> Range {
         for enhancement in enhancements {
             if let Some(e) = enhancement.spell_effect {
                 if e.increased_radius_tenths > 0 {
@@ -2097,8 +2062,8 @@ impl CoreGame {
     async fn perform_ability_target_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
-        roll_instruction: &RollInstruction,
-        enhancements: &[AbilityEnhancement],
+        roll_instruction: Option<&RollInstruction>,
+        enhancements: &[&AbilityEnhancement],
         target_effect: &AbilityTargetEffect,
         target: &Rc<Character>,
         num_prior_targets: u32,
@@ -2127,7 +2092,9 @@ impl CoreGame {
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
-                let advantage = roll_instruction.unwrap_roll_during_attack_advantage();
+                let advantage = roll_instruction
+                    .unwrap()
+                    .unwrap_roll_during_attack_advantage();
                 //caster.set_facing_toward(target.pos());
 
                 // Ability attack
@@ -2188,8 +2155,8 @@ impl CoreGame {
     async fn perform_spell_target_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
-        roll_instruction: &RollInstruction,
-        enhancements: &[AbilityEnhancement],
+        roll_instruction: Option<&RollInstruction>,
+        enhancements: &[&AbilityEnhancement],
         spell_target_effect: &SpellTargetEffect,
         target: &Rc<Character>,
         detail_lines: &mut Vec<String>,
@@ -2198,10 +2165,9 @@ impl CoreGame {
     ) -> AbilityTargetOutcome {
         let real_game = mode.real_game();
 
-        //let ability_roll = roll_instruction.perform(mode, );
-
         let hit_type = match spell_target_effect.defense_type {
             Some(defense_type) => {
+                let roll_instruction = roll_instruction.expect("defense requires roll");
                 let roll =
                     roll_instruction.execute(mode, Some((target, defense_type)), detail_lines);
                 Self::determine_ability_hit_type(caster, roll, defense_type, detail_lines)
@@ -2302,7 +2268,7 @@ impl CoreGame {
 
                 if matches!(
                     roll_instruction,
-                    RollInstruction::RollWithAttackModifier { .. }
+                    Some(RollInstruction::RollWithAttackModifier { .. })
                 ) {
                     // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                     let protected = target.get_condition_stacks(Condition::Protected);
@@ -2373,7 +2339,7 @@ impl CoreGame {
 
             if matches!(
                 roll_instruction,
-                RollInstruction::RollWithAttackModifier { .. }
+                Some(RollInstruction::RollWithAttackModifier { .. })
             ) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                 if target.lose_condition(Condition::Protected) {
@@ -2399,7 +2365,7 @@ impl CoreGame {
         actor: &Character,
         area_pos: Position,
         shape: AreaShape,
-        acquisition: AreaTargetAcquisition,
+        acquisition: TargetAcquisition,
     ) -> Vec<CharacterId> {
         let grid = mode.pathfind_grid();
         let characters = mode.characters();
@@ -3416,7 +3382,7 @@ impl CoreGame {
             let lost_condition = conditions
                 .borrow_mut()
                 .lose_stacks(&Condition::HealthPotionRecovering, 1);
-            let gained = self.character_gain_health(character, 2);
+            let gained = self.character_gain_health(character, 3);
 
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
@@ -3704,7 +3670,7 @@ pub fn predict_ability(
     characters: &Characters,
     caster: &Rc<Character>,
     ability: &'static Ability,
-    enhancements: &[AbilityEnhancement],
+    enhancements: &[&AbilityEnhancement],
     selected_target: &ActionTarget,
 ) -> AbilityPrediction {
     let mut targets: HashMap<CharacterId, TargetPrediction> = Default::default();
@@ -4354,7 +4320,7 @@ pub fn as_percentage(probability: f32) -> String {
 fn ability_roll_bonus(
     caster: &Character,
     defender: &Character,
-    enhancements: &[AbilityEnhancement],
+    enhancements: &[&AbilityEnhancement],
     modifier: AbilityRollType,
     main_damage_type: Option<DamageType>,
 ) -> DiceRollBonus {
@@ -4514,13 +4480,13 @@ impl Characters {
 pub fn is_valid_area_target(
     actor: &Character,
     other_char: &Character,
-    acquisition: AreaTargetAcquisition,
+    acquisition: TargetAcquisition,
 ) -> bool {
     let is_ally = other_char.player_controlled() == actor.player_controlled();
     match acquisition {
-        AreaTargetAcquisition::Enemies => !is_ally,
-        AreaTargetAcquisition::Everyone => true,
-        AreaTargetAcquisition::Allies => is_ally,
+        TargetAcquisition::Enemies => !is_ally,
+        TargetAcquisition::Any => true,
+        TargetAcquisition::Allies => is_ally,
     }
 }
 
@@ -4806,7 +4772,7 @@ impl Condition {
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| |<ap>| AP per turn",
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
-            HealthPotionRecovering => "|<faded>End of turn:| heal |<value>2| |<heart>|",
+            HealthPotionRecovering => "|<faded>End of turn:| heal |<value>3| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
             Wet => "Takes |<value>-25%| |<fire>|fire damage and |<value>+50%| |<lightning>|lightning damage",
@@ -5098,7 +5064,7 @@ pub enum Action {
     },
     UseAbility {
         ability: &'static Ability,
-        enhancements: Vec<AbilityEnhancement>,
+        enhancements: Vec<&'static AbilityEnhancement>,
         target: ActionTarget,
         equipment_index_to_consume: Option<usize>,
     },
@@ -5294,7 +5260,7 @@ pub struct Ability {
 
     pub roll: Option<AbilityRollType>,
     pub target: AbilityTarget,
-    pub possible_enhancements: [Option<AbilityEnhancement>; 3],
+    pub possible_enhancements: &'static [&'static AbilityEnhancement],
     pub animation_color: Color,
     pub animation: AbilityAnimation,
     pub initiate_sound: Option<SoundId>,
@@ -5322,21 +5288,17 @@ impl Ability {
     }
 
     pub fn targets_single_enemy(&self) -> bool {
-        matches!(self.target, AbilityTarget::Enemy { .. })
+        matches!(self.target, AbilityTarget::Character { .. })
     }
 
     pub fn targets_single_character(&self) -> bool {
-        matches!(
-            self.target,
-            AbilityTarget::Ally { .. } | AbilityTarget::Enemy { .. }
-        )
+        matches!(self.target, AbilityTarget::Character { .. })
     }
 
     pub fn requires_target(&self) -> bool {
         // either a character target or a positional / directional target
         match self.target {
-            AbilityTarget::Enemy { .. } => true,
-            AbilityTarget::Ally { .. } => true,
+            AbilityTarget::Character { .. } => true,
             AbilityTarget::PositionCircle { .. } => true,
             AbilityTarget::Line { .. } => true,
             AbilityTarget::Movement { .. } => true,
@@ -5347,15 +5309,14 @@ impl Ability {
 
     pub fn knockback(&self) -> Option<u32> {
         match self.target {
-            AbilityTarget::Enemy { effect, .. } => effect.knockback(),
+            AbilityTarget::Character { effect, .. } => effect.knockback(),
             _ => None,
         }
     }
 
     pub fn target_defense(&self) -> Option<DefenseType> {
         match &self.target {
-            AbilityTarget::Enemy { effect, .. } => effect.defense_type(),
-            AbilityTarget::Ally { .. } => None,
+            AbilityTarget::Character { effect, .. } => effect.defense_type(),
             AbilityTarget::PositionCircle { circle_effect, .. } => {
                 circle_effect.area_effect.target_effect.defense_type()
             }
@@ -5374,8 +5335,7 @@ impl Ability {
 
     pub fn main_damage_type(&self) -> Option<DamageType> {
         let effect: &AbilityTargetEffect = match &self.target {
-            AbilityTarget::Enemy { effect, .. } => Some(effect),
-            AbilityTarget::Ally { .. } => None,
+            AbilityTarget::Character { effect, .. } => Some(effect),
             AbilityTarget::PositionCircle { circle_effect, .. } => {
                 Some(&circle_effect.area_effect.target_effect)
             }
@@ -5576,17 +5536,12 @@ impl AbilityDamage {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbilityTarget {
-    Enemy {
+    Character {
+        acquisition: TargetAcquisition,
         reach: AbilityReach,
         effect: AbilityTargetEffect,
         circle: Option<CircleEffect>,
         environment_effect: Option<EnvironmentEffect>,
-    },
-
-    // TODO: merge enemy and ally target; just differentiate with Acquisition ?
-    Ally {
-        range: Range,
-        effect: AbilityTargetEffect,
     },
 
     PositionCircle {
@@ -5646,7 +5601,7 @@ pub struct CircleEffect {
 impl CircleEffect {
     pub const fn new(
         radius: Range,
-        acquisition: AreaTargetAcquisition,
+        acquisition: TargetAcquisition,
         target_effect: AbilityTargetEffect,
         create_surface: Option<Surface>,
     ) -> Self {
@@ -5660,7 +5615,7 @@ impl CircleEffect {
         }
     }
 
-    fn acquisition(&self) -> AreaTargetAcquisition {
+    fn acquisition(&self) -> TargetAcquisition {
         self.area_effect.acquisition
     }
 
@@ -5671,7 +5626,7 @@ impl CircleEffect {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AreaEffect {
-    pub acquisition: AreaTargetAcquisition,
+    pub acquisition: TargetAcquisition,
     pub target_effect: AbilityTargetEffect,
     pub create_surface: Option<Surface>,
 }
@@ -5683,10 +5638,10 @@ pub enum AreaShape {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum AreaTargetAcquisition {
+pub enum TargetAcquisition {
     Enemies,
     Allies,
-    Everyone,
+    Any,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5697,20 +5652,15 @@ pub enum AbilityReach {
 
 impl AbilityTarget {
     pub fn single_target(&self) -> bool {
-        match self {
-            AbilityTarget::Enemy { .. } => true,
-            AbilityTarget::Ally { .. } => true,
-            _ => false,
-        }
+        matches!(self, AbilityTarget::Character { .. })
     }
 
     fn base_range(&self) -> Option<Range> {
         match self {
-            AbilityTarget::Enemy { reach, .. } => match reach {
+            AbilityTarget::Character { reach, .. } => match reach {
                 AbilityReach::Range(range) => Some(*range),
                 AbilityReach::MoveIntoMelee(range) => Some(*range),
             },
-            AbilityTarget::Ally { range, .. } => Some(*range),
             AbilityTarget::PositionCircle { range, .. } => Some(*range),
             AbilityTarget::Line { range, .. } => Some(*range),
             AbilityTarget::Movement { range } => Some(*range),
@@ -5728,7 +5678,7 @@ impl AbilityTarget {
         }
     }
 
-    pub fn radius(&self, enhancements: &[AbilityEnhancement]) -> Option<Range> {
+    pub fn radius(&self, enhancements: &[&AbilityEnhancement]) -> Option<Range> {
         self.base_radius().map(|mut range| {
             for enhancement in enhancements {
                 if let Some(e) = enhancement.spell_effect {
@@ -5741,7 +5691,7 @@ impl AbilityTarget {
         })
     }
 
-    pub fn range(&self, enhancements: &[AbilityEnhancement]) -> Option<Range> {
+    pub fn range(&self, enhancements: &[&AbilityEnhancement]) -> Option<Range> {
         self.base_range().map(|mut range| {
             for enhancement in enhancements {
                 if let Some(e) = enhancement.spell_effect {
@@ -5754,10 +5704,9 @@ impl AbilityTarget {
         })
     }
 
-    pub fn acquisition(&self) -> Option<AreaTargetAcquisition> {
+    pub fn acquisition(&self) -> Option<TargetAcquisition> {
         match self {
-            AbilityTarget::Enemy { .. } => Some(AreaTargetAcquisition::Enemies),
-            AbilityTarget::Ally { .. } => Some(AreaTargetAcquisition::Allies),
+            AbilityTarget::Character { acquisition, .. } => Some(*acquisition),
             AbilityTarget::PositionCircle { circle_effect, .. } => {
                 Some(circle_effect.acquisition())
             }
@@ -5806,8 +5755,6 @@ impl AttackEnhancement {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityEnhancement {
-    // TODO: Remove this tracking - it's enough for the ability to track which enhancements it's compatible with (?)
-    pub ability_id: AbilityId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
@@ -5829,7 +5776,6 @@ impl AbilityEnhancement {
 
     pub const fn default() -> Self {
         Self {
-            ability_id: AbilityId::Kill,
             name: "<placeholder>",
             description: "",
             icon: IconId::Equip,
@@ -6153,7 +6099,7 @@ pub struct Character {
     pub known_actions: RefCell<Vec<BaseAction>>,
     pub known_attacked_reactions: RefCell<Vec<OnAttackedReaction>>,
     pub known_on_hit_reactions: RefCell<Vec<OnHitReaction>>,
-    pub known_ability_enhancements: RefCell<Vec<AbilityEnhancement>>,
+    pub known_ability_enhancements: RefCell<Vec<&'static AbilityEnhancement>>,
     pub known_passive_skills: RefCell<Vec<PassiveSkill>>,
 
     pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
@@ -6323,7 +6269,7 @@ impl Character {
             .push(enhancement);
     }
 
-    pub fn learn_ability_enhancement(&self, enhancement: AbilityEnhancement) {
+    pub fn learn_ability_enhancement(&self, enhancement: &'static AbilityEnhancement) {
         self.known_ability_enhancements
             .borrow_mut()
             .push(enhancement);
@@ -6971,31 +6917,11 @@ impl Character {
     pub fn reaches_with_ability(
         &self,
         ability: &Ability,
-        enhancements: &[AbilityEnhancement],
+        enhancements: &[&AbilityEnhancement],
         target_pos: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
-        target_within_range_squared(range.squared(), self.position.get(), target_pos)
-        /*
-        match ability.target {
-            AbilityTarget::Enemy { .. } | AbilityTarget::Ally { .. } => {
-                target_within_range_squared(range.squared(), self.position.get(), target_pos)
-            }
-            AbilityTarget::Circle { .. } => {
-                within_range_squared(range.squared(), self.position.get(), target_pos)
-            }
-            AbilityTarget::Line { .. } =>
-            AbilityTarget::Movement { .. } => {
-                within_range_squared(range.squared(), self.position.get(), target_pos)
-            }
-            AbilityTarget::None { .. } => {
-                panic!("Ability that has no target always reaches. Shouldn't be checked")
-            }
-            AbilityTarget::Projectile {
-                ..
-            } => within_range_squared(range.squared(), self.position.get(), target_pos),
-        }
-         */
+        target_within_range_squared(range.squared(), self.pos(), target_pos)
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
@@ -7392,7 +7318,7 @@ impl Character {
             .collect()
     }
 
-    pub fn knows_ability_enhancement(&self, enhancement: AbilityEnhancement) -> bool {
+    pub fn knows_ability_enhancement(&self, enhancement: &AbilityEnhancement) -> bool {
         self.known_ability_enhancements
             .borrow()
             .contains(&enhancement)
@@ -7401,7 +7327,7 @@ impl Character {
     pub fn can_use_ability_enhancement(
         &self,
         ability: &Ability,
-        enhancement: AbilityEnhancement,
+        enhancement: &AbilityEnhancement,
     ) -> bool {
         self.action_points.current() >= ability.action_point_cost + enhancement.action_point_cost
             && self.mana.current() >= ability.mana_cost + enhancement.mana_cost
@@ -7623,7 +7549,7 @@ impl Character {
 
     fn outgoing_ability_roll_bonus(
         &self,
-        enhancements: &[AbilityEnhancement],
+        enhancements: &[&AbilityEnhancement],
         modifier: AbilityRollType,
     ) -> (DiceRollBonus, Vec<(&'static str, RollBonusContributor)>) {
         let mut total_advantage = 0i32;
@@ -7739,7 +7665,7 @@ impl Character {
 
     pub fn outgoing_ability_roll_bonuses(
         &self,
-        enhancements: &[AbilityEnhancement],
+        enhancements: &[&AbilityEnhancement],
         modifier: AbilityRollType,
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let is_spell = matches!(modifier, AbilityRollType::Spell);

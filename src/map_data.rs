@@ -577,7 +577,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     //alice.learn_ability(&SPIKES);
     //alice.learn_ability(&SPIKETEST);
     //alice.learn_ability(&PIERCING_SHOT);
-    //alice.learn_ability_enhancement(INSPIRE_RUTHLESS);
+    //alice.learn_ability_enhancement(&INSPIRE_RUTHLESS);
 
     // TODO
     //alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
@@ -600,7 +600,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.armor_piece.set(Some(DRUID_COAT));
     bob.learn_ability(&DASH);
     bob.learn_ability(&SHIELD_BASH);
-    bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
 
     bob.learn_ability(&KILL);
     //    bob.learn_ability(&KILL_SELF);
@@ -608,7 +608,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     // TODO
 
     //bob.learn_ability(&EXECUTE);
-    //bob.learn_ability_enhancement(EXECUTE_BLOODLUST);
+    //bob.learn_ability_enhancement(&EXECUTE_BLOODLUST);
     //bob.learn_passive(PassiveSkill::HardenedSkin);
     ////bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
@@ -633,10 +633,10 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_ability(&DASH);
-    clara.learn_ability(&FIREBALL);
-    clara.learn_ability_enhancement(FIREBALL_REACH);
+    clara.learn_ability(&FIRE_BOLT);
+    clara.learn_ability_enhancement(&FIREBALL_REACH);
     clara.learn_ability(&LIGHTNING_BOLT);
-    clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
+    clara.learn_ability_enhancement(&LIGHTNING_BOLT_REACH);
     clara.learn_ability(&SHACKLED_MIND);
 
     clara
@@ -657,16 +657,16 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
     bob.learn_ability(&SWEEP_ATTACK);
-    bob.learn_ability_enhancement(SWEEP_ATTACK_PUSH);
+    bob.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
     // TODO: lunge attack, not working properly? Weird targetting and resulted in a
     // stackoverflow when trying to commit it
     bob.learn_ability(&SHIELD_BASH);
-    bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
     bob.learn_ability(&LIGHTNING_BOLT);
     // TODO
     //bob.learn_ability(&KILL);
     bob.learn_ability(&DASH);
-    bob.learn_ability_enhancement(INSPIRE_RUTHLESS);
+    bob.learn_ability_enhancement(&INSPIRE_RUTHLESS);
     //bob.learn_attack_enhancement(EMPOWER);
     bob.health.lose(10);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
@@ -703,7 +703,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
     alice.trinket.set(Some(ASSASSINS_VIAL));
     alice.learn_ability(&BLESS);
-    alice.learn_ability_enhancement(HEAL_ENERGIZE);
+    alice.learn_ability_enhancement(&HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_passive(PassiveSkill::WeaponProficiency);
     alice.learn_ability(&PIERCING_SHOT);
@@ -746,15 +746,15 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_passive(PassiveSkill::CriticalCharge);
     clara.learn_ability(&FIRE_BOLT);
-    clara.learn_ability_enhancement(FIREBALL_INFERNO);
-    clara.learn_ability_enhancement(FIREBALL_MASSIVE);
-    clara.learn_ability_enhancement(FIREBALL_REACH);
+    clara.learn_ability_enhancement(&FIREBALL_INFERNO);
+    clara.learn_ability_enhancement(&FIREBALL_MASSIVE);
+    clara.learn_ability_enhancement(&FIREBALL_REACH);
     clara.learn_ability(&FIREBALL);
     clara.learn_ability(&DASH);
     clara.learn_ability(&INFLICT_WOUNDS);
-    clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
+    clara.learn_ability_enhancement(&INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(&LIGHTNING_BOLT);
-    clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
+    clara.learn_ability_enhancement(&LIGHTNING_BOLT_REACH);
     clara.trinket.set(Some(BATTLEMAGE_SIGIL));
     //clara.learn_ability(MIND_BLAST);
 

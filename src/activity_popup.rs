@@ -756,7 +756,7 @@ impl ActivityPopup {
                     }
 
                     ConfiguredAction::UseAbility { ability, .. } => {
-                        for enhancement in ability.possible_enhancements.iter().flatten().copied() {
+                        for enhancement in ability.possible_enhancements.iter() {
                             let character = self.characters.get(active_character_id);
                             if character.knows_ability_enhancement(enhancement) {
                                 let btn =

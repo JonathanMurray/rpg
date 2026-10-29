@@ -48,8 +48,8 @@ use crate::{
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
         within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
-        AreaShape, AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction, Character,
-        CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType, Position,
+        AreaShape, AttackAction, AttackEnhancement, BaseAction, Character, CharacterFacing,
+        CircleEffect, Condition, Goodness, HitType, MovementType, Position, TargetAcquisition,
         TargetLine, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
@@ -3179,7 +3179,7 @@ impl GameGrid {
             if self
                 .ability_cast_particle_group
                 .as_ref()
-                .map(|(ability_id, group)| *ability_id != ability.id)
+                .map(|(ability_id, _group)| *ability_id != ability.id)
                 .unwrap_or(true)
             {
                 self.ability_cast_particle_group = Some((
@@ -3248,7 +3248,8 @@ impl GameGrid {
                     }
 
                     match &ability.target {
-                        AbilityTarget::Enemy {
+                        AbilityTarget::Character {
+                            acquisition,
                             circle: impact_circle,
                             reach,
                             ..
@@ -3265,12 +3266,24 @@ impl GameGrid {
                                 move_into_melee = Some(range.plus_tenths(increased_range_tenths));
                             }
 
-                            MouseState::RequiresEnemyTarget {
-                                area_radius,
-                                move_into_melee,
+                            match acquisition {
+                                TargetAcquisition::Enemies => MouseState::RequiresEnemyTarget {
+                                    area_radius,
+                                    move_into_melee,
+                                },
+                                TargetAcquisition::Allies => {
+                                    assert_eq!(area_radius, None, "single ally target with radius");
+                                    assert_eq!(
+                                        move_into_melee, None,
+                                        "single ally target with movement"
+                                    );
+                                    MouseState::RequiresAllyTarget
+                                }
+                                TargetAcquisition::Any => {
+                                    todo!("single target that can hit both ally and enemy")
+                                }
                             }
                         }
-                        AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
                         AbilityTarget::PositionCircle {
                             circle_effect,
                             range,
@@ -4754,7 +4767,7 @@ impl GameGrid {
     fn acquire_pushed_targets_from_ability(
         &self,
         ability: &Ability,
-        selected_enhancements: &[AbilityEnhancement],
+        selected_enhancements: &[&AbilityEnhancement],
         pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
     ) {
         let active_char_pos = self.characters[&self.active_character_id].pos();
@@ -5242,7 +5255,7 @@ impl GameGrid {
         CharacterId,
         Range,
         RangeIndicatorType,
-        Option<AreaTargetAcquisition>,
+        Option<TargetAcquisition>,
     )> {
         let mut indicator = None;
 
@@ -5256,7 +5269,7 @@ impl GameGrid {
                                 char_id,
                                 range,
                                 RangeIndicatorType::ActionTargetRange,
-                                Some(AreaTargetAcquisition::Enemies),
+                                Some(TargetAcquisition::Enemies),
                             ))
                         }
                     }
@@ -5340,7 +5353,7 @@ impl GameGrid {
                         self.active_character_id,
                         range,
                         indicator,
-                        Some(AreaTargetAcquisition::Enemies),
+                        Some(TargetAcquisition::Enemies),
                     ))
                 }
                 ConfiguredAction::UseAbility {

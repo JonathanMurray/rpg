@@ -44,7 +44,7 @@ pub enum Learning {
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
-    AbilityEnhancement(AbilityEnhancement),
+    AbilityEnhancement(&'static AbilityEnhancement),
     Passive(PassiveSkill),
 }
 
@@ -428,12 +428,10 @@ pub async fn run_victory_loop(
         for character in &characters {
             for ability in character.known_abilities() {
                 for enhancement in ability.possible_enhancements {
-                    if let Some(enhancement) = enhancement {
-                        candidate_rewards.push((
-                            ButtonAction::AbilityEnhancement(enhancement),
-                            Some(ability.name),
-                        ));
-                    }
+                    candidate_rewards.push((
+                        ButtonAction::AbilityEnhancement(enhancement),
+                        Some(ability.name),
+                    ));
                 }
             }
         }
@@ -652,7 +650,10 @@ fn can_learn(character: &Character, learning: Learning) -> bool {
             .borrow()
             .contains(&enhancement),
         Learning::AbilityEnhancement(enhancement) => {
-            character.knows_ability(enhancement.ability_id)
+            character
+                .known_abilities()
+                .iter()
+                .any(|a| a.possible_enhancements.contains(&enhancement))
                 && !character.knows_ability_enhancement(enhancement)
         }
         Learning::Passive(passive_skill) => !character
