@@ -832,11 +832,11 @@ fn describe_ability_negative_effect(effect: &AbilityNegativeEffect, t: &mut Tool
                     AbilityDamage::Fixed(n, dmg_type) => (n, dmg_type),
                     AbilityDamage::Dynamic(n, dmg_type) => (n, dmg_type),
                 };
-                let mut line = format!("  |<value>{}| {}", value, dmg_type.dmg_str());
+                let line = format!("  |<value>{}| {}", value, dmg_type.dmg_str());
                 t.technical_description.push(line);
             }
 
-            for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
+            for apply_effect in effect.on_hit.iter() {
                 describe_apply_effect(*apply_effect, t);
             }
             if let Some(environment_effect) = effect.environment_effect {

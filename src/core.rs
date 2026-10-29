@@ -2527,13 +2527,7 @@ impl CoreGame {
         let mut applied_effects = vec![];
 
         if let Some(game) = real_game {
-            for effect in spell_enemy_effect
-                .on_hit
-                .unwrap_or_default()
-                .iter()
-                .copied()
-                .flatten()
-            {
+            for effect in spell_enemy_effect.on_hit.iter().copied() {
                 let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                     hit_type,
                     effect,
@@ -5710,7 +5704,7 @@ impl AbilityTargetEffect {
 pub struct SpellNegativeEffect {
     pub defense_type: Option<DefenseType>,
     pub damage: Option<AbilityDamage>,
-    pub on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub on_hit: &'static [ApplyEffect],
     pub environment_effect: Option<EnvironmentEffect>,
 }
 
@@ -5719,7 +5713,7 @@ impl SpellNegativeEffect {
         Self {
             defense_type: None,
             damage: None,
-            on_hit: None,
+            on_hit: &[],
             environment_effect: None,
         }
     }
@@ -5734,7 +5728,7 @@ pub enum AbilityNegativeEffect {
 impl AbilityNegativeEffect {
     pub fn knockback(&self) -> Option<u32> {
         if let AbilityNegativeEffect::Spell(sne) = self {
-            for effect in sne.on_hit.iter().flatten().flatten() {
+            for effect in sne.on_hit.iter() {
                 if let ApplyEffect::Pushed(amount) = effect {
                     return Some(*amount);
                 }

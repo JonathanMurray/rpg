@@ -679,7 +679,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
         AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             defense_type: Some(DefenseType::Toughness),
-            on_hit: Some([Some(ApplyEffect::Pushed(2)), None]),
+            on_hit: &[ApplyEffect::Pushed(2)],
             ..SpellNegativeEffect::default()
         })),
         None,
@@ -804,7 +804,7 @@ pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
             AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
                 damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
-                on_hit: None,
+                on_hit: &[],
                 environment_effect: None,
             })),
             Some(Surface::Fire),
@@ -828,14 +828,11 @@ pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Fixed(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Poisoned,
-                    stacks: None,
-                    duration_rounds: Some(2),
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Poisoned,
+                stacks: None,
+                duration_rounds: Some(2),
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -918,14 +915,11 @@ pub const SHIELD_BASH: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Dazed,
-                    duration_rounds: Some(1),
-                    stacks: None,
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Dazed,
+                duration_rounds: Some(1),
+                stacks: None,
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -955,15 +949,15 @@ pub const ENEMY_TACKLE: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
+            on_hit: &[
+                ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
                     duration_rounds: Some(1),
                     stacks: None,
-                })),
+                }),
                 // Better keep this somewhat low. Critting while knocking into an obstacle can lead to crazy numbers.
-                Some(ApplyEffect::Pushed(2)),
-            ]),
+                ApplyEffect::Pushed(2),
+            ],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -1508,14 +1502,12 @@ pub const SCREAM: Ability = Ability {
             AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
 
-                on_hit: Some([
-                    Some(ApplyEffect::Condition(ApplyCondition {
-                        condition: Condition::Dazed,
-                        stacks: None,
-                        duration_rounds: Some(1),
-                    })),
-                    None,
-                ]),
+                on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Dazed,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })],
+
                 ..SpellNegativeEffect::default()
             })),
             None,
@@ -1552,18 +1544,18 @@ pub const SHACKLED_MIND: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
 
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
+            on_hit: &[
+                ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Slowed,
                     stacks: None,
                     duration_rounds: Some(1),
-                })),
-                Some(ApplyEffect::Condition(ApplyCondition {
+                }),
+                ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Exposed,
                     stacks: None,
                     duration_rounds: Some(2),
-                })),
-            ]),
+                }),
+            ],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -1643,7 +1635,7 @@ pub const MIND_BLAST: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Fixed(4, DamageType::Regular)),
-            on_hit: Some([Some(ApplyEffect::LoseActionPoints(1)), None]),
+            on_hit: &[ApplyEffect::LoseActionPoints(1)],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -1697,14 +1689,11 @@ pub const INFLICT_WOUNDS: Ability = Ability {
             AbilityTargetEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
-                on_hit: Some([
-                    Some(ApplyEffect::Condition(ApplyCondition {
-                        condition: Condition::Bleeding,
-                        stacks: Some(1), //Some(5),
-                        duration_rounds: None,
-                    })),
-                    None,
-                ]),
+                on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Bleeding,
+                    stacks: Some(1), //Some(5),
+                    duration_rounds: None,
+                })],
                 ..SpellNegativeEffect::default()
             })),
             None,
@@ -1745,14 +1734,11 @@ pub const DRAUG_HAUNT: Ability = Ability {
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
-                on_hit: Some([
-                    Some(ApplyEffect::Condition(ApplyCondition {
-                        condition: Condition::Dazed,
-                        stacks: None,
-                        duration_rounds: Some(1),
-                    })),
-                    None,
-                ]),
+                on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Dazed,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })],
                 ..SpellNegativeEffect::default()
             }),
         )),
@@ -1783,14 +1769,11 @@ pub const DRAUG_CLAW: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Blinded,
-                    stacks: None,
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Blinded,
+                stacks: None,
+                duration_rounds: Some(1),
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -1848,14 +1831,11 @@ pub const HULDRA_INFECT: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Poisoned,
-                    stacks: None,
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Poisoned,
+                stacks: None,
+                duration_rounds: Some(1),
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -1887,14 +1867,11 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
 
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Slowed,
-                    stacks: None,
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Slowed,
+                stacks: None,
+                duration_rounds: Some(1),
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
@@ -2770,14 +2747,11 @@ pub const SEARING_LIGHT: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Blinded,
-                    stacks: None,
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            on_hit: &[ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Blinded,
+                stacks: None,
+                duration_rounds: Some(1),
+            })],
             ..SpellNegativeEffect::default()
         }),
         impact_circle: None,
