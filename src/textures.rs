@@ -146,7 +146,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum StatusId {
     PlaceholderNegative,
     PlaceholderPositive,

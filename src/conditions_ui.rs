@@ -98,7 +98,7 @@ impl ConditionsList {
             let status_y = y0 + 5.0 - status_w;
             draw_rectangle(x, status_y, status_w, status_w, BLACK);
             draw_status_icon(
-                info.condition.status_icon(),
+                info.condition.status_id(),
                 x,
                 status_y,
                 Some((status_w, status_w)),

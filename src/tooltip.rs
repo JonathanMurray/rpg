@@ -197,7 +197,7 @@ pub fn draw_tooltip(
     };
 
     let header_status_icon = header_keyword.and_then(|keyword| match keyword {
-        Keyword::Cond(condition, _amount) => Some(condition.status_icon()),
+        Keyword::Cond(condition, _amount) => Some(condition.status_id()),
         _ => None,
     });
 

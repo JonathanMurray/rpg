@@ -9,6 +9,7 @@ use macroquad::{
     text::{draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
+use serde::Deserialize;
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -454,7 +455,8 @@ impl Drawable for TextLine {
 
 use lazy_static::lazy_static;
 
-const SYMBOL_H: f32 = 16.0;
+const FONT_SYMBOL_H: f32 = 16.0;
+const FONT_STATUS_W: f32 = 10.0;
 
 lazy_static! {
     static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
@@ -508,29 +510,23 @@ pub fn measure_text_with_font_tags(
     for mut part in parts {
         if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
-            h = h.max(SYMBOL_H);
+            h = h.max(FONT_SYMBOL_H);
             let symbol_offset = 13.0; //13.0;
             if let Some(prev_offset_y) = offset_y {
                 offset_y = Some(prev_offset_y.max(symbol_offset));
             } else {
                 offset_y = Some(symbol_offset);
             }
+        } else if consume_prefix_tag("<status>", &mut part) {
+            w += FONT_STATUS_W;
         } else {
             let font_size = font_size;
-            if part.starts_with("<value>") {
-                part = &part["<value>".len()..];
-                //font_size = (font_size as f32 * 1.5).floor() as u16;
-            } else if part.starts_with("<keyword>") {
-                part = &part["<keyword>".len()..];
-            } else if part.starts_with("<faded>") {
-                part = &part["<faded>".len()..];
-            } else if part.starts_with("<stat>") {
-                part = &part["<stat>".len()..];
-            } else if part.starts_with("<name>") {
-                part = &part["<name>".len()..];
-            } else if part.starts_with("<strikethrough>") {
-                part = &part["<strikethrough>".len()..];
-            }
+            let _ = consume_prefix_tag("<value>", &mut part)
+                || consume_prefix_tag("<keyword>", &mut part)
+                || consume_prefix_tag("<faded>", &mut part)
+                || consume_prefix_tag("<stat>", &mut part)
+                || consume_prefix_tag("<name>", &mut part)
+                || consume_prefix_tag("<strikethrough>", &mut part);
 
             if !part.is_empty() {
                 let dim = measure_text(part, font, font_size, font_scale);
@@ -587,33 +583,38 @@ pub fn draw_text_with_font_tags(
                 }
             }
             x0 += symbol_w;
+        } else if consume_prefix_tag("<status>", &mut part) {
+            // Serde needs a json string value (with quotes)
+            let part = format!("\"{}\"", part);
+            let status_id: StatusId = serde_json::from_str(&part).unwrap();
+            draw_status_icon(
+                status_id,
+                x0,
+                y - FONT_STATUS_W,
+                Some((FONT_STATUS_W, FONT_STATUS_W)),
+            );
+            x0 += FONT_STATUS_W;
         } else {
             let mut params = params.clone();
             let mut strikethrough = false;
-            if part.starts_with("<value>") {
-                part = &part["<value>".len()..];
+            if consume_prefix_tag("<value>", &mut part) {
                 if render_tags {
                     params.color = Color::new(0.9, 0.7, 1.0, 1.0);
                     //params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
                 }
-            } else if part.starts_with("<keyword>") {
-                part = &part["<keyword>".len()..];
+            } else if consume_prefix_tag("<keyword>", &mut part) {
                 if render_tags {
                     params.color = ORANGE;
                 }
-            } else if part.starts_with("<faded>") {
-                part = &part["<faded>".len()..];
+            } else if consume_prefix_tag("<faded>", &mut part) {
                 if render_tags {
                     params.color = LIGHTGRAY;
                 }
-            } else if part.starts_with("<stat>") {
-                part = &part["<stat>".len()..];
+            } else if consume_prefix_tag("<stat>", &mut part) {
                 if render_tags {
                     params.color = COL_LIGHT_BLUE;
                 }
-            } else if part.starts_with("<name>") {
-                part = &part["<name>".len()..];
-
+            } else if consume_prefix_tag("<name>", &mut part) {
                 if render_tags {
                     params.color = match part {
                         "Bob" => COL_BOB,
@@ -627,8 +628,7 @@ pub fn draw_text_with_font_tags(
                         _ => COL_ENEMY,
                     };
                 }
-            } else if part.starts_with("<strikethrough>") {
-                part = &part["<strikethrough>".len()..];
+            } else if consume_prefix_tag("<strikethrough>", &mut part) {
                 strikethrough = true;
             }
 
@@ -643,6 +643,15 @@ pub fn draw_text_with_font_tags(
         }
     }
     x0 - x
+}
+
+fn consume_prefix_tag(tag: &str, part: &mut &str) -> bool {
+    if part.starts_with(tag) {
+        *part = &part[tag.len()..];
+        true
+    } else {
+        false
+    }
 }
 
 pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> TextDimensions {

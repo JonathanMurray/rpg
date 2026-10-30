@@ -74,6 +74,7 @@ impl CoreGame {
 
     pub async fn run(mut self) -> Result<(), QuitEvent> {
         self.log("The battle begins").await;
+        self.log("~ ~ ~ ~ ~ ~ ~ ~").await;
 
         for character in self.characters.iter() {
             character.on_battle_start();
@@ -97,7 +98,7 @@ impl CoreGame {
             self.set_character_part_of_active_group(player_char).await;
         }
 
-        self.log("Round 1").await;
+        self.log_round_start().await;
 
         loop {
             println!(
@@ -352,7 +353,7 @@ impl CoreGame {
 
                     self.round_index += 1;
 
-                    self.log(format!("Round {}", self.round_index + 1)).await;
+                    self.log_round_start().await;
                 }
 
                 let game_time = self.current_time();
@@ -374,6 +375,14 @@ impl CoreGame {
                 }
             }
         }
+    }
+
+    async fn log_round_start(&self) {
+        self.log(format!(
+            "~ |<sword>| ROUND {} |<sword>| ~",
+            self.round_index + 1
+        ))
+        .await;
     }
 
     async fn spawn_undeads_at_start_of_battle(&self) {
@@ -1211,13 +1220,14 @@ impl CoreGame {
         //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
         if let Some(surface) = self.pathfind_grid.surface(character.pos()) {
             if surface.is_liquid() && !character.has_condition(&Condition::Wet) {
+                let source = "Water surface";
                 self.perform_character_receive_condition(
                     character,
                     ApplyCondition::rounds(Condition::Wet, 1),
-                    "Water surface",
+                    source,
                 )
                 .await;
-                self.perform_character_lose_condition(character, Condition::Burning, "Water")
+                self.perform_character_lose_condition(character, Condition::Burning, source)
                     .await;
             }
             if surface == Surface::Poison {
@@ -1434,8 +1444,9 @@ impl CoreGame {
 
         if did_receive {
             let mut line = format!(
-                "  |{}| received |<keyword>{}|",
+                "  |{}| gained: |<status>{:?}| |<keyword>{}|",
                 receiver.name_tag(),
+                apply_condition.condition.status_id(),
                 apply_condition.condition.name()
             );
 
@@ -2679,7 +2690,7 @@ impl CoreGame {
             };
 
             detail_lines.push(format!(
-                "{} {} (|<red_dice>|<stat>Attack|)| {}- {} (|<evasion>|<stat>Evasion|) = |<value>{}|",
+                "{} {} (|<red_dice>|<stat>Attack|)| {}-{} (|<evasion>|<stat>Evasion|) = |<value>{}|",
                 unmodified_roll,
                 plus_minus(attack_modifier),
                 attack_bonus_str,
@@ -4804,7 +4815,7 @@ impl Condition {
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
-            Protected => "Takes |<value>-x| |<sword>| damage from the next attack.",
+            Protected => "Receives |<value>x| less |<sword>| damage from the next attack.",
             Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
             Burning => "|<faded>End of turn:| deals |<value>x| damage.\n|<value>50%| spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
@@ -4883,7 +4894,7 @@ impl Condition {
         }
     }
 
-    pub const fn status_icon(&self) -> StatusId {
+    pub const fn status_id(&self) -> StatusId {
         use Condition::*;
         match self {
             Protected => StatusId::Protected,
@@ -4923,12 +4934,13 @@ impl Condition {
         }
     }
 
-    pub const fn related_keywords(&self) -> [Option<Keyword>; 2] {
+    pub const fn related_keywords(&self) -> &'static [Keyword] {
         use Condition::*;
         match self {
-            Blinded => [Some(Keyword::Flanked), None],
-            NearDeath => [Some(Keyword::Advantage), None],
-            _ => [None, None],
+            Blinded => &[Keyword::Flanked],
+            NearDeath => &[Keyword::Advantage],
+            ArcaneBlessing => &[Keyword::Advantage],
+            _ => &[],
         }
     }
 }

@@ -2196,7 +2196,7 @@ impl GameGrid {
                     }
                     ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
-                        texture = Some(condition.status_icon());
+                        texture = Some(condition.status_id());
                         if condition.is_positive() {
                             TextEffectStyle::PositiveEffect
                         } else {
@@ -2208,7 +2208,7 @@ impl GameGrid {
                     ApplyEffect::GainStamina(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::GainMana(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::LoseCondition { condition, .. } => {
-                        texture = Some(condition.status_icon());
+                        texture = Some(condition.status_id());
                         TextEffectStyle::PositiveEffect
                     }
                     ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
@@ -2238,7 +2238,7 @@ impl GameGrid {
                     character_id,
                     start_time,
                     2.0,
-                    Some(condition.status_icon()),
+                    Some(condition.status_id()),
                     condition.name().to_string(),
                     style,
                 );
@@ -5610,7 +5610,7 @@ impl GameGrid {
             let mut status_x =
                 box_x + box_w / 2.0 - (condition_infos.len() as f32 * status_w) / 2.0;
             for info in condition_infos {
-                let texture = info.condition.status_icon();
+                let texture = info.condition.status_id();
                 //let status_bg = BLACK;
                 let status_bg = Color::new(0.0, 0.0, 0.0, 0.6);
                 draw_rectangle(status_x, status_y, status_w, status_w, status_bg);

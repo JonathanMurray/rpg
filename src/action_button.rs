@@ -109,8 +109,8 @@ pub fn button_action_tooltip(action: &ButtonAction, character: Option<&Character
     // If any of the tooltip's keywords mention other keywords, add them as well
     let mut additional_keywords = HashSet::new();
     for keyword in &tooltip.keywords {
-        if let Keyword::Cond(condition, amount) = keyword {
-            for k in condition.related_keywords().into_iter().flatten() {
+        if let Keyword::Cond(condition, _amount) = keyword {
+            for k in condition.related_keywords() {
                 additional_keywords.insert(k);
             }
         }
@@ -494,10 +494,11 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             .push(format!("  Lose |<value>{}| |<heart>| health", n)),
         ApplyEffect::GainHealth(n) => t
             .technical_description
-            .push(format!("  Heal for |<value>{}| |<heart>|", n)),
+            .push(format!("  |<value>{}| |<heart>| healing", n)),
         ApplyEffect::Condition(apply_condition) => {
             let mut line = format!(
-                "  Gain condition: |<keyword>{}|",
+                "  Gain: |<status>{:?}| |<keyword>{}|",
+                apply_condition.condition.status_id(),
                 apply_condition.condition.name()
             );
             if let Some(stacks) = apply_condition.stacks {
@@ -515,8 +516,11 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         }
 
         ApplyEffect::LoseCondition { condition } => {
-            let line = format!("  Removes |<keyword>{}|", condition.name());
-
+            let line = format!(
+                "  Lose: |<status>{:?}| |<keyword>{}|",
+                condition.status_id(),
+                condition.name()
+            );
             t.technical_description.push(line);
             t.keywords.push(Keyword::Cond(condition, None));
         }

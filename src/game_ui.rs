@@ -1941,20 +1941,31 @@ impl UserInterface {
                     ApplyEffect::GainStamina(n) => format!("gained {n} stamina"),
                     ApplyEffect::GainMana(n) => format!("gained {n} mana"),
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
-                        format!("received condition: |<keyword>{}|", condition.name())
+                        format!(
+                            "gained: |<status>{:?}| |<keyword>{}|",
+                            condition.status_id(),
+                            condition.name()
+                        )
                     }
                     ApplyEffect::LoseCondition { condition } => {
-                        format!("lost condition: |<keyword>{}|", condition.name())
+                        format!(
+                            "lost: |<status>{:?}| |<keyword>{}|",
+                            condition.status_id(),
+                            condition.name()
+                        )
                     }
                     ApplyEffect::Pushed(_) => todo!(),
                     ApplyEffect::Escape => todo!(),
                 };
 
                 if !verb_phrase.is_empty() {
-                    self.log.add_with_details(
-                        format!("|{name_tag}| {verb_phrase}"),
-                        &[format!("|<faded>Source:| {source}")],
-                    );
+                    let line = format!("|{name_tag}| {verb_phrase}");
+                    if source.is_empty() {
+                        self.log.add(line);
+                    } else {
+                        self.log
+                            .add_with_details(line, &[format!("|<faded>Source:| {source}")]);
+                    }
                 }
 
                 self.show_applied_effect(applied_effect, character, 0.0);

@@ -661,7 +661,7 @@ impl PlayerCharacterPortrait {
             match statuses.get(i) {
                 Some(info) => {
                     status_rect.borrow_mut().style.bg_color = Some(BLACK);
-                    status_rect.borrow_mut().texture = Some(info.condition.status_icon());
+                    status_rect.borrow_mut().texture = Some(info.condition.status_id());
                     if status_rect.borrow().has_been_hovered.take() {
                         self.hovered_status_rect.set(Some((i, *info)));
                     }
