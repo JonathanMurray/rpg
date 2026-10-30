@@ -79,13 +79,14 @@ impl CoreGame {
             character.on_battle_start();
             // The condition's duration is set relative to the character's turn index, so that it affects each character
             // equally long, after they move out of a surface.
+            /*
             let char_game_time = if character.player_controlled() {
                 0
             } else {
                 character.index_in_round.get().unwrap()
             };
-            self.handle_character_standing_on_surface(character, char_game_time)
-                .await;
+             */
+            self.handle_character_standing_on_surface(character).await;
         }
 
         self.on_character_positions_changed();
@@ -124,7 +125,7 @@ impl CoreGame {
                 return Ok(());
             }
 
-            self.handle_character_standing_on_surface(self.active_character(), self.current_time())
+            self.handle_character_standing_on_surface(self.active_character())
                 .await;
 
             let action_or_character_change = self.user_interface.select_action(&self).await?;
@@ -242,6 +243,27 @@ impl CoreGame {
             }
 
             for ch in self.characters.iter() {
+                for dmg_type in ch.recently_received_damage_types.borrow_mut().drain() {
+                    if dmg_type == DamageType::Fire {
+                        self.perform_character_lose_condition(ch, Condition::Wet, "Fire")
+                            .await;
+                        let frost_melted = self
+                            .perform_character_lose_condition(ch, Condition::Frosty, "Fire")
+                            .await;
+                        if frost_melted {
+                            self.perform_character_receive_condition(
+                                ch,
+                                ApplyCondition::rounds(Condition::Wet, 1),
+                                "Melting frost",
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+
+            for ch in self.characters.iter() {
+                // TODO push all the characters in parallel, instead of each one separately
                 if let Some(vector) = ch.is_being_pushed_along_vector.take() {
                     self.perform_character_pushed(ch, vector).await?;
                 }
@@ -1041,8 +1063,7 @@ impl CoreGame {
                 }
             }
 
-            self.handle_character_standing_on_surface(character, self.current_time())
-                .await;
+            self.handle_character_standing_on_surface(character).await;
 
             positions.remove(0);
             step_idx += 1;
@@ -1100,23 +1121,16 @@ impl CoreGame {
                     .await;
                 self.perform_character_receive_condition(
                     character,
-                    ApplyCondition {
-                        condition: Condition::Burning,
-                        stacks: Some(2),
-                        duration_rounds: None,
-                    },
+                    ApplyCondition::stacks(Condition::Burning, 2),
+                    "Fire surface",
                 )
                 .await;
-                character.lose_condition(Condition::Wet);
             }
             Surface::Spikes => {
                 self.perform_character_receive_condition(
                     character,
-                    ApplyCondition {
-                        condition: Condition::Bleeding,
-                        stacks: Some(1),
-                        duration_rounds: None,
-                    },
+                    ApplyCondition::stacks(Condition::Bleeding, 1),
+                    "Spikes surface",
                 )
                 .await;
             }
@@ -1124,10 +1138,30 @@ impl CoreGame {
         }
     }
 
+    async fn perform_character_lose_condition(
+        &self,
+        ch: &Character,
+        condition: Condition,
+        reason: &'static str,
+    ) -> bool {
+        if ch.lose_condition(condition) {
+            self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                character: ch.id(),
+                applied_effect: ApplyEffect::LoseCondition { condition },
+                source: reason,
+            })
+            .await;
+            true
+        } else {
+            false
+        }
+    }
+
     async fn perform_character_receive_condition(
         &self,
         character: &Character,
         apply_condition: ApplyCondition,
+        source: &'static str,
     ) {
         let ends_at = apply_condition
             .duration_rounds
@@ -1138,7 +1172,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
                 applied_effect: ApplyEffect::Condition(apply_condition),
-                source: "",
+                source,
             })
             .await;
         }
@@ -1173,30 +1207,25 @@ impl CoreGame {
         }
     }
 
-    async fn handle_character_standing_on_surface(&self, character: &Character, game_time: u32) {
+    async fn handle_character_standing_on_surface(&self, character: &Character) {
         //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
         if let Some(surface) = self.pathfind_grid.surface(character.pos()) {
             if surface.is_liquid() && !character.has_condition(&Condition::Wet) {
                 self.perform_character_receive_condition(
                     character,
-                    ApplyCondition {
-                        condition: Condition::Wet,
-                        stacks: None,
-                        duration_rounds: Some(1),
-                    },
+                    ApplyCondition::rounds(Condition::Wet, 1),
+                    "Water surface",
                 )
                 .await;
-                character.lose_condition(Condition::Burning);
+                self.perform_character_lose_condition(character, Condition::Burning, "Water")
+                    .await;
             }
             if surface == Surface::Poison {
                 if !character.has_condition(&Condition::Poisoned) && !character.is_swamp_dweller() {
                     self.perform_character_receive_condition(
                         character,
-                        ApplyCondition {
-                            condition: Condition::Poisoned,
-                            stacks: None,
-                            duration_rounds: Some(1),
-                        },
+                        ApplyCondition::rounds(Condition::Poisoned, 1),
+                        "Poison surface",
                     )
                     .await;
                 }
@@ -1308,7 +1337,7 @@ impl CoreGame {
             }
             ApplyEffect::LoseHealth(n) => {
                 //let lost = receiver.health.lose(n);
-                let lost = self.character_lose_health(receiver, n);
+                let lost = self.character_lose_health(receiver, n, None);
                 actual_effect = Some(ApplyEffect::GainHealth(lost));
                 format!("  |{}| lost {} health", receiver.name_tag(), lost)
             }
@@ -1856,16 +1885,8 @@ impl CoreGame {
                     roll_instruction,
                     Some(RollInstruction::RollWithSpellModifier { .. })
                 ) {
-                    if actor.lose_condition(Condition::ArcaneBlessing) {
-                        game.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-                            character: actor_id,
-                            applied_effect: ApplyEffect::LoseCondition {
-                                condition: Condition::ArcaneBlessing,
-                            },
-                            source: "",
-                        })
+                    game.perform_character_lose_condition(actor, Condition::ArcaneBlessing, "")
                         .await;
-                    }
                 }
             }
         }
@@ -1948,8 +1969,7 @@ impl CoreGame {
 
     async fn handle_characters_standing_on_surface(&self) {
         for char in self.characters.iter() {
-            self.handle_character_standing_on_surface(char, self.current_time())
-                .await;
+            self.handle_character_standing_on_surface(char).await;
         }
     }
 
@@ -2297,7 +2317,8 @@ impl CoreGame {
             let damage = dmg_calculation.max(0) as u32;
 
             if let Some(game) = real_game {
-                actual_health_lost += game.character_lose_health(target, damage);
+                actual_health_lost +=
+                    game.character_lose_health(target, damage, Some(overall_dmg_type));
                 dmg_str.push_str(&format!(" = |<value>{damage}|"));
                 detail_lines.push(dmg_str);
             }
@@ -2457,9 +2478,20 @@ impl CoreGame {
         }
     }
 
-    fn character_lose_health(&self, character: &Character, amount: u32) -> u32 {
+    fn character_lose_health(
+        &self,
+        character: &Character,
+        amount: u32,
+        damage_type: Option<DamageType>,
+    ) -> u32 {
         let amount_lost = character.health.lose(amount);
         character.on_health_changed();
+        if let Some(dmg_type) = damage_type {
+            character
+                .recently_received_damage_types
+                .borrow_mut()
+                .insert(dmg_type);
+        }
         amount_lost
     }
 
@@ -2852,14 +2884,18 @@ impl CoreGame {
 
                     dmg_str.push_str(&format!(" = |<value>{damage}|"));
                     detail_lines.push(dmg_str);
-                    actual_health_lost = game.character_lose_health(defender, damage);
+                    actual_health_lost =
+                        game.character_lose_health(defender, damage, Some(DamageType::Regular));
 
                     if weapon.is_melee() {
                         let defender_thorns = defender.thorns();
                         if defender_thorns > 0 {
                             // TODO: How is this shown to player?
-                            let health_lost_to_thorns =
-                                game.character_lose_health(attacker, defender_thorns);
+                            let health_lost_to_thorns = game.character_lose_health(
+                                attacker,
+                                defender_thorns,
+                                Some(DamageType::Regular),
+                            );
                             if health_lost_to_thorns > 0 {
                                 detail_lines.push(format!(
                                     "|{}| lost {} health |<faded>(thorns)|",
@@ -2870,18 +2906,22 @@ impl CoreGame {
                                     .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
                             }
                         }
-                    }
-
-                    if let Some((reaction_name, thorns)) = reaction_thorns {
-                        let health_lost_to_thorns = game.character_lose_health(attacker, thorns);
-                        if health_lost_to_thorns > 0 {
-                            detail_lines.push(format!(
-                                "|{}| lost {} health |<faded>({})|",
-                                attacker.name_tag(),
-                                health_lost_to_thorns,
-                                reaction_name
-                            ));
-                            applied_to_self.push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                        if let Some((reaction_name, thorns)) = reaction_thorns {
+                            let health_lost_to_thorns = game.character_lose_health(
+                                attacker,
+                                thorns,
+                                Some(DamageType::Regular),
+                            );
+                            if health_lost_to_thorns > 0 {
+                                detail_lines.push(format!(
+                                    "|{}| lost {} health |<faded>({})|",
+                                    attacker.name_tag(),
+                                    health_lost_to_thorns,
+                                    reaction_name
+                                ));
+                                applied_to_self
+                                    .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                            }
                         }
                     }
 
@@ -2999,11 +3039,7 @@ impl CoreGame {
                                 let stacks = (damage * x.num) / x.den;
                                 let line = game
                                     .apply_condition_on_character(
-                                        ApplyCondition {
-                                            condition,
-                                            stacks: Some(stacks),
-                                            duration_rounds: None,
-                                        },
+                                        ApplyCondition::stacks(condition, stacks),
                                         defender,
                                     )
                                     .map_or_else(std::convert::identity, std::convert::identity);
@@ -3160,11 +3196,8 @@ impl CoreGame {
                 let reactor = self.characters.get(reactor_id);
                 self.perform_character_receive_condition(
                     reactor,
-                    ApplyCondition {
-                        condition: raging,
-                        stacks: None,
-                        duration_rounds: None,
-                    },
+                    ApplyCondition::of(raging),
+                    "Reaction",
                 )
                 .await;
             }
@@ -3238,7 +3271,7 @@ impl CoreGame {
         amount: u32,
         source: DamageSource,
     ) {
-        let lost = self.character_lose_health(character, amount);
+        let lost = self.character_lose_health(character, amount, Some(source.damage_type()));
         self.ui_handle_event(GameEvent::CharacterTookDamage {
             character: character.id(),
             amount: lost,
@@ -3375,11 +3408,8 @@ impl CoreGame {
                             num_receivers += 1;
                             self.perform_character_receive_condition(
                                 other,
-                                ApplyCondition {
-                                    condition: Condition::Burning,
-                                    stacks: Some(stacks),
-                                    duration_rounds: None,
-                                },
+                                ApplyCondition::stacks(Condition::Burning, stacks),
+                                "Spreading fire",
                             )
                             .await;
                         }
@@ -3432,11 +3462,8 @@ impl CoreGame {
         if character.knows_passive(PassiveSkill::RisingTemper) {
             self.perform_character_receive_condition(
                 character,
-                ApplyCondition {
-                    condition: Condition::Ferocity,
-                    stacks: Some(1),
-                    duration_rounds: None,
-                },
+                ApplyCondition::stacks(Condition::Ferocity, 1),
+                "Rising temper",
             )
             .await;
         }
@@ -4141,6 +4168,14 @@ impl DamageSource {
             DamageSource::SpikesSurface => "Spikes",
             DamageSource::FireSurface => "Fire",
             DamageSource::Ability(ability) => ability.name,
+        }
+    }
+
+    pub fn damage_type(&self) -> DamageType {
+        match self {
+            DamageSource::FireSurface => DamageType::Fire,
+            DamageSource::Ability(ability) => ability.main_damage_type().unwrap(),
+            _ => DamageType::Regular,
         }
     }
 }
@@ -4965,11 +5000,27 @@ pub struct ApplyCondition {
 }
 
 impl ApplyCondition {
-    pub const fn new(condition: Condition) -> Self {
+    pub const fn of(condition: Condition) -> Self {
         Self {
             condition,
             stacks: None,
             duration_rounds: None,
+        }
+    }
+
+    pub const fn stacks(condition: Condition, stacks: u32) -> Self {
+        Self {
+            condition,
+            stacks: Some(stacks),
+            duration_rounds: None,
+        }
+    }
+
+    pub const fn rounds(condition: Condition, rounds: u32) -> Self {
+        Self {
+            condition,
+            stacks: None,
+            duration_rounds: Some(rounds),
         }
     }
 }
@@ -5512,7 +5563,7 @@ impl AbilityAttackEffect {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DamageType {
     Regular,
     Fire,
@@ -6138,6 +6189,7 @@ pub struct Character {
     pub engagement_target: Cell<Option<CharacterId>>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
+    recently_received_damage_types: RefCell<HashSet<DamageType>>,
 
     pub facing: Cell<CharacterFacing>,
     is_being_pushed_along_vector: Cell<Option<(i32, i32)>>,
@@ -6227,6 +6279,7 @@ impl Character {
             is_engaged_by: Default::default(),
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
+            recently_received_damage_types: Default::default(),
             facing: Cell::new(CharacterFacing::West),
             is_being_pushed_along_vector: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),

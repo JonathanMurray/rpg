@@ -2181,9 +2181,7 @@ impl GameGrid {
             TextEffect::ApplyEffect(applied_effect) => {
                 let mut s = String::new();
                 let mut texture = None;
-                if let ApplyEffect::Condition(condition) = applied_effect {
-                    texture = Some(condition.condition.status_icon());
-                }
+
                 s.push_str(&format!("{} ", applied_effect));
                 let style = match applied_effect {
                     ApplyEffect::Pushed(_) => return false,
@@ -2198,6 +2196,7 @@ impl GameGrid {
                     }
                     ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
+                        texture = Some(condition.status_icon());
                         if condition.is_positive() {
                             TextEffectStyle::PositiveEffect
                         } else {
@@ -2208,7 +2207,10 @@ impl GameGrid {
                     ApplyEffect::GainHealth(_) => TextEffectStyle::Heal,
                     ApplyEffect::GainStamina(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::GainMana(_) => TextEffectStyle::PositiveEffect,
-                    ApplyEffect::LoseCondition { .. } => TextEffectStyle::PositiveEffect,
+                    ApplyEffect::LoseCondition { condition, .. } => {
+                        texture = Some(condition.status_icon());
+                        TextEffectStyle::PositiveEffect
+                    }
                     ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
                 };
 

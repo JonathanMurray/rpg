@@ -1953,7 +1953,7 @@ impl UserInterface {
                 if !verb_phrase.is_empty() {
                     self.log.add_with_details(
                         format!("|{name_tag}| {verb_phrase}"),
-                        &[format!("|<faded>Source: {source}|")],
+                        &[format!("|<faded>Source:| {source}")],
                     );
                 }
 

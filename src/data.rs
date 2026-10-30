@@ -2361,27 +2361,15 @@ pub const ICE_BOLT: Ability = Ability {
 };
 
 const fn apply_condition(condition: Condition) -> ApplyEffect {
-    ApplyEffect::Condition(ApplyCondition {
-        condition,
-        stacks: None,
-        duration_rounds: None,
-    })
+    ApplyEffect::Condition(ApplyCondition::of(condition))
 }
 
 const fn apply_condition_stacks(condition: Condition, stacks: u32) -> ApplyEffect {
-    ApplyEffect::Condition(ApplyCondition {
-        condition,
-        stacks: Some(stacks),
-        duration_rounds: None,
-    })
+    ApplyEffect::Condition(ApplyCondition::stacks(condition, stacks))
 }
 
 const fn apply_condition_rounds(condition: Condition, rounds: u32) -> ApplyEffect {
-    ApplyEffect::Condition(ApplyCondition {
-        condition,
-        stacks: None,
-        duration_rounds: Some(rounds),
-    })
+    ApplyEffect::Condition(ApplyCondition::rounds(condition, rounds))
 }
 
 pub const ENEMY_BURNING_ARROW: Ability = Ability {

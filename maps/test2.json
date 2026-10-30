@@ -416,7 +416,35 @@
         "NorthEast",
         "Water"
       ]
-    }
+    },
+    "(31, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(34, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(34, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 25)": "FireSurfaceSingleCell",
+    "(34, 25)": "FireSurfaceSingleCell",
+    "(31, 28)": "FireSurfaceSingleCell",
+    "(34, 16)": "FireSurfaceSingleCell"
   },
   "control_points": {},
   "characters": [
@@ -458,17 +486,6 @@
       "pos": [
         22,
         18
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Enslaved",
-      "pos": [
-        34,
-        22
       ],
       "health": null,
       "main_hand": null,
