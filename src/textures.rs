@@ -174,6 +174,7 @@ pub enum StatusId {
     Advantage,
     Mana,
     Blade,
+    Frost,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -183,6 +184,7 @@ pub enum IconId {
     Undead,
 
     Fireball,
+    Icebolt,
     SearingLight,
     MeleeAttack,
     RangedAttack,
@@ -1315,6 +1317,7 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
         IconId::Undefined => (1, 3),
         IconId::Undead => (2, 3),
         IconId::Fireball => (0, 1),
+        IconId::Icebolt => (3, 3),
         IconId::SearingLight => (2, 1),
         IconId::MeleeAttack => (6, 8),
         IconId::RangedAttack => (6, 7),
@@ -1452,6 +1455,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::Advantage => (5, 2),
         StatusId::Mana => (5, 3),
         StatusId::Blade => (0, 4),
+        StatusId::Frost => (1, 4),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

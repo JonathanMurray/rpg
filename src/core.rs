@@ -2195,8 +2195,6 @@ impl CoreGame {
             let mut dmg_calculation;
             let mut is_damage_affected_by_roll = true;
             let mut dmg_str = "  Damage: ".to_string();
-            let is_fire_dmg;
-            let is_lightning_dmg;
 
             let overall_dmg_type;
 
@@ -2204,15 +2202,11 @@ impl CoreGame {
                 AbilityDamage::Fixed(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_damage_affected_by_roll = false;
-                    is_fire_dmg = matches!(dmg_type, DamageType::Fire);
-                    is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                     overall_dmg_type = dmg_type;
                 }
                 AbilityDamage::Dynamic(n, dmg_type) => {
                     dmg_calculation = n as i32;
-                    is_fire_dmg = matches!(dmg_type, DamageType::Fire);
-                    is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                     overall_dmg_type = dmg_type;
                 }
@@ -2263,14 +2257,18 @@ impl CoreGame {
                     }
                 }
 
-                if target.has_condition(&Condition::Wet) {
-                    if is_fire_dmg {
-                        dmg_str.push_str(" -25% |<faded>(Wet)|");
-                        multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.25).ceil() as i32;
-                    }
-                    if is_lightning_dmg {
-                        dmg_str.push_str(" +50% |<faded>(Wet)|");
-                        multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                if let Some(dmg_sensitivity) = target.damage_sensitivity(overall_dmg_type) {
+                    match dmg_sensitivity {
+                        DamageSensitivity::Vulnerable(label) => {
+                            dmg_str.push_str(&format!(" +50% |<faded>({label})|"));
+                            multiplicative_bonus_dmg +=
+                                (dmg_calculation as f32 * 0.5).ceil() as i32;
+                        }
+                        DamageSensitivity::Resistant(label) => {
+                            dmg_str.push_str(&format!(" -25% |<faded>({label})|"));
+                            multiplicative_bonus_dmg -=
+                                (dmg_calculation as f32 * 0.25).ceil() as i32;
+                        }
                     }
                 }
 
@@ -4715,6 +4713,7 @@ pub enum Condition {
     HungeringBladeSouls,
     ArcaneBlessing,
     SpellFinesse,
+    Frosty,
 }
 
 impl Condition {
@@ -4755,6 +4754,7 @@ impl Condition {
             HungeringBladeSouls => "Captured souls",
             ArcaneBlessing => "Arcane blessing",
             SpellFinesse => "Spell finesse",
+            Frosty => "Frosty",
         }
     }
 
@@ -4764,14 +4764,14 @@ impl Condition {
             Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
             Blinded => "The miss chance of attacks and certain abilities is increased to |<value>25%| (from |<value>5%|).\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
-            Slowed => "|<value>-2| |<ap>| AP per turn..\n|<value>-25%| movement",
-            Hastened => "|<value>+1| |<ap>| AP per turn..\n|<value>+25%| movement",
+            Slowed => "|<value>-2| |<ap>| AP per turn",
+            Hastened => "|<value>+1| |<ap>| AP per turn",
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes |<value>-x| |<sword>| damage from the next attack.",
             Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
-            Burning => "|<faded>End of turn:| deals |<value>x| damage.\n50% spreads to adjacent.",
+            Burning => "|<faded>End of turn:| deals |<value>x| damage.\n|<value>50%| spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<evasion>| |<stat>Evasion| against the next attack.",
             Weakened => "|<value>-x| to all defenses and dice rolls.",
@@ -4789,12 +4789,13 @@ impl Condition {
             HealthPotionRecovering => "|<faded>End of turn:| heal |<value>3| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
-            Wet => "Takes |<value>-25%| |<fire>|fire damage and |<value>+50%| |<lightning>|lightning damage",
+            Wet => "Resistant: |<value>-25%| |<fire>||<faded>fire dmg|\n|Vulnerable: |<value>+50%| |<lightning>||<faded>lightning dmg|",
             Poisoned => "|<faded>End of turn:| lose |<value>10%| of current health |<heart>|",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
             ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
-            SpellFinesse => "After spending mana on a spell enhancement, regain |<value>1| |<mana>| mana"
+            SpellFinesse => "After spending mana on a spell enhancement, regain |<value>1| |<mana>| mana",
+            Frosty =>  "|<value>-1| |<ap>| AP per turn\nResistant: |<value>-25%| |<fire>||<faded>fire dmg|",
         }
     }
 
@@ -4835,6 +4836,7 @@ impl Condition {
             HungeringBladeSouls => true,
             ArcaneBlessing => true,
             SpellFinesse => true,
+            Frosty => false,
         }
     }
 
@@ -4867,6 +4869,7 @@ impl Condition {
             ReaperApCooldown => StatusId::ReaperApCooldown,
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
+            Frosty => StatusId::Frost,
             Ferocity => StatusId::Blade,
             Ruthless => StatusId::Rage,
             Wet => StatusId::Wet,
@@ -4903,6 +4906,7 @@ const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 //const INSPIRED_WILL_BONUS: u32 = 3;
 const INSPIRED_MOVE_BONUS: f32 = 3.0;
 const SLOWED_AP_PENALTY: u32 = 2;
+const FROSTY_AP_PENALTY: u32 = 1;
 const HASTENED_AP_BONUS: u32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -5398,6 +5402,7 @@ pub enum AbilityId {
     Haste,
     Fireball,
     FireBolt,
+    IceBolt,
     LightningBolt,
     SearingLight,
     Execute,
@@ -6256,16 +6261,21 @@ impl Character {
 
     pub fn end_of_turn_ap_gain(&self) -> u32 {
         let mut gain_ap = ACTION_POINTS_PER_TURN;
-        if self.conditions.borrow().has(&Condition::Adrenalin) {
+        if self.has_condition(&Condition::Adrenalin) {
             gain_ap += 1;
         }
-        if self.conditions.borrow().has(&Condition::NearDeath) {
+        if self.has_condition(&Condition::NearDeath) {
             gain_ap = gain_ap.saturating_sub(1);
         }
-        if self.conditions.borrow().has(&Condition::Slowed) {
+
+        if self.has_condition(&Condition::Slowed) {
             gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
         }
-        if self.conditions.borrow().has(&Condition::Hastened) {
+        if self.has_condition(&Condition::Frosty) {
+            gain_ap = gain_ap.saturating_sub(FROSTY_AP_PENALTY);
+        }
+
+        if self.has_condition(&Condition::Hastened) {
             gain_ap += HASTENED_AP_BONUS;
         }
         gain_ap
@@ -6413,7 +6423,7 @@ impl Character {
 
     fn maybe_gain_resources_from_reaper(&self) -> Option<(u32, u32)> {
         if self.knows_passive(PassiveSkill::Reaper) {
-            let (sta, ap) = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
+            let (sta, ap) = if self.has_condition(&Condition::ReaperApCooldown) {
                 (0, 0)
             } else {
                 (self.stamina.gain(2), self.action_points.gain(2))
@@ -6445,12 +6455,6 @@ impl Character {
         let mut modifier = 1.0;
         if self.has_condition(&Condition::Hindered) {
             modifier -= 0.5;
-        }
-        if self.has_condition(&Condition::Slowed) {
-            modifier -= 0.25;
-        }
-        if self.has_condition(&Condition::Hastened) {
-            modifier += 0.25;
         }
 
         if self.knows_passive(PassiveSkill::Undead) {
@@ -6540,7 +6544,7 @@ impl Character {
     }
 
     pub fn is_dead(&self) -> bool {
-        self.conditions.borrow().has(&Condition::Dead)
+        self.has_condition(&Condition::Dead)
     }
 
     pub fn listen_to_changed_equipment(&self) -> Rc<Cell<bool>> {
@@ -7308,7 +7312,7 @@ impl Character {
 
     pub fn can_use_on_hit_reaction(&self, reaction: OnHitReaction, is_within_melee: bool) -> bool {
         if let OnHitReactionEffect::Rage = reaction.effect {
-            if self.conditions.borrow().has(&Condition::Raging) {
+            if self.has_condition(&Condition::Raging) {
                 // Can't use this reaction while already raging
                 return false;
             }
@@ -7819,17 +7823,46 @@ impl Character {
             terms.push(("Near-death", RollBonusContributor::Advantage(1)))
         }
         if conditions.has(&Condition::Exposed) {
+            // Reduced defenses
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
         }
-        if main_damage_type == Some(DamageType::Lightning) && conditions.has(&Condition::Wet) {
-            // Increases damage
-            terms.push(("Wet", RollBonusContributor::OtherPositive));
+
+        if let Some(dmg_type) = main_damage_type {
+            if let Some(dmg_sensitivity) = self.damage_sensitivity(dmg_type) {
+                match dmg_sensitivity {
+                    DamageSensitivity::Vulnerable(label) => {
+                        // Increases damage
+                        terms.push((label, RollBonusContributor::OtherPositive));
+                    }
+                    DamageSensitivity::Resistant(label) => {
+                        // Reduces damage
+                        terms.push((label, RollBonusContributor::OtherNegative));
+                    }
+                }
+            }
         }
-        if main_damage_type == Some(DamageType::Fire) && conditions.has(&Condition::Wet) {
-            // Reduces damage
-            terms.push(("Wet", RollBonusContributor::OtherNegative));
-        }
+
         terms
+    }
+
+    fn damage_sensitivity(&self, damage_type: DamageType) -> Option<DamageSensitivity> {
+        match damage_type {
+            DamageType::Regular => {}
+            DamageType::Fire => {
+                if self.has_condition(&Condition::Wet) {
+                    return Some(DamageSensitivity::Resistant("Wet"));
+                }
+                if self.has_condition(&Condition::Frosty) {
+                    return Some(DamageSensitivity::Resistant("Frosty"));
+                }
+            }
+            DamageType::Lightning => {
+                if self.has_condition(&Condition::Wet) {
+                    return Some(DamageSensitivity::Vulnerable("Wet"));
+                }
+            }
+        }
+        None
     }
 
     pub fn is_bleeding(&self) -> bool {
@@ -7866,20 +7899,26 @@ impl Character {
                 }
             }
         } else {
-            if condition == Condition::Hindered {
-                self.remaining_movement
-                    .set(self.remaining_movement.get() - self.base_free_movement.get() * 0.5);
-            } else if condition == Condition::Slowed {
-                self.action_points.lose(SLOWED_AP_PENALTY);
-                self.remaining_movement
-                    .set(self.remaining_movement.get() - self.base_free_movement.get() * 0.25);
-            } else if condition == Condition::Hastened {
-                self.action_points.gain(HASTENED_AP_BONUS);
-                self.remaining_movement
-                    .set(self.remaining_movement.get() + self.base_free_movement.get() * 0.25);
-            } else if condition == Condition::Inspired {
-                self.remaining_movement
-                    .set(self.remaining_movement.get() + INSPIRED_MOVE_BONUS);
+            match condition {
+                Condition::Hindered => {
+                    self.remaining_movement
+                        .set(self.remaining_movement.get() - self.base_free_movement.get() * 0.5);
+                }
+                Condition::Slowed => {
+                    self.action_points.lose(SLOWED_AP_PENALTY);
+                }
+                Condition::Frosty => {
+                    self.action_points.lose(FROSTY_AP_PENALTY);
+                }
+                Condition::Hastened => {
+                    self.action_points.gain(HASTENED_AP_BONUS);
+                }
+                Condition::Inspired => {
+                    self.remaining_movement
+                        .set(self.remaining_movement.get() + INSPIRED_MOVE_BONUS);
+                }
+
+                _ => {}
             }
 
             conditions
@@ -7899,6 +7938,12 @@ impl Character {
     pub fn has_condition(&self, condition: &Condition) -> bool {
         self.conditions.borrow().has(condition)
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum DamageSensitivity {
+    Vulnerable(&'static str),
+    Resistant(&'static str),
 }
 
 fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {

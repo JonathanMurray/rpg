@@ -1247,6 +1247,7 @@ impl GameGrid {
                     },
                 ));
 
+                // Wiggle back and forth
                 let mut x_offsets = vec![];
                 for i in 0..10 {
                     let d = 0.05;
@@ -1269,7 +1270,8 @@ impl GameGrid {
                             (
                                 SpriteProperty::WeaponRotation,
                                 PropertyTimeline(vec![
-                                    PropertyUpdate::linear(0.2, weapon_rotation),
+                                    PropertyUpdate::fixed(0.2),
+                                    PropertyUpdate::linear(0.7, weapon_rotation),
                                     PropertyUpdate::linear(1.0, 0.0),
                                 ]),
                             ),
@@ -1280,6 +1282,14 @@ impl GameGrid {
                             (
                                 SpriteProperty::CharacterXOffsetCellW,
                                 PropertyTimeline(x_offsets),
+                            ),
+                            (
+                                SpriteProperty::CharacterRotateForward,
+                                PropertyTimeline(vec![
+                                    PropertyUpdate::linear(0.2, -0.03 * PI),
+                                    PropertyUpdate::linear(0.5, 0.1 * PI),
+                                    PropertyUpdate::linear(1.0, 0.0),
+                                ]),
                             ),
                         ],
                     },
@@ -3898,8 +3908,6 @@ impl GameGrid {
                         //println!("requires point target...");
                         //dbg!(&range_indicator);
                         if let Some((_char_id, range, _indicator, _acquisition)) = range_indicator {
-                            // TODO
-                            dbg!(range);
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))

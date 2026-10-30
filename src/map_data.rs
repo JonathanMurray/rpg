@@ -18,8 +18,8 @@ use crate::{
         DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
         ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS,
         FIRE_BOLT, HEALING_NOVA, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
-        INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE,
-        LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
+        ICE_BOLT, INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
+        LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
         SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH,
         TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW,
     },
@@ -32,10 +32,10 @@ use crate::{
 
 use crate::data::{
     PassiveSkill, ARCANE_POTION, BLESS, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEALTH_POTION, HEAL_ENERGIZE,
-    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MEDIUM_SHIELD,
-    PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE, SWEEP_ATTACK,
-    SWORD,
+    FIREBALL_INFERNO, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS,
+    INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MASSIVE_RADIUS, MEDIUM_SHIELD,
+    PIERCING_SHOT, REACH, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
+    SWEEP_ATTACK, SWORD,
 };
 
 pub fn create_game_grid(
@@ -634,7 +634,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_ability(&DASH);
     clara.learn_ability(&FIRE_BOLT);
-    clara.learn_ability_enhancement(&FIREBALL_REACH);
+    clara.learn_ability_enhancement(&REACH);
     clara.learn_ability(&LIGHTNING_BOLT);
     clara.learn_ability_enhancement(&LIGHTNING_BOLT_REACH);
     clara.learn_ability(&SHACKLED_MIND);
@@ -747,11 +747,11 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.learn_passive(PassiveSkill::CriticalCharge);
     clara.learn_ability(&FIRE_BOLT);
     clara.learn_ability_enhancement(&FIREBALL_INFERNO);
-    clara.learn_ability_enhancement(&FIREBALL_MASSIVE);
-    clara.learn_ability_enhancement(&FIREBALL_REACH);
+    clara.learn_ability_enhancement(&MASSIVE_RADIUS);
+    clara.learn_ability_enhancement(&REACH);
     clara.learn_ability(&FIREBALL);
     clara.learn_ability(&DASH);
-    clara.learn_ability(&INFLICT_WOUNDS);
+    clara.learn_ability(&ICE_BOLT);
     clara.learn_ability_enhancement(&INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(&LIGHTNING_BOLT);
     clara.learn_ability_enhancement(&LIGHTNING_BOLT_REACH);

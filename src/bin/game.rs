@@ -26,9 +26,9 @@ use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, Player
 
 use rpg::data::{
     PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, BLESS,
-    CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE,
-    HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION,
-    NECROTIC_BAND, PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
+    CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, HEALTH_POTION, HEAL_ENERGIZE,
+    HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
+    PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -196,7 +196,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                     (
                         PlayerId::Clara,
                         CharacterGrowth::of(
-                            vec![ButtonAction::AbilityEnhancement(&FIREBALL_MASSIVE)],
+                            vec![ButtonAction::AbilityEnhancement(&MASSIVE_RADIUS)],
                             vec![EquipmentEntry::Consumable(ARCANE_POTION)],
                         ),
                     ),
