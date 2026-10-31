@@ -686,7 +686,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, CHEAT_BOW);
+    alice.set_weapon(HandType::MainHand, BAD_BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(&FIRE_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
@@ -705,11 +705,9 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.learn_ability(&BLESS);
     alice.learn_ability_enhancement(&HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
-    alice.learn_passive(PassiveSkill::WeaponProficiency);
     alice.learn_ability(&PIERCING_SHOT);
     alice.learn_ability(&KILL);
     alice.learn_ability(&INFLICT_WOUNDS);
-    alice.learn_passive(PassiveSkill::Reaper);
 
     alice
 }
@@ -750,7 +748,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.learn_ability_enhancement(&MASSIVE_RADIUS);
     clara.learn_ability_enhancement(&REACH);
     clara.learn_ability(&FIREBALL);
-    clara.learn_ability(&DASH);
+    clara.learn_ability(&SHACKLED_MIND);
     clara.learn_ability(&ICE_BOLT);
     clara.learn_ability_enhancement(&INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(&LIGHTNING_BOLT);

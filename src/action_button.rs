@@ -489,7 +489,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         ApplyEffect::GainMana(n) => t
             .technical_description
             .push(format!("  Restore |<value>{}| |<mana>| mana", n)),
-        ApplyEffect::LoseHealth(n) => t
+        ApplyEffect::LoseHealth(n, source, dmg_type) => t
             .technical_description
             .push(format!("  Lose |<value>{}| |<heart>| health", n)),
         ApplyEffect::GainHealth(n) => t
@@ -589,7 +589,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         AbilityTarget::Character {
             acquisition,
             effect,
-            circle: impact_circle,
+            circle_effect: impact_circle,
             reach,
             environment_effect,
         } => {

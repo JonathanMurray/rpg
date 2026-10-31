@@ -449,21 +449,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Ghoul1",
-      "pos": [
-        18,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Clara",
       "pos": [
-        33,
-        17
+        31,
+        16
       ],
       "health": null,
       "main_hand": null,
@@ -471,10 +460,43 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Alice",
       "pos": [
         25,
-        23
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        19,
+        16
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        22,
+        15
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Skeleton",
+      "pos": [
+        19,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -484,18 +506,7 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        22,
-        18
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Huldra",
-      "pos": [
-        28,
+        16,
         16
       ],
       "health": null,

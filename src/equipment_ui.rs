@@ -191,7 +191,8 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         describe_apply_effect(effect.apply_effect(), &mut t);
     }
     if let Some(effect) = weapon.on_kill_apply_self {
-        t.technical_description.push(format!("On kill: {effect}"));
+        t.technical_description.push(format!("On kill: "));
+        describe_apply_effect(effect, &mut t);
     }
 
     if let Some(reaction) = weapon.on_attacked_reaction {

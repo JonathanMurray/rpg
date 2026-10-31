@@ -9,7 +9,6 @@ use macroquad::{
     rand::ChooseRandom,
     time::get_time,
 };
-use serde::de;
 
 #[derive(Clone)]
 pub struct SoundPlayer {
@@ -45,9 +44,9 @@ impl SoundPlayer {
             (SoundId::ClickButton, 1.0, vec!["fl_low_click.ogg"]),
             (SoundId::DragEquipment, 1.0, vec!["click_2"]),
             (SoundId::DropEquipment, 1.0, vec!["click_3"]),
-            (SoundId::Explosion, 0.6, vec!["explosion"]),
+            (SoundId::Explosion, 0.4, vec!["explosion"]),
             (SoundId::ShieldBash, 1.5, vec!["fl_shield_bash.ogg"]),
-            (SoundId::SweepAttack, 1.0, vec!["fl_sweep_attack.ogg"]),
+            (SoundId::SweepAttack, 1.3, vec!["fl_sweep_attack.ogg"]),
             (SoundId::FireballHit, 0.8, vec!["fl_fireball_hit.ogg"]),
             (SoundId::LightningHit, 0.25, vec!["fl_lightning_hit.ogg"]),
             (SoundId::Crit, 0.15, vec!["fl_crit.ogg"]),
@@ -169,6 +168,7 @@ impl SoundPlayer {
     }
 
     pub fn play(&self, sound_id: SoundId) {
+        dbg!(sound_id);
         if !self.enabled.get() {
             return;
         }
@@ -190,6 +190,7 @@ impl SoundPlayer {
     }
 
     pub fn play_delayed(&self, sound_id: SoundId, delay: f32) {
+        dbg!((sound_id, delay));
         if delay == 0.0 {
             self.play(sound_id);
         } else {

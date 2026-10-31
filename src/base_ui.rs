@@ -617,14 +617,9 @@ pub fn draw_text_with_font_tags(
             } else if consume_prefix_tag("<name>", &mut part) {
                 if render_tags {
                     params.color = match part {
-                        "Bob" => COL_BOB,
-                        "Gorm" => COL_BOB,
-
-                        "Alice" => COL_ALICE,
-                        "Ylva" => COL_ALICE,
-
-                        "Clara" => COL_CLARA,
-                        "Idun" => COL_CLARA,
+                        "Bob" | "Gorm" => COL_BOB,
+                        "Alice" | "Ylva" => COL_ALICE,
+                        "Clara" | "Idun" | "Test mage" => COL_CLARA,
                         _ => COL_ENEMY,
                     };
                 }

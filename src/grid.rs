@@ -48,10 +48,10 @@ use crate::{
         is_target_within_shape, is_valid_area_target, pushed_vector,
         target_char_within_range_squared, within_range_squared, Ability, AbilityAnimation,
         AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, ActionReach, ActionTarget,
-        ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
-        AttackEnhancementOnHitEffect, BaseAction, Character, CharacterFacing, CircleEffect,
-        Condition, Goodness, HitType, MovementType, Position, TargetAcquisition, TargetLine,
-        TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        AppliedEffect, ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
+        AttackEnhancementOnHitEffect, AudioVisuals, BaseAction, Character, CharacterFacing,
+        CircleEffect, Condition, Goodness, HitType, MovementType, Position, TargetAcquisition,
+        TargetLine, TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -353,28 +353,23 @@ const ZOOM_LEVELS: [u32; 3] = [64, 96, 128];
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum TextEffectStyle {
     PositiveEffect,
-    Heal,
-    Miss,
-    ReactionExclamation,
     NegativeEffect,
-    WeakHit,
     RegularHit,
-    StrongHit,
     CriticalHitLabel,
+    Miss,
+    Heal,
+    ReactionExclamation,
 }
 
 pub enum TextEffect {
-    ApplyEffect(ApplyEffect),
-    ReceiveCondition(Condition),
+    ApplyEffect(AppliedEffect),
     Effect {
         text: String,
         icon: Option<StatusId>,
         positive: bool,
     },
-    Heal(u32),
-    Miss,
     ReactionExclamation,
-    HitDamage(u32, HitType),
+    CriticalHit,
 }
 
 #[derive(Debug)]
@@ -1085,8 +1080,8 @@ impl GameGrid {
                     AnimationDetails::AttackCrosshairPreview { target_pos },
                 ));
             }
-            let text = if ability.speech != "" {
-                ability.speech
+            let text = if ability.audio_visuals.speech != "" {
+                ability.audio_visuals.speech
             } else {
                 ability.name
             };
@@ -1096,20 +1091,20 @@ impl GameGrid {
                 1.0,
                 AnimationDetails::SpeechBubble { text },
             ));
-        } else if ability.speech != "" {
+        } else if ability.audio_visuals.speech != "" {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
                 0.0,
                 1.0,
                 AnimationDetails::SpeechBubble {
-                    text: ability.speech,
+                    text: ability.audio_visuals.speech,
                 },
             ));
         }
 
         let mut aim_duration = 0.0;
 
-        let duration = match ability.animation {
+        let duration = match ability.audio_visuals.animation {
             AbilityAnimation::Dash => {
                 panic!("animate_initiating_ability shouldn't be called for Dash");
             }
@@ -1236,7 +1231,7 @@ impl GameGrid {
 
             AbilityAnimation::CastSpell => {
                 let casting_duration = 0.4;
-                let animation_color = ability.animation_color;
+                let animation_color = ability.audio_visuals.animation_color;
 
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
@@ -1341,7 +1336,7 @@ impl GameGrid {
                 self.add_circle_projectile_effect(
                     delay,
                     duration,
-                    ability.animation_color,
+                    ability.audio_visuals.animation_color,
                     caster_pos,
                     area_pos,
                 );
@@ -1369,7 +1364,7 @@ impl GameGrid {
                             start_time: delay,
                             end_time: delay + visual_duration,
                             variant: EffectVariant::Line {
-                                color: ability.animation_color,
+                                color: ability.audio_visuals.animation_color,
                                 thickness: 10.0,
                                 end_thickness: None,
                                 extend_gradually: true,
@@ -1951,6 +1946,23 @@ impl GameGrid {
         duration
     }
 
+    pub fn animate_ability_target_hit(
+        &mut self,
+        target_id: CharacterId,
+        audio_visuals: &AudioVisuals,
+        start_time: f32,
+    ) {
+        if let Some(effect_id) = audio_visuals.target_effect_id {
+            self.animate_effect(target_id, 0.5, effect_id);
+        }
+
+        if let Some(color) = audio_visuals.target_magic_sparks {
+            self.animate_magic_sparks(target_id, color);
+        }
+
+        self.animate_character_shaking(target_id, start_time);
+    }
+
     pub fn animate_effect(&mut self, character_id: CharacterId, duration: f32, effect: EffectId) {
         let pos = self.characters.get(&character_id).unwrap().pos();
         let pos = (pos.0 as f32, pos.1 as f32 - 0.5);
@@ -2179,23 +2191,32 @@ impl GameGrid {
     ) -> bool {
         match text_effect {
             TextEffect::ApplyEffect(applied_effect) => {
-                let mut s = String::new();
+                let mut f = String::new();
                 let mut texture = None;
 
-                s.push_str(&format!("{} ", applied_effect));
                 let style = match applied_effect {
-                    ApplyEffect::Pushed(_) => return false,
-                    ApplyEffect::LoseActionPoints(_) => {
+                    AppliedEffect::WasPushed(_) => return false,
+                    AppliedEffect::LostActionPoints(n) => {
                         if self.active_character_id == character_id {
                             // When active character "loses" AP, they're most likely just spending it.
                             // That shouldn't show up as a text effect on the grid
                             return false;
                         }
 
+                        for _ in 0..n {
+                            f.push_str("|<lose_ap>|");
+                        }
+
                         TextEffectStyle::NegativeEffect
                     }
-                    ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
-                    ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
+                    AppliedEffect::GainedActionPoints(n) => {
+                        for _ in 0..n {
+                            f.push_str("|<ap>|");
+                        }
+                        TextEffectStyle::PositiveEffect
+                    }
+                    AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => {
+                        f.push_str(condition.name());
                         texture = Some(condition.status_id());
                         if condition.is_positive() {
                             TextEffectStyle::PositiveEffect
@@ -2203,18 +2224,40 @@ impl GameGrid {
                             TextEffectStyle::NegativeEffect
                         }
                     }
-                    ApplyEffect::LoseHealth(_) => TextEffectStyle::RegularHit,
-                    ApplyEffect::GainHealth(_) => TextEffectStyle::Heal,
-                    ApplyEffect::GainStamina(_) => TextEffectStyle::PositiveEffect,
-                    ApplyEffect::GainMana(_) => TextEffectStyle::PositiveEffect,
-                    ApplyEffect::LoseCondition { condition, .. } => {
+                    AppliedEffect::LostHealth(n, ..) => {
+                        f.push_str(&format!("{}", n));
+                        TextEffectStyle::RegularHit
+                    }
+                    AppliedEffect::GainedHealth(n) => {
+                        f.push_str(&format!("{}", n));
+                        TextEffectStyle::Heal
+                    }
+                    AppliedEffect::GainedStamina(n) => {
+                        for _ in 0..n {
+                            f.push_str("|<stamina>|");
+                        }
+                        TextEffectStyle::PositiveEffect
+                    }
+                    AppliedEffect::GainedMana(n) => {
+                        f.push_str(&format!("{n} |<mana>|"));
+                        TextEffectStyle::PositiveEffect
+                    }
+                    AppliedEffect::LostCondition { condition, .. } => {
+                        f.push_str(&format!("|<strikethrough>{}|", condition.name()));
                         texture = Some(condition.status_id());
                         TextEffectStyle::PositiveEffect
                     }
-                    ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
+                    AppliedEffect::Escaped => {
+                        f.push_str("Escaped");
+                        TextEffectStyle::PositiveEffect
+                    }
+                    AppliedEffect::Dodged => {
+                        f.push_str("Miss!");
+                        TextEffectStyle::Miss
+                    }
                 };
 
-                self._add_text_effect(character_id, start_time, 2.0, texture, s.trim(), style);
+                self._add_text_effect(character_id, start_time, 2.0, texture, f.trim(), style);
             }
             TextEffect::Effect {
                 text,
@@ -2228,40 +2271,15 @@ impl GameGrid {
                 };
                 self._add_text_effect(character_id, start_time, 2.0, icon, text, style);
             }
-            TextEffect::ReceiveCondition(condition) => {
-                let style = if condition.is_positive() {
-                    TextEffectStyle::PositiveEffect
-                } else {
-                    TextEffectStyle::NegativeEffect
-                };
-                self._add_text_effect(
-                    character_id,
-                    start_time,
-                    2.0,
-                    Some(condition.status_id()),
-                    condition.name().to_string(),
-                    style,
-                );
-            }
 
-            TextEffect::Heal(amount) => {
+            TextEffect::CriticalHit => {
                 self._add_text_effect(
                     character_id,
                     start_time,
-                    2.0,
+                    1.5,
                     None,
-                    amount.to_string(),
-                    TextEffectStyle::Heal,
-                );
-            }
-            TextEffect::Miss => {
-                self._add_text_effect(
-                    character_id,
-                    start_time,
-                    2.0,
-                    None,
-                    "Miss!",
-                    TextEffectStyle::Miss,
+                    "Critical Hit!",
+                    TextEffectStyle::CriticalHitLabel,
                 );
             }
             TextEffect::ReactionExclamation => {
@@ -2273,31 +2291,6 @@ impl GameGrid {
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
-            }
-            TextEffect::HitDamage(amount, hit_type) => {
-                let mut text = amount.to_string();
-                let style = match hit_type {
-                    HitType::Miss => {
-                        text = "Miss!".to_string();
-                        TextEffectStyle::Miss
-                    }
-                    HitType::Weak => TextEffectStyle::WeakHit,
-                    HitType::Regular => TextEffectStyle::RegularHit,
-                    HitType::Strong => TextEffectStyle::StrongHit,
-                    HitType::Critical => TextEffectStyle::StrongHit,
-                };
-                self._add_text_effect(character_id, start_time, 2.0, None, text, style);
-
-                if hit_type == HitType::Critical {
-                    self._add_text_effect(
-                        character_id,
-                        start_time,
-                        1.5,
-                        None,
-                        "Critical Hit!",
-                        TextEffectStyle::CriticalHitLabel,
-                    );
-                }
             }
         }
 
@@ -2344,19 +2337,17 @@ impl GameGrid {
                 rise_indefinitely = false;
                 WHITE
             }
-            TextEffectStyle::ReactionExclamation => {
-                rise_indefinitely = false;
-                background = true;
-                ORANGE
-            }
             TextEffectStyle::CriticalHitLabel => {
                 font_size = 24;
                 rise_indefinitely = false;
                 RED
             }
-            TextEffectStyle::WeakHit => LIGHTGRAY,
+            TextEffectStyle::ReactionExclamation => {
+                rise_indefinitely = false;
+                background = true;
+                ORANGE
+            }
             TextEffectStyle::RegularHit => rgb(201, 226, 118),
-            TextEffectStyle::StrongHit => rgb(201, 226, 118),
         };
 
         let mut text_graphics = TextGraphics {
@@ -3183,7 +3174,7 @@ impl GameGrid {
                 &mut pushed_targets,
             );
 
-            if ability.charge_fx.is_some() {
+            if ability.audio_visuals.charge_fx.is_some() {
                 is_casting = Some(ability);
             }
         }
@@ -3199,8 +3190,8 @@ impl GameGrid {
                     ability.id,
                     ParticleGroup::calm(
                         self.active_character_id,
-                        ability.animation_color,
-                        ability.charge_fx.unwrap().particle_shape,
+                        ability.audio_visuals.animation_color,
+                        ability.audio_visuals.charge_fx.unwrap().particle_shape,
                     ),
                 ));
             }
@@ -3263,7 +3254,7 @@ impl GameGrid {
                     match &ability.target {
                         AbilityTarget::Character {
                             acquisition,
-                            circle: impact_circle,
+                            circle_effect: impact_circle,
                             reach,
                             ..
                         } => {
@@ -4063,7 +4054,7 @@ impl GameGrid {
                                     }
                                     PointTargetKind::Line => {
                                         let target_line = target_line.as_ref().unwrap();
-                                        dbg!(target_line);
+                                        //dbg!(target_line);
                                         ActionTarget::Line(target_line.clone())
                                     }
                                     _ => {
@@ -4591,11 +4582,11 @@ impl GameGrid {
                         facing = Some(CharacterFacing::of(character.pos(), mouse_grid_pos));
                     }
 
-                    let kind = match ability.animation {
+                    let kind = match ability.audio_visuals.animation {
                         AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
                         AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
                         AbilityAnimation::CastSpell => AnticipationKind::CastSpell {
-                            color: ability.animation_color,
+                            color: ability.audio_visuals.animation_color,
                         },
                         AbilityAnimation::Dash => AnticipationKind::Dash,
                         _ => AnticipationKind::Other,

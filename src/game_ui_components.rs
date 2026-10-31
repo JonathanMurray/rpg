@@ -858,7 +858,7 @@ pub struct Log {
 
 impl Log {
     pub fn new(font: Font) -> Self {
-        let h = 200.0;
+        let h = 300.0;
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -908,7 +908,7 @@ impl Log {
         let mut text_line = TextLine::new(text, font_size, WHITE, Some(self.font.clone()));
         text_line.set_padding(3.0, 3.0);
         text_line.set_max_width(self.container.min_width.unwrap());
-        text_line.set_min_height(20.0);
+        text_line.set_min_height(18.0);
         let text_line = Rc::new(text_line);
 
         self.text_lines.push(text_line.clone());

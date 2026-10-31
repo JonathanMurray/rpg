@@ -2,26 +2,19 @@ use std::cell::{Cell, RefCell};
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::ffi::IntoStringError;
 use std::fmt::Display;
-use std::pin::Pin;
-use std::process::exit;
 use std::rc::{Rc, Weak};
-use std::time::SystemTime;
 
 use indexmap::IndexMap;
-use macroquad::color::Color;
-use macroquad::math::Circle;
-use macroquad::miniquad::CompareFunc::Always;
-use macroquad::miniquad::CursorIcon::Move;
-use rand::Rng;
+use macroquad::color::{Color, BLACK};
 
 use crate::bot::BotBehaviour;
-use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
+use crate::core::AppliedEffect::GainedActionPoints;
+use crate::d20::{roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
-use crate::grid::{ControlPoint, GameGrid, ParticleShape};
+use crate::grid::{ControlPoint, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
 use crate::sounds::SoundId;
@@ -197,7 +190,7 @@ impl CoreGame {
                             if ap > 0 {
                                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                                     character: character.id(),
-                                    applied_effect: ApplyEffect::GainActionPoints(ap),
+                                    applied_effect: AppliedEffect::GainedActionPoints(ap),
                                     source: "Reaper",
                                 })
                                 .await;
@@ -205,7 +198,7 @@ impl CoreGame {
                             if sta > 0 {
                                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                                     character: character.id(),
-                                    applied_effect: ApplyEffect::GainStamina(sta),
+                                    applied_effect: AppliedEffect::GainedStamina(sta),
                                     source: "Reaper",
                                 })
                                 .await;
@@ -220,7 +213,7 @@ impl CoreGame {
 
                         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
-                            applied_effect: ApplyEffect::GainHealth(amount),
+                            applied_effect: AppliedEffect::GainedHealth(amount),
                             source: "on-kill effect",
                         })
                         .await;
@@ -367,7 +360,7 @@ impl CoreGame {
                     for condition in expired_conditions {
                         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
-                            applied_effect: ApplyEffect::LoseCondition { condition },
+                            applied_effect: AppliedEffect::LostCondition { condition },
                             source: "",
                         })
                         .await;
@@ -518,8 +511,13 @@ impl CoreGame {
                     )
                     .await?;
 
-                    self.perform_losing_health(character, 2, DamageSource::Falling)
-                        .await;
+                    self.perform_losing_health(
+                        character,
+                        2,
+                        DamageSource::Falling,
+                        DamageType::Regular,
+                    )
+                    .await;
                 }
                 previous_pos = *path.last().unwrap();
                 if path.len() > 1 {
@@ -553,8 +551,13 @@ impl CoreGame {
                 }
                 let dmg = total_collision_dmg as u32;
                 if dmg > 0 {
-                    self.perform_losing_health(ch, dmg, DamageSource::KnockbackCollision)
-                        .await;
+                    self.perform_losing_health(
+                        ch,
+                        dmg,
+                        DamageSource::KnockbackCollision,
+                        DamageType::Regular,
+                    )
+                    .await;
                 }
             }
         }
@@ -799,7 +802,7 @@ impl CoreGame {
                     actor.gain_mana(amount);
                     self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                         character: actor.id(),
-                        applied_effect: ApplyEffect::GainMana(amount),
+                        applied_effect: AppliedEffect::GainedMana(amount),
                         source: "Spell Finesse",
                     })
                     .await;
@@ -817,7 +820,7 @@ impl CoreGame {
 
                 let mut enemies_hit = vec![];
                 for event in ability_resolved_events {
-                    event.enemies_hit(&mut enemies_hit);
+                    event.collect_enemies_hit(&mut enemies_hit);
                 }
 
                 for enemy_id in &enemies_hit {
@@ -899,7 +902,7 @@ impl CoreGame {
 
         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
-            applied_effect: ApplyEffect::LoseActionPoints(amount),
+            applied_effect: AppliedEffect::LostActionPoints(amount),
             source: "",
         })
         .await;
@@ -1047,8 +1050,13 @@ impl CoreGame {
             }
 
             if new_surface == Some(Surface::Spikes) {
-                self.perform_losing_health(character, 1, DamageSource::SpikesSurface)
-                    .await;
+                self.perform_losing_health(
+                    character,
+                    1,
+                    DamageSource::SpikesSurface,
+                    DamageType::Regular,
+                )
+                .await;
             }
 
             if let Some(surface) = new_surface {
@@ -1106,7 +1114,7 @@ impl CoreGame {
         })
         .await;
 
-        // Movement opportunity attack
+        // opportunity attack
         let event = Self::perform_attack(
             reactor,
             HandType::MainHand,
@@ -1126,8 +1134,13 @@ impl CoreGame {
         match surface {
             Surface::Fire => {
                 // TODO maybe take less immediate damage if character was wet, and emit visual steam effect
-                self.perform_losing_health(character, 2, DamageSource::FireSurface)
-                    .await;
+                self.perform_losing_health(
+                    character,
+                    2,
+                    DamageSource::FireSurface,
+                    DamageType::Fire,
+                )
+                .await;
                 self.perform_character_receive_condition(
                     character,
                     ApplyCondition::stacks(Condition::Burning, 2),
@@ -1156,7 +1169,7 @@ impl CoreGame {
         if ch.lose_condition(condition) {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: ch.id(),
-                applied_effect: ApplyEffect::LoseCondition { condition },
+                applied_effect: AppliedEffect::LostCondition { condition },
                 source: reason,
             })
             .await;
@@ -1180,7 +1193,7 @@ impl CoreGame {
         if did_receive {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
-                applied_effect: ApplyEffect::Condition(apply_condition),
+                applied_effect: AppliedEffect::GainedCondition(apply_condition),
                 source,
             })
             .await;
@@ -1293,26 +1306,20 @@ impl CoreGame {
         giver: Option<&Character>,
         area_center: Option<Position>,
         receiver: &Character,
-        applied_effects: &mut Vec<ApplyEffect>,
+        applied_effects: &mut Vec<AppliedEffect>,
         name: Option<&'static str>,
     ) -> String {
         let mut reduced_to_nothing = false;
         modify_effect_by_hit_type(&mut effect, hit_type, &mut reduced_to_nothing);
-        if reduced_to_nothing {
-            format!("|<keyword>{}| was skipped", effect)
-        } else {
-            let (applied, log_line) = self.do_apply_effect(effect, giver, area_center, receiver);
-            if let Some(applied) = applied {
-                applied_effects.push(applied);
-            }
-            //*damage_from_effects += damage;
-            // *actual_health_lost += damage;
+        let (applied, log_line) = self.do_apply_effect(effect, giver, area_center, receiver);
+        if let Some(applied) = applied {
+            applied_effects.push(applied);
+        }
 
-            if let Some(name) = name {
-                format!("{} |<faded>({})|", log_line, name)
-            } else {
-                log_line
-            }
+        if let Some(name) = name {
+            format!("{} |<faded>({})|", log_line, name)
+        } else {
+            log_line
         }
     }
 
@@ -1322,51 +1329,71 @@ impl CoreGame {
         giver: Option<&Character>,
         area_center: Option<Position>,
         receiver: &Character,
-    ) -> (Option<ApplyEffect>, String) {
+    ) -> (Option<AppliedEffect>, String) {
         let mut actual_effect = None;
         let line = match effect {
             ApplyEffect::LoseActionPoints(n) => {
-                let lost = receiver.action_points.lose(n);
-                actual_effect = Some(ApplyEffect::LoseActionPoints(lost));
+                if n > 0 {
+                    let lost = receiver.action_points.lose(n);
+                    actual_effect = Some(AppliedEffect::LostActionPoints(lost));
+                }
                 format!("  |{}| lost {} |<ap>| AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainActionPoints(n) => {
-                let gained = receiver.action_points.gain(n);
-                actual_effect = Some(ApplyEffect::GainActionPoints(gained));
+                if n > 0 {
+                    let gained = receiver.action_points.gain(n);
+                    actual_effect = Some(AppliedEffect::GainedActionPoints(gained));
+                }
                 format!("  |{}| gained {} |<ap>| AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainStamina(n) => {
-                let gained = receiver.stamina.gain(n);
-                actual_effect = Some(ApplyEffect::GainStamina(gained));
-                format!("  |{}| gained {} stamina", receiver.name_tag(), gained)
+                if n > 0 {
+                    let gained = receiver.stamina.gain(n);
+                    actual_effect = Some(AppliedEffect::GainedStamina(gained));
+                    format!("  |{}| gained {} stamina", receiver.name_tag(), gained)
+                } else {
+                    format!("  |{}| gained no stamina", receiver.name_tag())
+                }
             }
             ApplyEffect::GainMana(n) => {
-                let gained = receiver.gain_mana(n);
-                actual_effect = Some(ApplyEffect::GainMana(gained));
-                format!("  |{}| gained {} mana", receiver.name_tag(), gained)
+                if n > 0 {
+                    let gained = receiver.gain_mana(n);
+                    actual_effect = Some(AppliedEffect::GainedMana(gained));
+                    format!("  |{}| gained {} mana", receiver.name_tag(), gained)
+                } else {
+                    format!("  |{}| gained no mana", receiver.name_tag())
+                }
             }
-            ApplyEffect::LoseHealth(n) => {
-                //let lost = receiver.health.lose(n);
-                let lost = self.character_lose_health(receiver, n, None);
-                actual_effect = Some(ApplyEffect::GainHealth(lost));
-                format!("  |{}| lost {} health", receiver.name_tag(), lost)
+
+            ApplyEffect::LoseHealth(n, source, dmg_type) => {
+                if n > 0 {
+                    let lost = self.character_lose_health(receiver, n, None);
+                    actual_effect = Some(AppliedEffect::LostHealth(lost, source, dmg_type));
+                    format!("  |{}| lost {} health", receiver.name_tag(), lost)
+                } else {
+                    format!("  |{}| lost no health", receiver.name_tag())
+                }
             }
             ApplyEffect::GainHealth(n) => {
-                let gained = receiver.health.gain(n);
-                actual_effect = Some(ApplyEffect::GainHealth(gained));
-                format!("  |{}| gained {} health", receiver.name_tag(), gained)
+                if n > 0 {
+                    let gained = receiver.health.gain(n);
+                    actual_effect = Some(AppliedEffect::GainedHealth(gained));
+                    format!("  |{}| gained {} health", receiver.name_tag(), gained)
+                } else {
+                    format!("  |{}| gained no health", receiver.name_tag())
+                }
             }
-            e @ ApplyEffect::Condition(apply_condition) => {
+            ApplyEffect::Condition(apply_condition) => {
                 match self.apply_condition_on_character(apply_condition, receiver) {
                     Ok(line) => {
-                        actual_effect = Some(e);
+                        actual_effect = Some(AppliedEffect::GainedCondition(apply_condition));
                         line
                     }
                     Err(line) => line,
                 }
             }
 
-            e @ ApplyEffect::LoseCondition { condition } => {
+            ApplyEffect::LoseCondition { condition } => {
                 let prev_stacks = receiver.get_condition_stacks(condition);
                 let did_clear = receiver.clear_condition(condition);
                 let mut line = "".to_string();
@@ -1379,11 +1406,11 @@ impl CoreGame {
                     if prev_stacks > 0 {
                         line.push_str(&format!(" ({})", prev_stacks));
                     }
-                    actual_effect = Some(e);
+                    actual_effect = Some(AppliedEffect::LostCondition { condition });
                 }
                 line
             }
-            e @ ApplyEffect::Pushed(base_push_amount) => {
+            ApplyEffect::Pushed(base_push_amount) => {
                 let giver = giver.unwrap();
                 let mut source_pos = giver.pos();
 
@@ -1398,7 +1425,7 @@ impl CoreGame {
                 if push_amount > 0 {
                     let vector = pushed_vector(source_pos, receiver.pos(), push_amount);
                     receiver.is_being_pushed_along_vector.set(Some(vector));
-                    actual_effect = Some(e);
+                    actual_effect = Some(AppliedEffect::WasPushed(base_push_amount));
                     format!(
                         "  |{}| was knocked back ({})",
                         receiver.name_tag(),
@@ -1436,6 +1463,16 @@ impl CoreGame {
         apply_condition: ApplyCondition,
         receiver: &Character,
     ) -> Result<String, String> {
+        let cond_str = format!(
+            "|<status>{:?}| |<keyword>{}|",
+            apply_condition.condition.status_id(),
+            apply_condition.condition.name()
+        );
+
+        if apply_condition.stacks == Some(0) || apply_condition.duration_rounds == Some(0) {
+            return Err(format!("  {} was not applied", cond_str));
+        }
+
         let ends_at = apply_condition
             .duration_rounds
             .map(|rounds| self.current_time() + (rounds * self.round_length));
@@ -1443,29 +1480,20 @@ impl CoreGame {
             receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
 
         if did_receive {
-            let mut line = format!(
-                "  |{}| gained: |<status>{:?}| |<keyword>{}|",
-                receiver.name_tag(),
-                apply_condition.condition.status_id(),
-                apply_condition.condition.name()
-            );
-
+            let mut line = format!("  |{}| gained: {}", receiver.name_tag(), cond_str);
             if let Some(stacks) = apply_condition.stacks {
                 line.push_str(&format!(" x {}", stacks));
             }
-
             if let Some(duration) = apply_condition.duration_rounds {
                 line.push_str(&format!(" ({})", duration));
             }
-
             Ok(line)
         } else {
-            let line = format!(
-                "  |{}| is immune to |<keyword>{}|",
+            Err(format!(
+                "  |{}| is immune to {}",
                 receiver.name_tag(),
-                apply_condition.condition.name()
-            );
-            Err(line)
+                cond_str
+            ))
         }
     }
 
@@ -1488,7 +1516,6 @@ impl CoreGame {
 
         let real_game: Option<&CoreGame> = mode.real_game();
 
-        let mut enemies_hit = vec![];
         let mut ability_resolved_events = vec![];
 
         let mut cast_n_times = 1;
@@ -1501,7 +1528,7 @@ impl CoreGame {
         }
 
         for i in 0..cast_n_times {
-            let mut detail_lines = vec![];
+            let mut extra_logs = vec![];
 
             let mut roll_instruction = None;
 
@@ -1533,7 +1560,7 @@ impl CoreGame {
             match &ability.target {
                 AbilityTarget::Character {
                     effect,
-                    circle: impact_circle,
+                    circle_effect: impact_circle,
                     environment_effect,
                     ..
                 } => {
@@ -1576,41 +1603,44 @@ impl CoreGame {
                             game.perform_environment_effect(
                                 *env_effect,
                                 target.pos(),
-                                &mut detail_lines,
+                                &mut extra_logs,
                             )
                             .await;
                         }
                     }
 
-                    let before = SystemTime::now();
-
+                    let mut target_outcome_lines = vec![];
                     let outcome = Self::perform_ability_target_effect(
                         actor,
+                        Some(ability.id),
                         ability.name,
                         roll_instruction.as_ref(),
                         enhancements,
                         &effect,
                         target,
                         0,
-                        &mut detail_lines,
+                        &mut target_outcome_lines,
                         None,
                         mode,
                     )
                     .await;
-                    target_outcome = Some((*target_id, outcome));
+
+                    target_outcome = Some(DecoratedTargetOutcome::new(
+                        *target_id,
+                        target_outcome_lines,
+                        outcome,
+                    ));
 
                     if let Some(c) = impact_circle {
-                        detail_lines.push("".to_string());
-                        detail_lines.push("|<faded>Area of effect:|".to_string());
-
                         let area_target_outcomes = Self::perform_ability_area_effect(
-                            "AoE",
+                            Some(ability.id),
+                            &format!("{} AoE", ability.name),
                             &roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             target.pos(),
                             ShapedEffect::from_circle_effect(c.clone()),
-                            &mut detail_lines,
+                            &mut extra_logs,
                             mode,
                         )
                         .await;
@@ -1656,33 +1686,38 @@ impl CoreGame {
 
                     if let Some(target_id) = target_line.obstructing_character {
                         let target = mode.characters().get_rc(target_id);
+                        let mut target_outcome_lines = vec![];
                         let outcome = Self::perform_ability_target_effect(
                             actor,
+                            Some(ability.id),
                             ability.name,
                             roll_instruction.as_ref(),
                             enhancements,
                             impact_effect,
                             target,
                             0,
-                            &mut detail_lines,
+                            &mut target_outcome_lines,
                             None,
                             mode,
                         )
                         .await;
-                        target_outcome = Some((target_id, outcome));
+                        target_outcome = Some(DecoratedTargetOutcome::new(
+                            target_id,
+                            target_outcome_lines,
+                            outcome,
+                        ));
                     }
 
                     if let Some(c) = impact_circle {
-                        detail_lines.push("|<faded>Area of effect:|".to_string());
-
                         let outcomes = Self::perform_ability_area_effect(
+                            Some(ability.id),
                             ability.name,
                             roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             target_pos,
                             ShapedEffect::from_circle_effect(c.clone()),
-                            &mut detail_lines,
+                            &mut extra_logs,
                             mode,
                         )
                         .await;
@@ -1715,9 +1750,8 @@ impl CoreGame {
                         .await;
                     }
 
-                    detail_lines.push("|<faded>Area of effect:|".to_string());
-
                     let outcomes = Self::perform_ability_area_effect(
+                        Some(ability.id),
                         ability.name,
                         roll_instruction.as_ref().unwrap(),
                         enhancements,
@@ -1729,7 +1763,7 @@ impl CoreGame {
                             shape: AreaShape::Line,
                             area_effect: area_effect.clone(),
                         },
-                        &mut detail_lines,
+                        &mut extra_logs,
                         mode,
                     )
                     .await;
@@ -1767,16 +1801,15 @@ impl CoreGame {
                         .await;
                     }
 
-                    detail_lines.push("|<faded>Area of effect:|".to_string());
-
                     let outcomes = Self::perform_ability_area_effect(
+                        Some(ability.id),
                         ability.name,
                         roll_instruction.as_ref().unwrap(),
                         enhancements,
                         actor,
                         target_pos,
                         ShapedEffect::from_circle_effect(circle_effect.clone()),
-                        &mut detail_lines,
+                        &mut extra_logs,
                         mode,
                     )
                     .await;
@@ -1816,31 +1849,38 @@ impl CoreGame {
                     }
 
                     if let Some(effect) = self_effect {
+                        let mut target_outcome_lines = vec![];
                         let outcome = Self::perform_ability_target_effect(
                             actor,
+                            Some(ability.id),
                             ability.name,
                             roll_instruction.as_ref(),
                             enhancements,
                             &effect,
                             actor,
                             0,
-                            &mut detail_lines,
+                            &mut target_outcome_lines,
                             Some(actor.pos()),
                             mode,
                         )
                         .await;
-                        target_outcome = Some((actor_id, outcome));
+                        target_outcome = Some(DecoratedTargetOutcome::new(
+                            actor_id,
+                            target_outcome_lines,
+                            outcome,
+                        ));
                     }
 
                     if let Some(circle_effect) = self_circle {
                         let outcomes = Self::perform_ability_area_effect(
+                            Some(ability.id),
                             ability.name,
                             roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             actor.position.get(),
                             ShapedEffect::from_circle_effect(circle_effect.clone()),
-                            &mut detail_lines,
+                            &mut extra_logs,
                             mode,
                         )
                         .await;
@@ -1852,7 +1892,7 @@ impl CoreGame {
                             game.perform_environment_effect(
                                 *env_effect,
                                 actor.pos(),
-                                &mut detail_lines,
+                                &mut extra_logs,
                             )
                             .await;
                         }
@@ -1861,20 +1901,7 @@ impl CoreGame {
             };
 
             if i < cast_n_times - 1 {
-                detail_lines.push(format!("|{}| cast again!", actor.name_tag()))
-            }
-
-            if let Some((target_id, outcome)) = &target_outcome {
-                if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
-                    enemies_hit.push(*target_id);
-                }
-            }
-            if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
-                for (target_id, outcome) in targets {
-                    if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
-                        enemies_hit.push(*target_id);
-                    }
-                }
+                extra_logs.push(format!("|{}| cast again!", actor.name_tag()))
             }
 
             let resolve_event = AbilityResolvedEvent {
@@ -1882,7 +1909,7 @@ impl CoreGame {
                 target_outcome,
                 area_outcome,
                 ability,
-                detail_lines,
+                extra_logs,
             };
 
             ability_resolved_events.push(resolve_event.clone());
@@ -1985,7 +2012,8 @@ impl CoreGame {
     }
 
     async fn perform_ability_area_effect(
-        name: &'static str,
+        ability_id: Option<AbilityId>,
+        label: &str,
         roll_instruction: &RollInstruction,
         enhancements: &[&AbilityEnhancement],
         caster: &Rc<Character>,
@@ -2007,24 +2035,27 @@ impl CoreGame {
         let targets = Self::acquire_targets(mode, caster, area_pos, shape, acquisition);
 
         for (i, target_id) in targets.iter().enumerate() {
+            let mut target_detail_lines = vec![];
             let target = mode.characters().get_rc(*target_id);
-            //println!("perform ability AoE on target: {}", target.name);
-            detail_lines.push("".to_string());
-            detail_lines.push(format!("|{}|:", target.name_tag()));
             let outcome = Self::perform_ability_target_effect(
                 caster,
-                name,
+                ability_id,
+                label,
                 Some(roll_instruction),
                 enhancements,
                 effect,
                 target,
                 i as u32,
-                detail_lines,
+                &mut target_detail_lines,
                 Some(area_pos),
                 mode,
             )
             .await;
-            target_outcomes.push((target.id(), outcome));
+            target_outcomes.push(DecoratedTargetOutcome::new(
+                target.id(),
+                target_detail_lines,
+                outcome,
+            ));
         }
 
         let num_targets_hit = target_outcomes.len() as u32;
@@ -2048,9 +2079,13 @@ impl CoreGame {
                             applied_effects.push(applied);
                         }
 
-                        target_outcomes.push((
+                        target_outcomes.push(DecoratedTargetOutcome::new(
                             caster.id(),
-                            Box::new(AbilityTargetOutcome::AffectedAlly { applied_effects }),
+                            vec!["todo: describe 'apply on self per area target hit'?".to_string()],
+                            Box::new(AbilityTargetOutcome::HitTarget {
+                                applied_effects,
+                                hit_type: HitType::Regular,
+                            }),
                         ));
                     }
                 }
@@ -2106,7 +2141,8 @@ impl CoreGame {
 
     async fn perform_ability_target_effect(
         caster: &Rc<Character>,
-        ability_name: &'static str,
+        ability_id: Option<AbilityId>,
+        label: &str,
         roll_instruction: Option<&RollInstruction>,
         enhancements: &[&AbilityEnhancement],
         target_effect: &AbilityTargetEffect,
@@ -2120,7 +2156,8 @@ impl CoreGame {
             AbilityTargetEffect::Spell(spell_target_effect) => {
                 Self::perform_spell_target_effect(
                     caster,
-                    ability_name,
+                    ability_id,
+                    label,
                     roll_instruction,
                     enhancements,
                     spell_target_effect,
@@ -2143,7 +2180,7 @@ impl CoreGame {
                 //caster.set_facing_toward(target.pos());
 
                 // Ability attack
-                let event = Self::perform_attack(
+                let mut event = Self::perform_attack(
                     caster,
                     HandType::MainHand,
                     &attack_enhancement_effects,
@@ -2155,6 +2192,8 @@ impl CoreGame {
                     Some(ability_attack_effect),
                 )
                 .await;
+
+                detail_lines.extend(event.detail_lines.drain(..));
 
                 AbilityTargetOutcome::AttackedEnemy(event)
             }
@@ -2199,7 +2238,8 @@ impl CoreGame {
 
     async fn perform_spell_target_effect(
         caster: &Rc<Character>,
-        ability_name: &'static str,
+        ability_id: Option<AbilityId>,
+        label: &str,
         roll_instruction: Option<&RollInstruction>,
         enhancements: &[&AbilityEnhancement],
         spell_target_effect: &SpellTargetEffect,
@@ -2220,33 +2260,35 @@ impl CoreGame {
             None => HitType::Regular,
         };
 
-        let mut actual_health_lost = 0;
+        let mut applied_effects = vec![];
 
-        let damage = if let Some(ability_damage) = spell_target_effect.damage {
+        if let Some(ability_damage) = spell_target_effect.damage {
             let mut dmg_calculation;
             let mut is_damage_affected_by_roll = true;
             let mut dmg_str = "  Damage: ".to_string();
 
             let overall_dmg_type;
 
+            let miss;
+
             match ability_damage {
                 AbilityDamage::Fixed(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_damage_affected_by_roll = false;
-                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
+                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, label));
                     overall_dmg_type = dmg_type;
                 }
                 AbilityDamage::Dynamic(n, dmg_type) => {
                     dmg_calculation = n as i32;
-                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
+                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, label));
                     overall_dmg_type = dmg_type;
                 }
             };
 
             if is_damage_affected_by_roll && hit_type == HitType::Miss {
-                dmg_str.push_str(&format!(" -100% |<faded>(miss)|"));
-                dmg_calculation = 0;
+                miss = true;
             } else {
+                miss = false;
                 for enhancement in enhancements {
                     let e = enhancement.spell_effect.unwrap();
                     let bonus_dmg = if area_center.is_some() {
@@ -2325,24 +2367,41 @@ impl CoreGame {
                 }
             }
 
-            let damage = dmg_calculation.max(0) as u32;
+            if miss {
+                applied_effects.push(AppliedEffect::Dodged);
+            } else {
+                let damage = dmg_calculation.max(0) as u32;
 
-            if let Some(game) = real_game {
-                actual_health_lost +=
-                    game.character_lose_health(target, damage, Some(overall_dmg_type));
-                dmg_str.push_str(&format!(" = |<value>{damage}|"));
-                detail_lines.push(dmg_str);
+                let mut health_lost = damage; // Assume full damage, if not real game
+                if let Some(game) = real_game {
+                    health_lost =
+                        game.character_lose_health(target, damage, Some(overall_dmg_type));
+                    dmg_str.push_str(&format!(" = |<value>{damage}|"));
+                    detail_lines.push(dmg_str);
+                }
+
+                // If not ability, assume attack (e.g. effect from arrows)
+                let dmg_source = ability_id
+                    .map(|id| DamageSource::Ability(id))
+                    .unwrap_or_else(|| {
+                        let attack_type = if caster.has_equipped_ranged_weapon() {
+                            AttackType::Ranged
+                        } else {
+                            AttackType::Melee
+                        };
+                        DamageSource::Attack(attack_type, hit_type)
+                    });
+
+                applied_effects.push(AppliedEffect::LostHealth(
+                    health_lost,
+                    dmg_source,
+                    overall_dmg_type,
+                ));
             }
+        }
 
-            Some((damage, overall_dmg_type))
-        } else {
-            None
-        };
-
-        let mut applied_effects = vec![];
-
-        if let Some(game) = real_game {
-            for effect in spell_target_effect.on_hit.iter().copied() {
+        for effect in spell_target_effect.on_hit.iter().copied() {
+            if let Some(game) = real_game {
                 let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                     hit_type,
                     effect,
@@ -2352,22 +2411,30 @@ impl CoreGame {
                     &mut applied_effects,
                     None,
                 );
-                detail_lines.push(log_line);
+                if !log_line.is_empty() {
+                    detail_lines.push(log_line);
+                }
+            } else {
+                applied_effects.push(AppliedEffect::from_apply_effect(effect));
             }
+        }
 
+        if let Some(game) = real_game {
             if let Some(e) = spell_target_effect.environment_effect {
                 game.perform_environment_effect(e, target.pos(), detail_lines)
                     .await;
             }
+        }
 
-            for enhancement in enhancements {
-                let e = enhancement.spell_effect.unwrap();
-                let effects = if area_center.is_some() {
-                    e.area_on_hit
-                } else {
-                    e.target_on_hit
-                };
-                for effect in effects.iter().copied() {
+        for enhancement in enhancements {
+            let e = enhancement.spell_effect.unwrap();
+            let effects = if area_center.is_some() {
+                e.area_on_hit
+            } else {
+                e.target_on_hit
+            };
+            for effect in effects.iter().copied() {
+                if let Some(game) = real_game {
                     let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                         hit_type,
                         effect,
@@ -2378,9 +2445,13 @@ impl CoreGame {
                         Some(enhancement.name),
                     );
                     detail_lines.push(log_line);
+                } else {
+                    applied_effects.push(AppliedEffect::from_apply_effect(effect));
                 }
             }
+        }
 
+        if let Some(game) = real_game {
             if matches!(
                 roll_instruction,
                 Some(RollInstruction::RollWithAttackModifier { .. })
@@ -2396,11 +2467,9 @@ impl CoreGame {
             }
         }
 
-        AbilityTargetOutcome::HitEnemy {
-            damage,
+        AbilityTargetOutcome::HitTarget {
             hit_type,
             applied_effects,
-            actual_health_lost,
         }
     }
 
@@ -2479,8 +2548,11 @@ impl CoreGame {
                 };
 
                 ch.kind.unwrap_party().gain_money(amount);
-                self.ui_handle_event(GameEvent::PlayerGainedMoney { amount })
-                    .await;
+                self.ui_handle_event(GameEvent::PlayerGainedMoney {
+                    amount,
+                    source: "Treasure",
+                })
+                .await;
                 enemy
                     .conditions
                     .borrow_mut()
@@ -2854,7 +2926,7 @@ impl CoreGame {
                     damage: 0,
                     actual_health_lost: 0,
                     hit_type,
-                    applied_to_target: vec![],
+                    applied_to_target: vec![AppliedEffect::Dodged],
                     applied_to_self: vec![],
                     visual_effect: None,
                 }
@@ -2881,7 +2953,7 @@ impl CoreGame {
 
                 let mut actual_health_lost = 0;
 
-                let mut applied_to_target = vec![];
+                let mut applied_to_target: Vec<AppliedEffect> = vec![];
                 let mut applied_to_self = vec![];
                 let mut visual_effect = None;
 
@@ -2898,6 +2970,12 @@ impl CoreGame {
                     actual_health_lost =
                         game.character_lose_health(defender, damage, Some(DamageType::Regular));
 
+                    let attack_type = if weapon.is_melee() {
+                        AttackType::Melee
+                    } else {
+                        AttackType::Ranged
+                    };
+
                     if weapon.is_melee() {
                         let defender_thorns = defender.thorns();
                         if defender_thorns > 0 {
@@ -2913,8 +2991,11 @@ impl CoreGame {
                                     attacker.name_tag(),
                                     health_lost_to_thorns
                                 ));
-                                applied_to_self
-                                    .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                                applied_to_self.push(AppliedEffect::LostHealth(
+                                    health_lost_to_thorns,
+                                    DamageSource::Thorns,
+                                    DamageType::Regular,
+                                ));
                             }
                         }
                         if let Some((reaction_name, thorns)) = reaction_thorns {
@@ -2930,8 +3011,11 @@ impl CoreGame {
                                     health_lost_to_thorns,
                                     reaction_name
                                 ));
-                                applied_to_self
-                                    .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                                applied_to_self.push(AppliedEffect::LostHealth(
+                                    health_lost_to_thorns,
+                                    DamageSource::Thorns,
+                                    DamageType::Regular,
+                                ));
                             }
                         }
                     }
@@ -2969,6 +3053,12 @@ impl CoreGame {
                             game.do_apply_effect(effect, Some(attacker), None, defender);
                         detail_lines.push(log_line);
                     }
+
+                    applied_to_target.push(AppliedEffect::LostHealth(
+                        damage,
+                        DamageSource::Attack(attack_type, hit_type),
+                        DamageType::Regular,
+                    ));
 
                     if damage > 0 {
                         if let Some(effect) = weapon.on_damage {
@@ -3153,6 +3243,7 @@ impl CoreGame {
                 // Need box pin to avoid
                 // error[E0733]: recursion in an async fn requires boxing
                 let area_target_outcomes = Box::pin(Self::perform_ability_area_effect(
+                    None,
                     arrow.name,
                     &RollInstruction::RollWithAttackModifier {
                         attack_modifier,
@@ -3168,7 +3259,7 @@ impl CoreGame {
                 .await;
 
                 let radius = area_target_outcomes.circle.unwrap().radius;
-                circle_outcome = Some((radius, area_target_outcomes.targets));
+                circle_outcome = Some((arrow.name, radius, area_target_outcomes.targets));
             }
         }
 
@@ -3193,83 +3284,64 @@ impl CoreGame {
             OnHitReactionEffect::Rage => {
                 let raging = Condition::Raging;
 
+                let apply_condition = ApplyCondition::of(raging);
+
                 self.ui_handle_event(GameEvent::CharacterReactedToHit {
                     main_line: format!("{} reacted with Rage", reactor_name_tag),
                     detail_lines: vec![],
                     reactor: reactor_id,
-                    outcome: HitReactionOutcome {
-                        received_condition: Some(raging),
-                        offensive: None,
-                    },
                 })
                 .await;
 
                 let reactor = self.characters.get(reactor_id);
-                self.perform_character_receive_condition(
-                    reactor,
-                    ApplyCondition::of(raging),
-                    "Reaction",
-                )
-                .await;
+                self.perform_character_receive_condition(reactor, apply_condition, "Reaction")
+                    .await;
             }
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
 
-                let outcome = {
-                    let attacker = self.characters.get(self.active_character_id);
-                    let reactor = self.characters.get(reactor_id);
-                    let toughness = attacker.toughness() as i32;
-                    let roll = roll_d20_with_advantage(0) as i32;
-                    let attack_mod = reactor.attack_modifier(HandType::MainHand);
-                    let res = roll + attack_mod;
-                    lines.push(format!(
-                        "Rolled: {} (+{} atk mod) = {}, vs toughness={}",
-                        roll, attack_mod, res, toughness,
-                    ));
-                    let condition = if res >= toughness {
-                        let degree_of_success = ((res - toughness) / 5) as u32;
-                        let (label, bonus) = match degree_of_success {
-                            0 => ("Hit".to_string(), 0),
-                            1 => ("Critical hit".to_string(), 1),
-                            n => (format!("Critical hit ({n})"), n),
-                        };
-
-                        let duration = 1 + bonus;
-                        lines.push(label);
-
-                        Some((Condition::Dazed, Some(duration)))
-                    } else {
-                        None
+                let attacker = self.characters.get(self.active_character_id);
+                let reactor = self.characters.get(reactor_id);
+                let toughness = attacker.toughness() as i32;
+                let roll = roll_d20_with_advantage(0) as i32;
+                let attack_mod = reactor.attack_modifier(HandType::MainHand);
+                let res = roll + attack_mod;
+                lines.push(format!(
+                    "Rolled: {} (+{} atk mod) = {}, vs toughness={}",
+                    roll, attack_mod, res, toughness,
+                ));
+                if res >= toughness {
+                    let degree_of_success = ((res - toughness) / 5) as u32;
+                    let (label, bonus) = match degree_of_success {
+                        0 => ("Hit".to_string(), 0),
+                        1 => ("Critical hit".to_string(), 1),
+                        n => (format!("Critical hit ({n})"), n),
                     };
 
-                    if let Some((condition, duration)) = condition {
-                        let (_applied, log_line) = self.do_apply_effect(
-                            ApplyEffect::Condition(ApplyCondition {
-                                condition,
-                                stacks: None,
-                                duration_rounds: duration,
-                            }),
-                            Some(reactor),
-                            None,
-                            attacker,
-                        );
-                        lines.push(format!("{} (Shield bash)", log_line));
-                    } else {
-                        lines.push("  Miss!".to_string());
-                    }
-                    OffensiveHitReactionOutcome {
-                        inflicted_condition: condition,
-                    }
+                    let duration = 1 + bonus;
+                    lines.push(label);
+
+                    let apply_condition = ApplyCondition::rounds(Condition::Dazed, duration);
+
+                    self.perform_character_receive_condition(
+                        attacker,
+                        apply_condition,
+                        "Shield bash",
+                    )
+                    .await;
+                } else {
+                    self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                        character: attacker.id(),
+                        applied_effect: AppliedEffect::Dodged,
+                        source: "Shield bash",
+                    })
+                    .await;
                 };
 
                 self.ui_handle_event(GameEvent::CharacterReactedToHit {
                     main_line: format!("{} reacted with Shield bash", reactor_name_tag),
                     detail_lines: lines,
                     reactor: reactor_id,
-                    outcome: HitReactionOutcome {
-                        received_condition: None,
-                        offensive: Some(outcome),
-                    },
                 })
                 .await;
             }
@@ -3281,12 +3353,13 @@ impl CoreGame {
         character: &Character,
         amount: u32,
         source: DamageSource,
+        damage_type: DamageType,
     ) {
-        let lost = self.character_lose_health(character, amount, Some(source.damage_type()));
-        self.ui_handle_event(GameEvent::CharacterTookDamage {
+        let lost = self.character_lose_health(character, amount, Some(damage_type));
+        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
-            amount: lost,
-            source,
+            applied_effect: AppliedEffect::LostHealth(lost, source, damage_type),
+            source: source.name(),
         })
         .await;
     }
@@ -3351,6 +3424,7 @@ impl CoreGame {
                 character,
                 amount,
                 DamageSource::Condition(Condition::Poisoned),
+                DamageType::Regular,
             )
             .await;
         }
@@ -3361,6 +3435,7 @@ impl CoreGame {
                 character,
                 bleed_stacks,
                 DamageSource::Condition(Condition::Bleeding),
+                DamageType::Regular,
             )
             .await;
             let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
@@ -3370,7 +3445,7 @@ impl CoreGame {
             {
                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                     character: character.id(),
-                    applied_effect: ApplyEffect::LoseCondition {
+                    applied_effect: AppliedEffect::LostCondition {
                         condition: Condition::Bleeding,
                     },
                     source: "",
@@ -3385,6 +3460,7 @@ impl CoreGame {
                 character,
                 burn_stacks,
                 DamageSource::Condition(Condition::Burning),
+                DamageType::Fire,
             )
             .await;
             conditions.borrow_mut().remove(&Condition::Burning);
@@ -3439,14 +3515,14 @@ impl CoreGame {
 
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
-                applied_effect: ApplyEffect::GainHealth(gained),
+                applied_effect: AppliedEffect::GainedHealth(gained),
                 source: "healing potion",
             })
             .await;
             if lost_condition {
                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                     character: character.id(),
-                    applied_effect: ApplyEffect::LoseCondition {
+                    applied_effect: AppliedEffect::LostCondition {
                         condition: Condition::HealthPotionRecovering,
                     },
                     source: "",
@@ -3536,7 +3612,7 @@ fn modify_effect_by_hit_type(
         ApplyEffect::GainMana(ref mut n) => {
             modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
         }
-        ApplyEffect::LoseHealth(ref mut n) => {
+        ApplyEffect::LoseHealth(ref mut n, ..) => {
             modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
         }
         ApplyEffect::GainHealth(ref mut n) => {
@@ -3817,6 +3893,9 @@ pub fn predict_ability(
         }
     }
 
+    // TODO
+    dbg!(&targets);
+
     AbilityPrediction { targets }
 }
 
@@ -3881,14 +3960,14 @@ pub fn predict_attack(
         } = event.outcome;
 
         if area_targets.is_empty() {
-            if let Some((_shape, outcomes)) = &event.circle_outcome {
-                for (target_id, outcome) in outcomes {
-                    let damage = outcome.damage().map(|(d, dmg_type)| DamageInterval {
+            if let Some((_name, _shape, outcomes)) = &event.circle_outcome {
+                for o in outcomes {
+                    let damage = o.outcome.damage().map(|(d, dmg_type)| DamageInterval {
                         min: d,
                         max: d,
                         dmg_type,
                     });
-                    area_targets.push((*target_id, damage));
+                    area_targets.push((o.target_id, damage));
                 }
             }
         }
@@ -4077,6 +4156,7 @@ pub enum GameEvent {
     GameOver(GameOverType),
     PlayerGainedMoney {
         amount: u32,
+        source: &'static str,
     },
     SurfaceWasConverted {
         positions: Vec<Position>,
@@ -4106,7 +4186,6 @@ pub enum GameEvent {
         main_line: String,
         detail_lines: Vec<String>,
         reactor: CharacterId,
-        outcome: HitReactionOutcome,
     },
     CharacterReactedWithOpportunityAttack {
         reactor: CharacterId,
@@ -4140,17 +4219,12 @@ pub enum GameEvent {
     NewActiveCharacter {
         new_active: CharacterId,
     },
-    CharacterTookDamage {
-        character: CharacterId,
-        amount: u32,
-        source: DamageSource,
-    },
     CharactersSpawning {
         characters: Vec<CharacterId>,
     },
     CharacterEffectWasApplied {
         character: CharacterId,
-        applied_effect: ApplyEffect,
+        applied_effect: AppliedEffect,
         source: &'static str,
     },
     CharacterChangedEquipment,
@@ -4160,14 +4234,17 @@ pub enum GameEvent {
     },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DamageSource {
     Condition(Condition),
     KnockbackCollision,
     Falling,
     SpikesSurface,
     FireSurface,
-    Ability(&'static Ability),
+    Attack(AttackType, HitType),
+    Ability(AbilityId),
+    Unknown,
+    Thorns,
 }
 
 impl DamageSource {
@@ -4178,15 +4255,32 @@ impl DamageSource {
             DamageSource::Falling => "Falling",
             DamageSource::SpikesSurface => "Spikes",
             DamageSource::FireSurface => "Fire",
-            DamageSource::Ability(ability) => ability.name,
+            DamageSource::Attack { .. } => "Attack",
+            DamageSource::Ability(..) => "Ability",
+            DamageSource::Thorns => "Thorns",
+            // Should not be shown
+            DamageSource::Unknown => "UNKNOWN_DAMAGE_SOURCE",
         }
     }
+}
 
-    pub fn damage_type(&self) -> DamageType {
-        match self {
-            DamageSource::FireSurface => DamageType::Fire,
-            DamageSource::Ability(ability) => ability.main_damage_type().unwrap(),
-            _ => DamageType::Regular,
+#[derive(Debug, Clone)]
+pub struct DecoratedTargetOutcome {
+    pub target_id: CharacterId,
+    pub detail_lines: Vec<String>,
+    pub outcome: Box<AbilityTargetOutcome>,
+}
+
+impl DecoratedTargetOutcome {
+    pub fn new(
+        target_id: CharacterId,
+        detail_lines: Vec<String>,
+        outcome: Box<AbilityTargetOutcome>,
+    ) -> Self {
+        Self {
+            target_id,
+            detail_lines,
+            outcome,
         }
     }
 }
@@ -4194,15 +4288,15 @@ impl DamageSource {
 #[derive(Debug, Clone)]
 pub struct AbilityResolvedEvent {
     pub actor: CharacterId,
-    pub target_outcome: Option<(CharacterId, Box<AbilityTargetOutcome>)>,
+    pub target_outcome: Option<DecoratedTargetOutcome>,
     pub area_outcome: Option<AbilityAreaOutcome>,
     pub ability: &'static Ability,
-    pub detail_lines: Vec<String>,
+    pub extra_logs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct AbilityAreaOutcome {
-    pub targets: Vec<(CharacterId, Box<AbilityTargetOutcome>)>,
+    pub targets: Vec<DecoratedTargetOutcome>,
     pub circle: Option<ConcreteCircle>,
 }
 
@@ -4213,22 +4307,26 @@ pub struct ConcreteCircle {
 }
 
 impl AbilityResolvedEvent {
-    fn enemies_hit(&self, result: &mut Vec<CharacterId>) {
-        if let Some((target_id, outcome)) = &self.target_outcome {
-            if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
-                result.push(*target_id);
+    fn collect_enemies_hit(&self, result: &mut Vec<CharacterId>) {
+        if let Some(o) = &self.target_outcome {
+            if matches!(o.outcome.as_ref(), AbilityTargetOutcome::HitTarget { .. }) {
+                result.push(o.target_id);
             }
-            if matches!(outcome.as_ref(), AbilityTargetOutcome::AttackedEnemy { .. }) {
-                result.push(*target_id);
+            if matches!(
+                o.outcome.as_ref(),
+                AbilityTargetOutcome::AttackedEnemy { .. }
+            ) {
+                result.push(o.target_id);
             }
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
-            for (target_id, outcome) in targets {
+            for o in targets {
                 if matches!(
-                    outcome.as_ref(),
-                    AbilityTargetOutcome::HitEnemy { .. } | AbilityTargetOutcome::AttackedEnemy(..)
+                    o.outcome.as_ref(),
+                    AbilityTargetOutcome::HitTarget { .. }
+                        | AbilityTargetOutcome::AttackedEnemy(..)
                 ) {
-                    result.push(*target_id);
+                    result.push(o.target_id);
                 }
             }
         }
@@ -4236,30 +4334,30 @@ impl AbilityResolvedEvent {
 
     fn affected_targets(&self) -> HashMap<CharacterId, TargetResult> {
         let mut affected_targets = HashMap::default();
-        if let Some((target_id, outcome)) = &self.target_outcome {
+        if let Some(o) = &self.target_outcome {
+            // TODO
+            dbg!(o);
             affected_targets.insert(
-                *target_id,
+                o.target_id,
                 TargetResult {
-                    damage: outcome.damage(),
-                    is_buff: outcome.is_buff(),
-                    hit_type: outcome.hit_type(),
+                    damage: o.outcome.damage(),
+                    is_buff: o.outcome.is_positive(),
                 },
             );
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
-            for (target_id, outcome) in targets {
-                let entry = affected_targets.entry(*target_id).or_insert(TargetResult {
+            for o in targets {
+                let entry = affected_targets.entry(o.target_id).or_insert(TargetResult {
                     damage: None,
                     is_buff: false,
-                    hit_type: outcome.hit_type(),
                 });
-                entry.damage = match (entry.damage, outcome.damage()) {
+                entry.damage = match (entry.damage, o.outcome.damage()) {
                     (None, None) => None,
                     (Some(d), None) => Some(d),
                     (None, Some(d)) => Some(d),
                     (Some((d1, dmg_type)), Some((d2, _dmg_type2))) => Some((d1 + d2, dmg_type)),
                 };
-                if outcome.is_buff() {
+                if o.outcome.is_positive() {
                     entry.is_buff = true;
                 }
             }
@@ -4272,7 +4370,6 @@ impl AbilityResolvedEvent {
 struct TargetResult {
     damage: Option<(u32, DamageType)>,
     is_buff: bool,
-    hit_type: Option<HitType>,
 }
 
 #[derive(Debug, Clone)]
@@ -4281,21 +4378,52 @@ pub struct AttackedEvent {
     pub target: CharacterId,
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
-    pub circle_outcome: Option<(Range, Vec<(CharacterId, Box<AbilityTargetOutcome>)>)>,
+    pub circle_outcome: Option<(&'static str, Range, Vec<DecoratedTargetOutcome>)>,
     effective_armor_value: u32,
+}
+
+pub enum IncludeCircleEffects {
+    Yes,
+    No,
+}
+
+impl AttackedEvent {
+    pub fn collect_applied_effects(
+        &self,
+        attacker_id: CharacterId,
+        target_id: CharacterId,
+        result: &mut Vec<(CharacterId, AppliedEffect)>,
+        include_circle_effects: IncludeCircleEffects,
+    ) {
+        for e in &self.outcome.applied_to_self {
+            result.push((attacker_id, *e));
+        }
+        for e in &self.outcome.applied_to_target {
+            result.push((target_id, *e));
+        }
+        if matches!(include_circle_effects, IncludeCircleEffects::Yes) {
+            if let Some((_name, _range, outcomes)) = self.circle_outcome.as_ref() {
+                for o in outcomes {
+                    o.outcome
+                        .collect_applied_effects(attacker_id, o.target_id, result);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct AttackOutcome {
+    // TODO: replace damage/actual health lost with just ApplyEffect?
     pub damage: u32,
     pub actual_health_lost: u32,
     pub hit_type: HitType,
-    pub applied_to_target: Vec<ApplyEffect>,
-    pub applied_to_self: Vec<ApplyEffect>,
+    pub applied_to_target: Vec<AppliedEffect>,
+    pub applied_to_self: Vec<AppliedEffect>,
     pub visual_effect: Option<EffectId>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum HitType {
     Miss,
     Weak,
@@ -4305,66 +4433,95 @@ pub enum HitType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct HitReactionOutcome {
-    pub received_condition: Option<Condition>,
-    pub offensive: Option<OffensiveHitReactionOutcome>,
-}
-
-#[derive(Debug, Copy, Clone)]
 pub struct OffensiveHitReactionOutcome {
-    pub inflicted_condition: Option<(Condition, Option<u32>)>,
+    pub inflicted_condition: Option<ApplyCondition>,
 }
 
 #[derive(Debug, Clone)]
 pub enum AbilityTargetOutcome {
-    HitEnemy {
-        damage: Option<(u32, DamageType)>,
-        applied_effects: Vec<ApplyEffect>,
+    HitTarget {
+        applied_effects: Vec<AppliedEffect>,
         hit_type: HitType,
-        actual_health_lost: u32,
     },
     AttackedEnemy(AttackedEvent),
-    AffectedAlly {
-        applied_effects: Vec<ApplyEffect>,
-    },
 }
 
 impl AbilityTargetOutcome {
     fn damage(&self) -> Option<(u32, DamageType)> {
         match self {
-            AbilityTargetOutcome::HitEnemy { damage, .. } => *damage,
+            AbilityTargetOutcome::HitTarget {
+                applied_effects, ..
+            } => {
+                let mut dmg = 0;
+                let mut dmg_type = DamageType::Regular;
+                for e in applied_effects {
+                    match e {
+                        AppliedEffect::LostHealth(n, _damage_source, damage_type) => {
+                            dmg += n;
+                            dmg_type = *damage_type
+                        }
+                        _ => {}
+                    }
+                }
+                if dmg > 0 {
+                    Some((dmg, dmg_type))
+                } else {
+                    None
+                }
+            }
             AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
                 Some((attacked_event.outcome.damage, DamageType::Regular))
             }
-            AbilityTargetOutcome::AffectedAlly { .. } => None,
         }
     }
 
-    fn is_buff(&self) -> bool {
-        matches!(self, AbilityTargetOutcome::AffectedAlly { .. })
-    }
-
-    fn hit_type(&self) -> Option<HitType> {
+    pub fn hit_type(&self) -> HitType {
         match self {
-            AbilityTargetOutcome::HitEnemy { hit_type, .. } => Some(*hit_type),
-            AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
-                Some(attacked_event.outcome.hit_type)
-            }
-            _ => None,
+            AbilityTargetOutcome::HitTarget { hit_type, .. } => *hit_type,
+            AbilityTargetOutcome::AttackedEnemy(attacked_event) => attacked_event.outcome.hit_type,
         }
     }
 
-    /*
-    // TODO: This doesn't work. Ability prediction doesn't run the code that applies effects, so applied_effects would always be empty
-    fn is_debuff(&self) -> bool {
+    pub fn is_positive(&self) -> bool {
         match self {
-            AbilityTargetOutcome::HitEnemy {
+            AbilityTargetOutcome::HitTarget {
                 applied_effects, ..
-            } => !applied_effects.is_empty(),
-            _ => false,
+            } => {
+                for e in applied_effects {
+                    if !e.is_positive() {
+                        return false;
+                    }
+                }
+                true
+            }
+            AbilityTargetOutcome::AttackedEnemy(..) => false,
         }
     }
-     */
+
+    pub fn collect_applied_effects(
+        &self,
+        caster_id: CharacterId,
+        target_id: CharacterId,
+        result: &mut Vec<(CharacterId, AppliedEffect)>,
+    ) {
+        match self {
+            AbilityTargetOutcome::HitTarget {
+                applied_effects, ..
+            } => {
+                for e in applied_effects {
+                    result.push((target_id, *e));
+                }
+            }
+            AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
+                attacked_event.collect_applied_effects(
+                    caster_id,
+                    target_id,
+                    result,
+                    IncludeCircleEffects::Yes,
+                );
+            }
+        }
+    }
 }
 
 pub fn as_percentage(probability: f32) -> String {
@@ -4549,10 +4706,62 @@ pub fn is_valid_area_target(
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum AppliedEffect {
+    LostActionPoints(u32),
+    GainedActionPoints(u32),
+    LostHealth(u32, DamageSource, DamageType),
+    GainedHealth(u32),
+    GainedStamina(u32),
+    GainedMana(u32),
+    GainedCondition(ApplyCondition),
+    LostCondition { condition: Condition },
+    WasPushed(u32),
+    Escaped,
+    Dodged,
+}
+
+impl AppliedEffect {
+    fn is_positive(&self) -> bool {
+        match self {
+            AppliedEffect::LostActionPoints(_) => false,
+            AppliedEffect::GainedActionPoints(_) => true,
+            AppliedEffect::LostHealth(..) => false,
+            AppliedEffect::GainedHealth(_) => true,
+            AppliedEffect::GainedStamina(_) => true,
+            AppliedEffect::GainedMana(_) => true,
+            AppliedEffect::GainedCondition(apply_condition) => {
+                apply_condition.condition.is_positive()
+            }
+            AppliedEffect::LostCondition { condition } => !condition.is_positive(),
+            AppliedEffect::WasPushed(_) => false,
+            AppliedEffect::Escaped => true,
+            AppliedEffect::Dodged => true,
+        }
+    }
+
+    fn from_apply_effect(apply_effect: ApplyEffect) -> Self {
+        match apply_effect {
+            ApplyEffect::LoseActionPoints(n) => Self::LostActionPoints(n),
+            ApplyEffect::GainActionPoints(n) => Self::GainedActionPoints(n),
+            ApplyEffect::LoseHealth(n, damage_source, damage_type) => {
+                Self::LostHealth(n, damage_source, damage_type)
+            }
+            ApplyEffect::GainHealth(n) => Self::GainedHealth(n),
+            ApplyEffect::GainStamina(n) => Self::GainedStamina(n),
+            ApplyEffect::GainMana(n) => Self::GainedMana(n),
+            ApplyEffect::Condition(apply_condition) => Self::GainedCondition(apply_condition),
+            ApplyEffect::LoseCondition { condition } => Self::LostCondition { condition },
+            ApplyEffect::Pushed(n) => Self::WasPushed(n),
+            ApplyEffect::Escape => Self::Escaped,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ApplyEffect {
     LoseActionPoints(u32),
     GainActionPoints(u32),
-    LoseHealth(u32),
+    LoseHealth(u32, DamageSource, DamageType),
     GainHealth(u32),
     GainStamina(u32),
     GainMana(u32),
@@ -4575,49 +4784,13 @@ impl ApplyEffect {
                     *stacks *= factor;
                 }
             }
-            ApplyEffect::LoseHealth(n) => *n *= factor,
+            ApplyEffect::LoseHealth(n, ..) => *n *= factor,
             ApplyEffect::GainHealth(n) => *n *= factor,
             ApplyEffect::GainStamina(n) => *n *= factor,
             ApplyEffect::GainMana(n) => *n *= factor,
             ApplyEffect::LoseCondition { .. } => todo!(),
             ApplyEffect::Pushed(n) => *n *= factor,
             ApplyEffect::Escape => {}
-        }
-    }
-}
-
-impl Display for ApplyEffect {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ApplyEffect::LoseActionPoints(n) => {
-                for _ in 0..*n {
-                    f.write_str("|<lose_ap>|")?;
-                }
-                Ok(())
-            }
-            ApplyEffect::GainActionPoints(n) => {
-                for _ in 0..*n {
-                    f.write_str("|<ap>|")?;
-                }
-                Ok(())
-            }
-            ApplyEffect::GainStamina(n) => {
-                for _ in 0..*n {
-                    f.write_str("|<stamina>|")?;
-                }
-                Ok(())
-            }
-            ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
-            ApplyEffect::LoseHealth(n) => f.write_fmt(format_args!("{n}")),
-            ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
-            ApplyEffect::Condition(apply_condition) => {
-                f.write_fmt(format_args!("{}", apply_condition.condition.name()))
-            }
-            ApplyEffect::LoseCondition { condition } => {
-                f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
-            }
-            ApplyEffect::Pushed(distance) => f.write_fmt(format_args!("{distance}")),
-            ApplyEffect::Escape => f.write_str("Escaped"),
         }
     }
 }
@@ -4692,19 +4865,6 @@ impl AttackHitEffect {
         match self {
             AttackHitEffect::ApplyTarget(apply_effect) => *apply_effect,
             AttackHitEffect::ApplySelf(apply_effect) => *apply_effect,
-        }
-    }
-}
-
-impl Display for AttackHitEffect {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AttackHitEffect::ApplyTarget(apply_effect) => {
-                f.write_fmt(format_args!("|<faded>(target)| {}", apply_effect))
-            }
-            AttackHitEffect::ApplySelf(apply_effect) => {
-                f.write_fmt(format_args!("|<faded>(self)| {}", apply_effect))
-            }
         }
     }
 }
@@ -4817,7 +4977,7 @@ impl Condition {
             Hindered => "|<value>-50%| movement.",
             Protected => "Receives |<value>x| less |<sword>| damage from the next attack.",
             Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
-            Burning => "|<faded>End of turn:| deals |<value>x| damage.\n|<value>50%| spreads to adjacent.",
+            Burning => "|<faded>End of turn:| deals |<value>x| |<fire>|fire damage.\n|<value>50%| spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<evasion>| |<stat>Evasion| against the next attack.",
             Weakened => "|<value>-x| to all defenses and dice rolls.",
@@ -5323,15 +5483,40 @@ pub enum AbilityAnimation {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AbilityChargeFx {
-    pub(crate) particle_shape: ParticleShape,
-    pub(crate) sound: SoundId,
+    pub particle_shape: ParticleShape,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct AudioVisuals {
+    pub animation_color: Color,
+    pub animation: AbilityAnimation,
+    pub initiate_sound: Option<SoundId>,
+    pub resolve_sound: Option<SoundId>,
+    pub charge_fx: Option<AbilityChargeFx>,
+    pub speech: &'static str,
+    pub target_effect_id: Option<EffectId>,
+    pub target_magic_sparks: Option<Color>,
+}
+
+impl AudioVisuals {
+    pub const fn default() -> Self {
+        Self {
+            animation_color: BLACK,
+            animation: AbilityAnimation::MeleeWeaponAttack,
+            initiate_sound: None,
+            resolve_sound: None,
+            charge_fx: None,
+            speech: "",
+            target_effect_id: None,
+            target_magic_sparks: None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Ability {
     pub id: AbilityId,
     pub name: &'static str,
-    pub speech: &'static str,
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
@@ -5342,11 +5527,7 @@ pub struct Ability {
     pub roll: Option<AbilityRollType>,
     pub target: AbilityTarget,
     pub possible_enhancements: &'static [&'static AbilityEnhancement],
-    pub animation_color: Color,
-    pub animation: AbilityAnimation,
-    pub initiate_sound: Option<SoundId>,
-    pub resolve_sound: Option<SoundId>,
-    pub charge_fx: Option<AbilityChargeFx>,
+    pub audio_visuals: AudioVisuals,
 }
 
 impl Ability {
@@ -5437,13 +5618,13 @@ impl Ability {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EquipmentRequirement {
     Weapon(WeaponType),
     Shield,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AbilityId {
     Tackle,
     ShieldBash,
@@ -5498,7 +5679,7 @@ pub enum WeaponType {
     Ranged,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AbilityRollType {
     Spell,
     RollDuringAttack(i32),
@@ -5621,7 +5802,7 @@ pub enum AbilityTarget {
         acquisition: TargetAcquisition,
         reach: AbilityReach,
         effect: AbilityTargetEffect,
-        circle: Option<CircleEffect>,
+        circle_effect: Option<CircleEffect>,
         environment_effect: Option<EnvironmentEffect>,
     },
 
@@ -6771,6 +6952,16 @@ impl Character {
         } else {
             false
         }
+    }
+
+    pub fn equipped_weapon_type(&self) -> Option<AttackType> {
+        self.weapon(HandType::MainHand).map(|w| {
+            if w.is_melee() {
+                AttackType::Melee
+            } else {
+                AttackType::Ranged
+            }
+        })
     }
 
     pub fn shield(&self) -> Option<Shield> {

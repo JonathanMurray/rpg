@@ -185,7 +185,7 @@ pub const COL_LIGHT_BLUE: Color = rgb(117, 217, 242);
 pub const COL_BOB: Color = rgb(85, 167, 212);
 pub const COL_ALICE: Color = rgb(144, 181, 58);
 pub const COL_CLARA: Color = rgb(199, 131, 233);
-pub const COL_ENEMY: Color = COL_RED;
+pub const COL_ENEMY: Color = COL_RED_BRIGHT;
 
 pub const COL_DARK: Color = rgb(34, 39, 52);
 pub const COL_BRIGHT: Color = rgb(230, 234, 234);

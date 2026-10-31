@@ -31,14 +31,15 @@ use crate::{
     core::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
-        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterFacing, CharacterId, Characters,
-        CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval, DamageSource, GameEvent,
-        GameOverType, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction, Position,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AppliedEffect, ApplyCondition,
+        ApplyEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
+        AttackOutcome, AttackType, AttackedEvent, BaseAction, Character, CharacterFacing,
+        CharacterId, Characters, CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval,
+        DamageSource, DecoratedTargetOutcome, GameEvent, GameOverType, HandType, HitType,
+        IncludeCircleEffects, MovementType, OnAttackedReaction, OnHitReaction, Position,
         TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
-    data::INSPIRE,
+    data::{INSPIRE, KILL},
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -917,9 +918,10 @@ impl UserInterface {
         character_ui.draw(ui_x0, ui_y + 5.0);
 
         let log_x = screen_width() - self.log.width();
-        self.log.draw(log_x, ui_y);
+        let log_y = ui_y - 100.0;
+        self.log.draw(log_x, log_y);
 
-        self.log.draw_tooltips(log_x, ui_y);
+        self.log.draw_tooltips(log_x, log_y);
 
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
@@ -1622,34 +1624,10 @@ impl UserInterface {
                 main_line,
                 detail_lines,
                 reactor,
-                outcome,
             } => {
+                let reactor = self.characters.get(reactor);
                 self.log.add_with_details(main_line, &detail_lines);
-
-                if let Some(condition) = outcome.received_condition {
-                    self.game_grid.add_text_effect(
-                        reactor,
-                        0.0,
-                        TextEffect::ReceiveCondition(condition),
-                    );
-                }
-
-                if let Some(offensive) = outcome.offensive {
-                    if let Some((condition, _duration)) = offensive.inflicted_condition {
-                        self.game_grid.add_text_effect(
-                            self.active_character_id,
-                            0.0,
-                            TextEffect::ReceiveCondition(condition),
-                        );
-                    } else {
-                        self.game_grid.add_text_effect(
-                            self.active_character_id,
-                            0.0,
-                            TextEffect::Miss,
-                        );
-                    }
-                }
-                self.animation_stopwatch.set_to_at_least(0.5);
+                self.animate_reaction(reactor.id());
             }
             GameEvent::AttackWasInitiated {
                 actor,
@@ -1666,12 +1644,11 @@ impl UserInterface {
                 ability,
                 destination,
             } => {
-                println!("Ability was initiated: {}", ability.name);
                 let (delay, duration) =
                     self.game_grid
                         .animate_initiating_ability(actor, &ability, destination);
 
-                if let Some(sound_id) = ability.initiate_sound {
+                if let Some(sound_id) = ability.audio_visuals.initiate_sound {
                     self.sound_player.play_delayed(sound_id, delay);
                 }
 
@@ -1682,14 +1659,14 @@ impl UserInterface {
                 target_outcome,
                 area_outcome,
                 ability,
-                detail_lines,
+                extra_logs,
             }) => {
                 self.handle_ability_resolved(
                     actor,
                     target_outcome,
                     area_outcome,
                     ability,
-                    detail_lines,
+                    extra_logs,
                 );
             }
             GameEvent::ConsumableWasUsed { user, consumable } => {
@@ -1721,7 +1698,11 @@ impl UserInterface {
                 for char_id in characters {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {
-                        self.log.add(format!("|{}| died", char.name_tag()));
+                        self.log.add(format!(
+                            "|{}| died |<status>{:?}|",
+                            char.name_tag(),
+                            StatusId::Dead
+                        ));
                     }
                 }
 
@@ -1730,16 +1711,17 @@ impl UserInterface {
                 self.game_grid.remove_dead();
                 self.top_character_portraits.remove_dead();
 
-                // TODO: Ideally the UI shouldn't show a new active character until the death "animation" is complete.
                 self.animation_stopwatch.set_to_at_least(0.5);
 
                 if let Some(new_active) = new_active {
                     self.set_new_active_character_id(new_active);
                 }
             }
-            GameEvent::PlayerGainedMoney { amount } => {
-                self.log
-                    .add(format!("Player gained money: |<value>{}|", amount));
+            GameEvent::PlayerGainedMoney { amount, source } => {
+                self.log.add_with_details(
+                    format!("Player gained money: |<value>{}|", amount),
+                    &[format!("Source: |<keyword>{}|", source)],
+                );
                 self.sound_player.play(SoundId::Coin);
                 for char in self.characters.iter() {
                     if char.player_controlled() {
@@ -1894,81 +1876,18 @@ impl UserInterface {
 
                 self.animation_stopwatch.set_to_at_least(duration);
             }
-            GameEvent::CharacterTookDamage {
-                character,
-                amount,
-                source,
-            } => {
-                let character = self.characters.get(character);
-                self.log.add(format!(
-                    "|{}| took |<value>{}| damage |<faded>({})|",
-                    character.name_tag(),
-                    amount,
-                    source.name()
-                ));
-                if source == DamageSource::Condition(Condition::Burning) {
-                    self.sound_player.play(SoundId::Burning);
-                }
-                self.sound_player.play_delayed(character.damage_sound, 0.03);
-
-                self.game_grid.add_text_effect(
-                    character.id(),
-                    0.0,
-                    TextEffect::HitDamage(amount, HitType::Regular),
-                );
-
-                self.animate_character_damage(character.id(), amount, Some(source));
-
-                if source == DamageSource::KnockbackCollision {
-                    self.animation_stopwatch.set_to_at_least(0.15);
-                }
-            }
             GameEvent::CharacterEffectWasApplied {
                 character,
                 applied_effect,
                 source,
             } => {
-                let name_tag = self.characters.get(character).name_tag();
-                let verb_phrase = match applied_effect {
-                    ApplyEffect::LoseActionPoints(n) => "".to_string(),
-                    ApplyEffect::GainActionPoints(n) => {
-                        format!("gained {n} AP")
-                    }
-                    ApplyEffect::LoseHealth(_) => todo!(),
-                    ApplyEffect::GainHealth(n) => {
-                        format!("gained |<value>{}| health", n,)
-                    }
-                    ApplyEffect::GainStamina(n) => format!("gained {n} stamina"),
-                    ApplyEffect::GainMana(n) => format!("gained {n} mana"),
-                    ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
-                        format!(
-                            "gained: |<status>{:?}| |<keyword>{}|",
-                            condition.status_id(),
-                            condition.name()
-                        )
-                    }
-                    ApplyEffect::LoseCondition { condition } => {
-                        format!(
-                            "lost: |<status>{:?}| |<keyword>{}|",
-                            condition.status_id(),
-                            condition.name()
-                        )
-                    }
-                    ApplyEffect::Pushed(_) => todo!(),
-                    ApplyEffect::Escape => todo!(),
-                };
-
-                if !verb_phrase.is_empty() {
-                    let line = format!("|{name_tag}| {verb_phrase}");
-                    if source.is_empty() {
-                        self.log.add(line);
-                    } else {
-                        self.log
-                            .add_with_details(line, &[format!("|<faded>Source:| {source}")]);
-                    }
-                }
-
-                self.show_applied_effect(applied_effect, character, 0.0);
+                self.handle_effect_was_applied(
+                    0.0,
+                    character,
+                    applied_effect,
+                    &[format!("Source: |<keyword>{source}|")],
+                    None,
+                );
             }
             GameEvent::GameOver(type_) => {
                 let text = match type_ {
@@ -2003,6 +1922,85 @@ impl UserInterface {
         }
     }
 
+    fn handle_effect_was_applied(
+        &mut self,
+        start_time: f32,
+        character: u32,
+        applied_effect: AppliedEffect,
+        detail_lines: &[String],
+        ability: Option<AbilityId>,
+    ) {
+        self.log_applied_effect(character, applied_effect, detail_lines);
+        self.show_applied_effect(applied_effect, character, start_time, ability);
+    }
+
+    fn log_applied_effect(
+        &mut self,
+        character: u32,
+        applied_effect: AppliedEffect,
+        detail_lines: &[String],
+    ) {
+        //dbg!(character, applied_effect, detail_lines);
+        let name_tag = self.characters.get(character).name_tag();
+        let verb_phrase = match applied_effect {
+            AppliedEffect::LostActionPoints(n) => "".to_string(),
+            AppliedEffect::GainedActionPoints(n) => {
+                format!("gained {n} AP")
+            }
+            AppliedEffect::LostHealth(n, source, dmg_type) => match source {
+                DamageSource::Attack(..) | DamageSource::Ability(..) => {
+                    format!("was hit for |<value>{}| {}", n, dmg_type.dmg_str())
+                }
+                _ => format!("lost |<value>{}| health", n),
+            },
+            AppliedEffect::GainedHealth(n) => {
+                format!("gained |<value>{}| health", n,)
+            }
+            AppliedEffect::GainedStamina(n) => format!("gained {n} stamina"),
+            AppliedEffect::GainedMana(n) => format!("gained {n} mana"),
+            AppliedEffect::GainedCondition(ApplyCondition {
+                condition,
+                stacks,
+                duration_rounds,
+            }) => {
+                let mut line = format!(
+                    "gained: |<status>{:?}| |<keyword>{}|",
+                    condition.status_id(),
+                    condition.name()
+                );
+
+                if let Some(stacks) = stacks {
+                    line.push_str(&format!(" x{}", stacks));
+                }
+
+                if let Some(duration) = duration_rounds {
+                    line.push_str(&format!(" ({})", duration));
+                }
+
+                line
+            }
+            AppliedEffect::LostCondition { condition } => {
+                format!(
+                    "lost: |<status>{:?}| |<keyword>{}|",
+                    condition.status_id(),
+                    condition.name()
+                )
+            }
+            AppliedEffect::Dodged => "dodged".to_string(),
+            AppliedEffect::WasPushed(_) => "was pushed".to_string(),
+            AppliedEffect::Escaped => todo!(),
+        };
+
+        if !verb_phrase.is_empty() {
+            let line = format!("|{name_tag}| {verb_phrase}");
+            if detail_lines.is_empty() {
+                self.log.add(line);
+            } else {
+                self.log.add_with_details(line, detail_lines);
+            }
+        }
+    }
+
     fn animate_reaction(&mut self, reactor: CharacterId) {
         self.game_grid
             .add_text_effect(reactor, 0.0, TextEffect::ReactionExclamation);
@@ -2010,49 +2008,24 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(0.5);
     }
 
-    fn animate_character_damage(
+    fn handle_area_outcomes(
         &mut self,
-        character_id: CharacterId,
-        actual_health_lost: u32,
-        source: Option<DamageSource>,
-    ) {
-        if actual_health_lost > 0 {
-            let prev_health =
-                self.characters.get(character_id).health.current() + actual_health_lost;
-            self.game_grid
-                .animate_character_health_change(character_id, prev_health, 0.9);
-
-            if let Some(source) = source {
-                match source {
-                    DamageSource::KnockbackCollision | DamageSource::Falling => {
-                        self.game_grid.animate_character_shaking(character_id, 0.0);
-                        self.game_grid
-                            .animate_effect(character_id, 0.5, EffectId::Pow);
-                    }
-                    DamageSource::Ability(ability) => {
-                        if ability.id == AbilityId::LightningBolt {
-                            self.game_grid
-                                .animate_effect(character_id, 0.5, EffectId::Zap);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    fn add_effects_for_area_outcomes(
-        &mut self,
+        label: &str,
+        actor: CharacterId,
         start_time: f32,
         animation_color: Color,
         circle: Option<ConcreteCircle>,
-        outcomes: &[(CharacterId, Box<AbilityTargetOutcome>)],
-        show_area_circle: bool,
-        ability: Option<&'static Ability>,
+        outcomes: &[DecoratedTargetOutcome],
+        ability: Option<&Ability>,
     ) {
         let area_duration = 1.5;
 
+        let ability_id = ability.map(|a| a.id);
         if let Some(circle) = circle {
+            let mut show_area_circle = true;
+            if matches!(ability_id, Some(AbilityId::Inspire) | Some(AbilityId::Kill)) {
+                show_area_circle = false;
+            }
             // TODO: This type of rendering code should be moved to grid along with the ability initation rendering code
             if show_area_circle {
                 self.game_grid.add_effect(
@@ -2081,36 +2054,32 @@ impl UserInterface {
         }
 
         let mut delay = 0.1;
-        for (target_id, outcome) in outcomes {
-            let target_pos = self.characters.get(*target_id).pos();
+        for (i, o) in outcomes.iter().enumerate() {
+            let details_header = format!("|<keyword>{}| |<faded>AoE (target {})|:", label, i + 1);
+            let mut lines = vec![details_header];
+            lines.extend_from_slice(&o.detail_lines);
 
-            let start = start_time + delay;
-            let end = start + 0.2;
+            //dbg!((i, o));
 
-            self.game_grid.add_effect(
-                target_pos,
-                target_pos,
-                EffectData {
-                    start_time: start,
-                    end_time: end,
-                    variant: EffectVariant::At(
-                        EffectPosition::Destination,
-                        EffectGraphics::Circle {
-                            radius: 20.0,
-                            end_radius: Some(25.0),
-                            fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
-                            stroke: Some((animation_color, 4.0)),
-                            fade: true,
-                        },
-                    ),
-                },
-            );
+            let mut effects = vec![];
+            o.outcome
+                .collect_applied_effects(actor, o.target_id, &mut effects);
 
-            self.game_grid.animate_character_shaking(*target_id, start);
+            if let Some(a) = ability {
+                if o.outcome.hit_type() != HitType::Miss {
+                    self.game_grid
+                        .animate_ability_target_hit(o.target_id, &a.audio_visuals, delay);
+                }
+            }
 
-            self.add_effect_for_target_outcome(outcome, start, *target_id, ability);
+            if o.outcome.hit_type() == HitType::Critical {
+                self.game_grid
+                    .add_text_effect(o.target_id, delay, TextEffect::CriticalHit);
+            }
 
-            self.animation_stopwatch.set_to_at_least(start_time + 0.3);
+            for (ch_id, e) in effects {
+                self.handle_effect_was_applied(start_time, ch_id, e, &lines, ability_id);
+            }
 
             delay += 0.1;
         }
@@ -2118,133 +2087,91 @@ impl UserInterface {
 
     fn handle_ability_resolved(
         &mut self,
-        actor: CharacterId,
-        target_outcome: Option<(u32, Box<AbilityTargetOutcome>)>,
+        actor_id: CharacterId,
+        target_outcome: Option<DecoratedTargetOutcome>,
         area_outcome: Option<AbilityAreaOutcome>,
         ability: &'static Ability,
-        mut detail_lines: Vec<String>,
+        extra_logs: Vec<String>,
     ) {
-        if let Some(sound_id) = ability.initiate_sound {
+        // TODO
+        //dbg!(&target_outcome, &area_outcome);
+
+        if let Some(sound_id) = ability.audio_visuals.initiate_sound {
             self.sound_player.stop(sound_id);
         }
 
-        let actor = self.characters.get(actor);
+        let actor = self.characters.get(actor_id);
         let actor_name_tag = actor.name_tag();
-        let mut line = if ability.id == AbilityId::EnemyEscape {
+        if ability.id == AbilityId::EnemyEscape {
             let gold = actor.get_condition_stacks(Condition::Treasure);
             let with_gold = if gold > 0 {
                 format!(" with |<value>{}| gold", gold)
             } else {
                 "".to_string()
             };
-            format!("|{}| escaped{}", actor_name_tag, with_gold)
+            let line = format!("|{}| escaped{}", actor_name_tag, with_gold);
+
+            self.log.add(line);
+            return;
+        }
+
+        let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
+            "cast"
         } else {
-            let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
-                "cast"
-            } else {
-                "used"
-            };
-            let mut line = format!("|{}| {} {}", actor_name_tag, verb, ability.name);
-            if let Some((target_id, _outcome)) = &target_outcome {
-                let target_name_tag = self.characters.get(*target_id).name_tag();
-                line.push_str(&format!(" on |{}|", target_name_tag));
-            }
-            line
+            "used"
         };
-
-        let mut attacks = vec![];
-
-        let mut missed = false;
-        if let Some((target, outcome)) = &target_outcome {
-            match outcome.as_ref() {
-                AbilityTargetOutcome::HitEnemy {
-                    damage,
-                    hit_type,
-                    applied_effects,
-                    ..
-                } => {
-                    missed = matches!(hit_type, HitType::Miss);
-                    if let Some((dmg, _dmg_type)) = damage {
-                        line.push_str(&format!(" (|<value>{}| damage)", dmg))
-                    } else if applied_effects.is_empty() {
-                        let suffix = match hit_type {
-                            HitType::Miss => " (miss)",
-                            HitType::Weak => " (graze)",
-                            HitType::Regular => " (hit)",
-                            HitType::Strong => "  (strong)",
-                            HitType::Critical => " (crit)",
-                        };
-                        line.push_str(suffix);
-                    } else if applied_effects.len() == 1 {
-                        line.push_str(&format!("  ({})", applied_effects[0]));
-                    }
-                }
-                AbilityTargetOutcome::AffectedAlly { applied_effects } => {
-                    if applied_effects.len() == 1 {
-                        line.push_str(&format!("  ({})", applied_effects[0]));
-                    }
-                }
-                AbilityTargetOutcome::AttackedEnemy(event) => {
-                    attacks.push(event);
-                }
+        let mut line = format!("|{}| {} |<keyword>{}|", actor_name_tag, verb, ability.name);
+        if let Some(o) = &target_outcome {
+            let target_name_tag = self.characters.get(o.target_id).name_tag();
+            line.push_str(&format!(" on |{}|", target_name_tag));
+            self.log.add_with_details(line, &o.detail_lines);
+        } else {
+            if let Some(o) = &area_outcome {
+                let num_targets = o.targets.len();
+                let suffix = if num_targets > 1 { "s" } else { "" };
+                line.push_str(&format!(" |<faded>({} target{})|", num_targets, suffix));
             }
+            self.log.add(line);
         }
 
-        if let Some(sound_id) = ability.resolve_sound {
-            if missed {
-                self.sound_player.play(SoundId::AttackMiss);
-            } else {
-                self.sound_player.play(sound_id);
-            }
+        if let Some(sound_id) = ability.audio_visuals.resolve_sound {
+            self.sound_player.play(sound_id);
         }
 
-        if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
-            for (_, outcome) in targets {
-                if let AbilityTargetOutcome::AttackedEnemy(attacked_event) = &outcome.as_ref() {
-                    attacks.push(attacked_event);
-                }
+        if let Some(o) = &target_outcome {
+            let mut effects = vec![];
+            o.outcome
+                .collect_applied_effects(actor_id, o.target_id, &mut effects);
+            let mut detail_lines = vec![format!("|<keyword>{}|:", ability.name)];
+            detail_lines.extend_from_slice(&o.detail_lines);
+            for (ch_id, e) in effects {
+                self.handle_effect_was_applied(0.0, ch_id, e, &detail_lines, Some(ability.id));
             }
-        }
-
-        if !attacks.is_empty() {
-            // The provided details are misleading; they report the dice-roll used when performing the ability, but that
-            // dice roll is effectively ignored since the ability instead proceeded to perform an attack (which uses
-            // its own dice roll)
-            detail_lines.clear();
-
-            // For AoE ability - show how many targets were hit
-            if !ability.targets_single_enemy() {
-                if attacks.len() == 1 {
-                    line.push_str(" (1 target)");
-                } else {
-                    line.push_str(&format!(" ({} targets)", attacks.len()));
-                }
+            if o.outcome.hit_type() != HitType::Miss {
+                self.game_grid
+                    .animate_ability_target_hit(o.target_id, &ability.audio_visuals, 0.0);
             }
-        }
-
-        self.log.add_with_details(line, &detail_lines);
-
-        let animation_color = ability.animation_color;
-        if let Some((target, outcome)) = &target_outcome {
-            self.game_grid.animate_character_shaking(*target, 0.0);
-            self.add_effect_for_target_outcome(outcome, 0.0, *target, Some(ability));
+            if o.outcome.hit_type() == HitType::Critical {
+                self.game_grid
+                    .add_text_effect(o.target_id, 0.0, TextEffect::CriticalHit);
+            }
             self.animation_stopwatch.set_to_at_least(0.15);
         }
 
         if let Some(AbilityAreaOutcome { targets, circle }) = &area_outcome {
-            let show_area_circle = ability != &INSPIRE;
-            self.add_effects_for_area_outcomes(
+            self.handle_area_outcomes(
+                ability.name,
+                actor_id,
                 0.0,
-                animation_color,
+                ability.audio_visuals.animation_color,
                 *circle,
                 targets,
-                show_area_circle,
                 Some(ability),
             );
         }
 
-        for (i, event) in attacks.iter().enumerate() {
-            self.handle_attacked_event(event, i);
+        for line in extra_logs {
+            self.log.add(line);
         }
     }
 
@@ -2267,8 +2194,22 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(duration);
     }
 
+    fn play_attack_hit_sound(&self, attack_type: AttackType, hit_type: HitType, start_time: f32) {
+        let sound = match attack_type {
+            AttackType::Melee => SoundId::MeleeAttack,
+            AttackType::Ranged => SoundId::HitArrow,
+        };
+        self.sound_player.play_delayed(sound, start_time);
+        if matches!(hit_type, HitType::Critical) {
+            self.sound_player
+                .play_delayed(SoundId::Crit, start_time + 0.02);
+        }
+    }
+
     fn handle_attacked_event(&mut self, event: &AttackedEvent, attack_index: usize) {
-        let attacker = event.attacker;
+        //dbg!(event);
+
+        let attacker_id = event.attacker;
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
@@ -2276,93 +2217,41 @@ impl UserInterface {
 
         let target_pos = self.characters.get(target).pos();
 
-        if event.outcome.hit_type == HitType::Miss {
-            self.sound_player
-                .play_delayed(SoundId::AttackMiss, start_time);
-        } else if event.outcome.damage == 0 {
-            self.sound_player
-                .play_delayed(SoundId::ArmorAbsorbed, start_time);
-        } else {
-            if self.characters.get(attacker).has_equipped_ranged_weapon() {
-                self.sound_player
-                    .play_delayed(SoundId::HitArrow, start_time);
-            } else {
-                self.sound_player
-                    .play_delayed(SoundId::MeleeAttack, start_time);
-            }
-            if matches!(event.outcome.hit_type, HitType::Critical) {
-                self.sound_player
-                    .play_delayed(SoundId::Crit, start_time + 0.02);
-            }
-            self.sound_player
-                .play_delayed(self.characters.get(target).damage_sound, start_time + 0.03);
+        let attacker = self.characters.get(attacker_id);
+
+        if event.outcome.hit_type != HitType::Miss {
+            let attack_type = attacker.equipped_weapon_type().unwrap();
+            self.play_attack_hit_sound(attack_type, event.outcome.hit_type, start_time);
+        }
+        if event.outcome.hit_type == HitType::Critical {
+            self.game_grid
+                .add_text_effect(target, 0.0, TextEffect::CriticalHit);
         }
 
-        let verb = match event.outcome.hit_type {
-            HitType::Miss => "missed",
-            HitType::Weak | HitType::Regular | HitType::Strong => "hit",
-            HitType::Critical => "crit",
-        };
-        let applied_to_target = &event.outcome.applied_to_target;
-        let applied_to_self = &event.outcome.applied_to_self;
-
-        let mut line = format!(
-            "|{}| {} |{}|",
-            self.characters.get(attacker).name_tag(),
-            verb,
+        let line = format!(
+            "|{}| attacked |{}|",
+            attacker.name_tag(),
             self.characters.get(target).name_tag()
         );
 
-        let mut damage_was_dealt = false;
-        match event.outcome {
-            AttackOutcome {
-                damage,
-                actual_health_lost,
-                hit_type,
-                ..
-            } => {
-                if hit_type != HitType::Miss {
-                    self.animate_character_damage(target, actual_health_lost, None);
-                    damage_was_dealt = damage > 0;
-                    line.push_str(&format!(" (|<value>{}| damage)", damage))
-                }
-            }
-        }
-
         self.log.add_with_details(line, detail_lines);
 
-        self.game_grid.add_text_effect(
-            target,
-            start_time,
-            TextEffect::HitDamage(event.outcome.damage, event.outcome.hit_type),
-        );
+        let mut effects = vec![];
+        // Don't collect circle effects here - they are handled separately further down (code reuse with ability AoE effects)
+        event.collect_applied_effects(attacker_id, target, &mut effects, IncludeCircleEffects::No);
 
-        if !applied_to_target.is_empty() {
-            let mut delay = 0.0;
-            for apply_effect in applied_to_target {
-                if self.show_applied_effect(*apply_effect, target, start_time + delay) {
-                    delay += 0.3;
-                }
-            }
-        };
-        if !applied_to_self.is_empty() {
-            let mut delay = 0.3;
-            for apply_effect in applied_to_self {
-                if self.show_applied_effect(*apply_effect, attacker, start_time + delay) {
-                    delay += 0.3;
-                }
-            }
-        };
+        for (ch_id, e) in effects {
+            self.handle_effect_was_applied(0.0, ch_id, e, detail_lines, None);
+        }
+
         if let Some(effect_id) = event.outcome.visual_effect {
             self.game_grid.animate_effect(target, 0.5, effect_id);
         }
 
-        if damage_was_dealt {
-            self.game_grid.animate_character_shaking(target, start_time);
-        }
-
-        if let Some((radius, outcomes)) = &event.circle_outcome {
-            self.add_effects_for_area_outcomes(
+        if let Some((name, radius, outcomes)) = &event.circle_outcome {
+            self.handle_area_outcomes(
+                &format!("Attack - {}", name),
+                attacker_id,
                 start_time,
                 RED,
                 Some(ConcreteCircle {
@@ -2370,12 +2259,11 @@ impl UserInterface {
                     radius: *radius,
                 }),
                 outcomes,
-                true,
                 None,
             );
         }
 
-        let duration = if self.characters.get(attacker).player_controlled() {
+        let duration = if self.characters.get(attacker_id).player_controlled() {
             // player behaviour should be snappy
             0.3
         } else {
@@ -2385,104 +2273,77 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(duration);
     }
 
-    fn add_effect_for_target_outcome(
-        &mut self,
-        outcome: &AbilityTargetOutcome,
-        start_time: f32,
-        target: CharacterId,
-        ability: Option<&'static Ability>,
-    ) {
-        //let mut effects = vec![];
-        let mut effects = vec![];
-
-        match &outcome {
-            AbilityTargetOutcome::HitEnemy {
-                damage,
-                hit_type,
-                applied_effects,
-                actual_health_lost,
-            } => {
-                // TODO: color (and/or entire effect) should depend on the ability?
-                self.game_grid.animate_magic_sparks(target, RED);
-
-                if let Some((dmg, _dmg_type)) = damage {
-                    effects.push(TextEffect::HitDamage(*dmg, *hit_type));
-                    if *dmg > 0 {
-                        let damage_source = ability.map(|a| DamageSource::Ability(a));
-                        self.animate_character_damage(target, *actual_health_lost, damage_source);
-                        self.sound_player.play_delayed(
-                            self.characters.get(target).damage_sound,
-                            start_time + 0.03,
-                        );
-                    }
-                }
-
-                if *hit_type == HitType::Miss {
-                    effects.push(TextEffect::Miss);
-                }
-
-                if !applied_effects.is_empty() {
-                    let mut delay = 0.0;
-                    for apply_effect in applied_effects {
-                        if self.show_applied_effect(*apply_effect, target, delay) {
-                            delay += 0.3;
-                        }
-                    }
-                };
-            }
-            AbilityTargetOutcome::AffectedAlly { applied_effects } => {
-                self.game_grid.animate_magic_sparks(target, WHITE);
-                let mut delay = 0.0;
-                for apply_effect in applied_effects {
-                    if self.show_applied_effect(*apply_effect, target, delay) {
-                        delay += 0.3;
-                    }
-                }
-            }
-            AbilityTargetOutcome::AttackedEnemy(..) => {
-                // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.
-            }
-        };
-
-        let mut effect_start_time = start_time;
-        for effect in effects {
-            self.game_grid
-                .add_text_effect(target, effect_start_time, effect);
-            effect_start_time += 0.35;
-        }
-    }
-
     fn show_applied_effect(
         &mut self,
-        applied_effect: ApplyEffect,
+        applied_effect: AppliedEffect,
         character_id: CharacterId,
         start_time: f32,
+        ability: Option<AbilityId>,
     ) -> bool {
         match applied_effect {
-            ApplyEffect::LoseActionPoints(n) => {
+            AppliedEffect::LostActionPoints(n) => {
                 self.game_grid.animate_character_lost_ap(character_id, n);
             }
-            ApplyEffect::GainActionPoints(n) => {
-                self.sound_player.play(SoundId::GainedAP);
+            AppliedEffect::GainedActionPoints(n) => {
+                self.sound_player
+                    .play_delayed(SoundId::GainedAP, start_time);
             }
-            ApplyEffect::LoseHealth(_) => {}
-            ApplyEffect::GainHealth(..) => {
-                self.game_grid.animate_magic_sparks(character_id, WHITE);
+            AppliedEffect::LostHealth(amount, source, dmg_type) => {
+                let character = self.characters.get(character_id);
+                if amount > 0 {
+                    if source == DamageSource::Condition(Condition::Burning) {
+                        self.sound_player.play_delayed(SoundId::Burning, start_time);
+                    }
+                    self.sound_player
+                        .play_delayed(character.damage_sound, start_time);
+                    let prev_health = self.characters.get(character_id).health.current() + amount;
+                    self.game_grid
+                        .animate_character_health_change(character_id, prev_health, 0.9);
+
+                    match source {
+                        DamageSource::KnockbackCollision | DamageSource::Falling => {
+                            self.game_grid
+                                .animate_character_shaking(character_id, start_time);
+                            self.game_grid
+                                .animate_effect(character_id, 0.5, EffectId::Pow);
+                        }
+                        DamageSource::Attack(attack_type, hit_type) => {
+                            self.game_grid
+                                .animate_character_shaking(character_id, start_time);
+                            self.play_attack_hit_sound(attack_type, hit_type, start_time);
+                        }
+
+                        _ => {}
+                    }
+                    if ability.is_some() {}
+                } else {
+                    if matches!(source, DamageSource::Attack(..)) {
+                        self.sound_player
+                            .play_delayed(SoundId::ArmorAbsorbed, start_time);
+                        self.game_grid
+                            .animate_character_shaking(character_id, start_time);
+                    }
+                }
+                if source == DamageSource::KnockbackCollision {
+                    self.animation_stopwatch.set_to_at_least(0.15);
+                }
             }
-            ApplyEffect::GainStamina(n) => {}
-            ApplyEffect::GainMana(n) => {}
-            ApplyEffect::Condition(ApplyCondition { condition, .. }) => match condition {
+            AppliedEffect::Dodged => {
+                self.sound_player
+                    .play_delayed(SoundId::AttackMiss, start_time);
+                self.game_grid
+                    .animate_character_shaking(character_id, start_time);
+            }
+            AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => match condition {
                 Condition::Ferocity => {
-                    self.sound_player.play(SoundId::Execute);
+                    self.sound_player.play_delayed(SoundId::Execute, start_time);
                 }
                 Condition::Burning => {
-                    self.sound_player.play(SoundId::Burning);
+                    self.sound_player.play_delayed(SoundId::Burning, start_time);
                 }
                 _ => {}
             },
-            ApplyEffect::LoseCondition { .. } => {}
-            ApplyEffect::Pushed(_) => {}
-            ApplyEffect::Escape => {}
+            _ => {}
         };
 
         self.game_grid.add_text_effect(

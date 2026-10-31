@@ -1,5 +1,5 @@
 use macroquad::color::{
-    Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, SKYBLUE, YELLOW,
+    Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, SKYBLUE, WHITE, YELLOW,
 };
 
 use crate::{
@@ -8,12 +8,12 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityReach, AbilityRollType, AbilityTarget,
         AbilityTargetEffect, ApplyCondition, ApplyEffect, AreaEffect, AreaShape, ArmorPiece, Arrow,
         AttackAttribute, AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect,
-        AttackHitEffect, AttackType, CircleEffect, Circumstance, Condition, Consumable, DamageType,
-        DefenseType, EnvironmentEffect, EquipEffect, EquipmentRequirement, Fraction, HandType,
-        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
-        OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellTargetEffect, TargetAcquisition, Trinket, Weapon, WeaponGrip,
-        WeaponRange, WeaponType,
+        AttackHitEffect, AttackType, AudioVisuals, CircleEffect, Circumstance, Condition,
+        Consumable, DamageSource, DamageType, DefenseType, EnvironmentEffect, EquipEffect,
+        EquipmentRequirement, Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect,
+        OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, SpellEnhancementEffect, SpellTargetEffect, TargetAcquisition, Trinket, Weapon,
+        WeaponGrip, WeaponRange, WeaponType,
     },
     grid::ParticleShape,
     pathfind::Surface,
@@ -145,7 +145,7 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             None,
-            apply_condition_stacks(Condition::Burning, 4),
+            apply_condition_stacks(Condition::Bleeding, 4),
         )),
         //inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
         ..AttackEnhancementEffect::default()
@@ -798,7 +798,7 @@ pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
             on_hit: &[apply_condition_rounds(Condition::Poisoned, 2)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
     COL_GREEN_3,
@@ -813,7 +813,7 @@ const fn grenade_ability(
     Ability {
         id,
         name,
-        speech: "Hey, catch!",
+
         description: "",
         icon: IconId::Undefined,
         action_point_cost: 2,
@@ -824,15 +824,18 @@ const fn grenade_ability(
         roll: Some(AbilityRollType::Spell),
         possible_enhancements: &[],
         target: target,
-        animation_color: color,
-        animation: AbilityAnimation::Throw(color),
-        // TODO: Throw sound effect
-        initiate_sound: Some(SoundId::ShootSpell),
-        resolve_sound: Some(SoundId::BottleSplash),
-        charge_fx: Some(AbilityChargeFx {
-            particle_shape: ParticleShape::Circle,
-            sound: SoundId::MechanicNoise,
-        }),
+        audio_visuals: AudioVisuals {
+            speech: "Hey, catch!",
+            animation_color: color,
+            animation: AbilityAnimation::Throw(color),
+            // TODO: Throw sound effect
+            initiate_sound: Some(SoundId::ShootSpell),
+            resolve_sound: Some(SoundId::BottleSplash),
+            charge_fx: Some(AbilityChargeFx {
+                particle_shape: ParticleShape::Circle,
+            }),
+            ..AudioVisuals::default()
+        },
     }
 }
 
@@ -862,7 +865,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
-    speech: "",
+
     description: "Deal |<value>3| damage and inflict |<keyword>Dazed|",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
@@ -881,20 +884,23 @@ pub const SHIELD_BASH: Ability = Ability {
             on_hit: &[apply_condition_rounds(Condition::Dazed, 1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::ShieldAttack,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::ShieldBash),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::ShieldAttack,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::ShieldBash),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ENEMY_TACKLE: Ability = Ability {
     id: AbilityId::Tackle,
     name: "Tackle",
-    speech: "",
+
     description: "",
     icon: IconId::Tackle,
     action_point_cost: 3,
@@ -903,6 +909,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
     requirement: None,
     possible_enhancements: &[],
 
+    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     target: AbilityTarget::Character {
         acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::Melee),
@@ -916,21 +923,23 @@ pub const ENEMY_TACKLE: Ability = Ability {
             ],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
     id: AbilityId::EnemySlashingAttack,
     name: "Slashing attack",
-    speech: "",
+
     description: "",
     icon: IconId::Slashing,
     action_point_cost: 3,
@@ -948,14 +957,17 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
             on_hit: Some(apply_condition_stacks(Condition::Bleeding, 2)),
             ..AbilityAttackEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
@@ -1203,7 +1215,7 @@ pub const SWEEP_ATTACK_PUSH: AbilityEnhancement = AbilityEnhancement {
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
     name: "Sweeping attack",
-    speech: "",
+
     description: "Attack all surrounding enemies",
     icon: IconId::SweepAttack,
     action_point_cost: 3,
@@ -1226,14 +1238,16 @@ pub const SWEEP_ATTACK: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    animation_color: BLACK,
-    animation: AbilityAnimation::SpinAttack,
-    initiate_sound: Some(SoundId::SweepAttack),
-    resolve_sound: None,
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: BLACK,
+        animation: AbilityAnimation::SpinAttack,
+        initiate_sound: Some(SoundId::SweepAttack),
+        resolve_sound: None,
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
@@ -1270,7 +1284,7 @@ pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
 pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
     name: "Lunge attack",
-    speech: "",
+
     description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
     action_point_cost: 3,
@@ -1284,17 +1298,19 @@ pub const LUNGE_ATTACK: Ability = Ability {
         acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::MoveIntoMelee(Range::f32(10.0)),
         effect: AbilityTargetEffect::PerformAttack(AbilityAttackEffect::default()),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
@@ -1312,7 +1328,7 @@ pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
 pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
-    speech: "",
+
     description: "Attack with advantage, and regain |<value>2| AP if it kills",
     icon: IconId::Execute,
     action_point_cost: 3,
@@ -1328,23 +1344,25 @@ pub const EXECUTE: Ability = Ability {
             on_kill_apply_self: Some(ApplyEffect::GainActionPoints(2)),
             ..AbilityAttackEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    initiate_sound: Some(SoundId::Execute),
-    resolve_sound: None,
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: Some(SoundId::Execute),
+        resolve_sound: None,
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ENEMY_BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
-    speech: "",
+
     description: "",
     icon: IconId::Brace,
     action_point_cost: 2,
@@ -1369,17 +1387,20 @@ pub const ENEMY_BRACE: Ability = Ability {
 
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::BuffBrace),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::BuffBrace),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
-    speech: "",
+
     description: "",
     icon: IconId::Brace,
     action_point_cost: 1,
@@ -1399,14 +1420,16 @@ pub const BRACE: Ability = Ability {
         )])),
         environment_effect: None,
     },
-    animation_color: GRAY,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::BuffBrace),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::BuffBrace),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
@@ -1424,7 +1447,7 @@ pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
 pub const SCREAM: Ability = Ability {
     id: AbilityId::Scream,
     name: "Scream",
-    speech: "",
+
     description: "Daze nearby enemies",
     icon: IconId::Scream,
     action_point_cost: 2,
@@ -1449,20 +1472,22 @@ pub const SCREAM: Ability = Ability {
     },
     possible_enhancements: &[&SCREAM_SHRIEK],
 
-    animation_color: BLUE,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: BLUE,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
-    speech: "",
+
     description: "|<keyword>Slow| and |<keyword>Expose| an enemy",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
@@ -1483,7 +1508,7 @@ pub const SHACKLED_MIND: Ability = Ability {
             ],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
     possible_enhancements: &[],
@@ -1515,20 +1540,22 @@ pub const SHACKLED_MIND: Ability = Ability {
         None,
     ],
      */
-    animation_color: Color::new(0.6, 0.3, 0.8, 1.00),
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Rect,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: Color::new(0.6, 0.3, 0.8, 1.00),
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Rect,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const MIND_BLAST: Ability = Ability {
     id: AbilityId::MindBlast,
     name: "Mind blast",
-    speech: "",
+
     description: "Damage an enemy and make them lose AP",
     icon: IconId::Mindblast,
     action_point_cost: 3,
@@ -1564,17 +1591,19 @@ pub const MIND_BLAST: Ability = Ability {
             on_hit: &[ApplyEffect::LoseActionPoints(1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: PURPLE,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: PURPLE,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
@@ -1592,7 +1621,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    speech: "",
+
     description: "Deal damage and cause |<keyword>Bleeding| in an area",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
@@ -1616,20 +1645,22 @@ pub const INFLICT_WOUNDS: Ability = Ability {
             None,
         ),
     },
-    animation_color: BROWN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: BROWN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const DRAUG_HAUNT: Ability = Ability {
     id: AbilityId::DraugHaunt,
     name: "Haunt",
-    speech: "",
+
     description: "Deal |<value>2| damage and inflict |<keyword>Dazed| to targets in an area",
     icon: IconId::DraugHaunt,
     action_point_cost: 3,
@@ -1646,7 +1677,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             ..SpellTargetEffect::default()
         }),
-        circle: Some(CircleEffect::new(
+        circle_effect: Some(CircleEffect::new(
             Range::of(4),
             TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -1659,17 +1690,20 @@ pub const DRAUG_HAUNT: Ability = Ability {
         )),
         environment_effect: None,
     },
-    animation_color: PURPLE,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: PURPLE,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const DRAUG_CLAW: Ability = Ability {
     id: AbilityId::DraugClaw,
     name: "Claw",
-    speech: "",
+
     description: "Deal |<value>4| damage and inflict |<keyword>Blinded|",
     icon: IconId::DraugClaw,
     action_point_cost: 3,
@@ -1688,20 +1722,23 @@ pub const DRAUG_CLAW: Ability = Ability {
             on_hit: &[apply_condition_rounds(Condition::Blinded, 1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: PURPLE,
-    animation: AbilityAnimation::MeleeWeaponAttack,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: PURPLE,
+        animation: AbilityAnimation::MeleeWeaponAttack,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ENEMY_ESCAPE: Ability = Ability {
     id: AbilityId::EnemyEscape,
     name: "Escape",
-    speech: "Don't mind me!",
+
     description: "",
     icon: IconId::Escape,
     action_point_cost: 4,
@@ -1721,17 +1758,21 @@ pub const ENEMY_ESCAPE: Ability = Ability {
         })),
         environment_effect: None,
     },
-    animation_color: BROWN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Laugh),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        speech: "Don't mind me!",
+        animation_color: BROWN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Laugh),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const HULDRA_INFECT: Ability = Ability {
     id: AbilityId::HuldraInfect,
     name: "Infect",
-    speech: "",
+
     description: "",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
@@ -1749,21 +1790,24 @@ pub const HULDRA_INFECT: Ability = Ability {
             on_hit: &[apply_condition_rounds(Condition::Poisoned, 1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
         reach: AbilityReach::Range(Range::f32(15.5)),
     },
-    animation_color: BROWN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: BROWN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     id: AbilityId::HuldraInflictHorrors,
     name: "Curse",
-    speech: "",
+
     description: "",
     icon: IconId::Mindblast,
     action_point_cost: 2,
@@ -1782,20 +1826,23 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
             on_hit: &[apply_condition_rounds(Condition::Slowed, 1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: PURPLE,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: PURPLE,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub static HULDRA_HEAL: Ability = Ability {
     id: AbilityId::HuldraHeal,
     name: "Blood magic",
-    speech: "",
+
     description: "",
     icon: IconId::BloodMagic,
     action_point_cost: 3,
@@ -1816,11 +1863,15 @@ pub static HULDRA_HEAL: Ability = Ability {
         ],
     ),
     possible_enhancements: &[],
-    animation_color: LIME,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: LIME,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: None,
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 const fn ally_spell_target(range: Range, apply: &'static [ApplyEffect]) -> AbilityTarget {
@@ -1828,7 +1879,7 @@ const fn ally_spell_target(range: Range, apply: &'static [ApplyEffect]) -> Abili
         acquisition: TargetAcquisition::Allies,
         reach: AbilityReach::Range(range),
         effect: uncontested_spell_effect(apply),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     }
 }
@@ -1847,9 +1898,8 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const BLESS: Ability = Ability {
     id: AbilityId::Bless,
     name: "Bless",
-    speech: "",
-    description:
-        "|<keyword>Protect| an ally from the next attack, and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
+    description: "|<keyword>Protect| an ally from the next attack \
+        and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Bless,
     action_point_cost: 2,
     mana_cost: 1,
@@ -1857,31 +1907,36 @@ pub const BLESS: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    target: ally_spell_target(Range::f32(9.5),
+    target: ally_spell_target(
+        Range::f32(9.5),
         &[
-                ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Protected,
-                    stacks: Some(3),
-                    duration_rounds: Some(1),
-                }),
-                ApplyEffect::LoseCondition {
-                    condition: Condition::Bleeding,
-                },
-                ApplyEffect::LoseCondition {
-                    condition: Condition::Poisoned,
-                },
-            ]),
-            // TODO add enhancement that heals over time (1 per round for 3 turns?)
+            ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(3),
+                duration_rounds: Some(1),
+            }),
+            ApplyEffect::LoseCondition {
+                condition: Condition::Bleeding,
+            },
+            ApplyEffect::LoseCondition {
+                condition: Condition::Poisoned,
+            },
+        ],
+    ),
+    // TODO add enhancement that heals over time (1 per round for 3 turns?)
     possible_enhancements: &[&BLESS_REACH, &HEAL_ENERGIZE],
 
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Heal),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Heal),
+        target_magic_sparks: Some(WHITE),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const BLESS_REACH: AbilityEnhancement = AbilityEnhancement {
@@ -1899,7 +1954,7 @@ pub const BLESS_REACH: AbilityEnhancement = AbilityEnhancement {
 pub const HASTE: Ability = Ability {
     id: AbilityId::Haste,
     name: "Haste",
-    speech: "",
+
     description: "Grant an ally bonus AP and movement",
     icon: IconId::Haste,
     action_point_cost: 2,
@@ -1913,14 +1968,17 @@ pub const HASTE: Ability = Ability {
         &[apply_condition_rounds(Condition::Hastened, 4)],
     ),
     possible_enhancements: &[],
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
@@ -1938,7 +1996,7 @@ pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
 pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
-    speech: "",
+
     description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 2,
@@ -1958,14 +2016,17 @@ pub const INSPIRE: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 const fn uncontested_spell_effect(apply: &'static [ApplyEffect]) -> AbilityTargetEffect {
@@ -1980,7 +2041,7 @@ const fn uncontested_spell_effect(apply: &'static [ApplyEffect]) -> AbilityTarge
 pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
-    speech: "",
+
     description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 3,
@@ -2000,17 +2061,21 @@ pub const ENEMY_INSPIRE: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: None,
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const HEALING_NOVA: Ability = Ability {
     id: AbilityId::HealingNova,
     name: "Healing nova",
-    speech: "",
+
     description: "Restore health to nearby allies",
     icon: IconId::PlusPlus,
     action_point_cost: 3,
@@ -2030,20 +2095,23 @@ pub const HEALING_NOVA: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ENEMY_SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
-    speech: "",
+
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
@@ -2065,17 +2133,20 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
         ])),
         environment_effect: None,
     },
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
-    speech: "",
+
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
@@ -2097,20 +2168,22 @@ pub const SELF_HEAL: Ability = Ability {
         ])),
         environment_effect: None,
     },
-    animation_color: GREEN,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: GREEN,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        target_magic_sparks: Some(WHITE),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SPIKE_TRAP: Ability = Ability {
     id: AbilityId::Spikes,
     name: "Spike trap",
-    speech: "",
     description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them",
     icon: IconId::SpikeTrap,
     action_point_cost: 2,
@@ -2133,19 +2206,19 @@ pub const SPIKE_TRAP: Ability = Ability {
         )
         ,
     },
-    animation_color: GRAY,
+    audio_visuals: AudioVisuals {animation_color: GRAY,
     animation: AbilityAnimation::CastSpell,
     //TODO
     initiate_sound: Some(SoundId::AttackMiss),
     //TODO
     resolve_sound: Some(SoundId::Crit),
-    charge_fx: None,
+    charge_fx: None,..AudioVisuals::default()}
 };
 
 pub const DASH: Ability = Ability {
     id: AbilityId::Dash,
     name: "Dash",
-    speech: "",
+
     description:
         "Move swiftly in a straight line, without triggering opportunity attacks from enemies.",
     icon: IconId::Dash,
@@ -2158,17 +2231,20 @@ pub const DASH: Ability = Ability {
     target: AbilityTarget::Movement {
         range: Range::f32(8.0),
     },
-    animation_color: RED,
-    animation: AbilityAnimation::Dash,
-    initiate_sound: None,
-    resolve_sound: None,
-    charge_fx: None,
+    audio_visuals: AudioVisuals {
+        animation_color: RED,
+        animation: AbilityAnimation::Dash,
+        initiate_sound: None,
+        resolve_sound: None,
+        charge_fx: None,
+        ..AudioVisuals::default()
+    },
 };
 
 pub const PIERCING_SHOT: Ability = Ability {
     id: AbilityId::PiercingShot,
     name: "Piercing shot",
-    speech: "",
+
     description: "Attack all enemies in a line",
     icon: IconId::PiercingShot,
     action_point_cost: 3,
@@ -2191,14 +2267,16 @@ pub const PIERCING_SHOT: Ability = Ability {
         },
     },
 
-    animation_color: YELLOW,
-    animation: AbilityAnimation::RangedWeaponAttack,
-    initiate_sound: Some(SoundId::ShootArrow),
-    resolve_sound: None, //Some(SoundId::HitArrow),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: YELLOW,
+        animation: AbilityAnimation::RangedWeaponAttack,
+        initiate_sound: Some(SoundId::ShootArrow),
+        resolve_sound: None, //Some(SoundId::HitArrow),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const REACH: AbilityEnhancement = AbilityEnhancement {
@@ -2238,7 +2316,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireball,
     name: "Fireball",
-    speech: "",
+
     description:
         "Deal |<value>3| |<fire>|fire damage to an enemy and |<value>4| to its surroundings",
     icon: IconId::Fireball,
@@ -2256,7 +2334,7 @@ pub const FIREBALL: Ability = Ability {
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Fire)),
             ..SpellTargetEffect::default()
         }),
-        circle: Some(CircleEffect::new(
+        circle_effect: Some(CircleEffect::new(
             Range::f32(3.5),
             TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -2269,20 +2347,21 @@ pub const FIREBALL: Ability = Ability {
     },
     possible_enhancements: &[&REACH, &MASSIVE_RADIUS, &FIREBALL_INFERNO],
 
-    animation_color: RED,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::FireballHit),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::FireCrackle,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: RED,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::FireballHit),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const FIRE_BOLT: Ability = Ability {
     id: AbilityId::FireBolt,
     name: "Fire bolt",
-    speech: "",
     description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first enemy hit, and |<value>4| to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
@@ -2314,20 +2393,19 @@ pub const FIRE_BOLT: Ability = Ability {
         &FIREBALL_INFERNO,
     ],
 
-    animation_color: RED,
+    audio_visuals: AudioVisuals {animation_color: RED,
     animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::FireballHit),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
-        sound: SoundId::FireCrackle,
-    }),
+    }),..AudioVisuals::default()}
 };
 
 pub const ICE_BOLT: Ability = Ability {
     id: AbilityId::IceBolt,
     name: "Ice bolt",
-    speech: "",
+
     description: "todo",
     icon: IconId::Icebolt,
     action_point_cost: 0, //TODO
@@ -2349,15 +2427,17 @@ pub const ICE_BOLT: Ability = Ability {
     },
     possible_enhancements: &[&REACH],
 
-    animation_color: SKYBLUE,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    // TODO sound
-    resolve_sound: Some(SoundId::BottleSplash),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::FireCrackle,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: SKYBLUE,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        // TODO sound
+        resolve_sound: Some(SoundId::BottleSplash),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 const fn apply_condition(condition: Condition) -> ApplyEffect {
@@ -2375,7 +2455,6 @@ const fn apply_condition_rounds(condition: Condition, rounds: u32) -> ApplyEffec
 pub const ENEMY_BURNING_ARROW: Ability = Ability {
     id: AbilityId::EnemyBurningArrow,
     name: "Burning arrow",
-    speech: "",
     description: "Deal |<value>3| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 4,
@@ -2391,7 +2470,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             ..SpellTargetEffect::default()
         }),
-        circle: Some(CircleEffect::new(
+        circle_effect: Some(CircleEffect::new(
             Range::f32(3.5),
             TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -2406,14 +2485,16 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     },
     possible_enhancements: &[],
 
-    animation_color: RED,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootArrow),
-    resolve_sound: Some(SoundId::FireballHit),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::FireCrackle,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: RED,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootArrow),
+        resolve_sound: Some(SoundId::FireballHit),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    }
 };
 
 pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
@@ -2432,7 +2513,7 @@ pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
 pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
-    speech: "",
+
     description: "Deal |<value>7| |<lightning>|lightning damage in a line",
     icon: IconId::LightningBolt,
     action_point_cost: 3,
@@ -2458,20 +2539,23 @@ pub const LIGHTNING_BOLT: Ability = Ability {
 
     possible_enhancements: &[&LIGHTNING_BOLT_REACH],
 
-    animation_color: YELLOW,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::LightningHit),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::FireCrackle,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: YELLOW,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::LightningHit),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        target_effect_id: Some(EffectId::Zap),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const KILL: Ability = Ability {
     id: AbilityId::Kill,
     name: "Kill",
-    speech: "",
+
     description: "Kill all enemies",
     icon: IconId::Fireball,
     action_point_cost: 1,
@@ -2494,20 +2578,22 @@ pub const KILL: Ability = Ability {
         self_effect: None,
         environment_effect: None,
     },
-    animation_color: BLACK,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: BLACK,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const KILL_SELF: Ability = Ability {
     id: AbilityId::KillSelf,
     name: "Kill self",
-    speech: "",
+
     description: "Kill self",
     icon: IconId::Fireball,
     action_point_cost: 4,
@@ -2519,17 +2605,23 @@ pub const KILL_SELF: Ability = Ability {
     possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: None,
-        self_effect: Some(uncontested_spell_effect(&[ApplyEffect::LoseHealth(99)])),
+        self_effect: Some(uncontested_spell_effect(&[ApplyEffect::LoseHealth(
+            99,
+            DamageSource::Unknown,
+            DamageType::Regular,
+        )])),
         environment_effect: None,
     },
-    animation_color: BLACK,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: BLACK,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
@@ -2546,7 +2638,7 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
 pub const SEARING_LIGHT: Ability = Ability {
     id: AbilityId::SearingLight,
     name: "Searing light",
-    speech: "",
+
     description: "Envelops the target in blinding light",
     icon: IconId::SearingLight,
     action_point_cost: 3,
@@ -2565,17 +2657,19 @@ pub const SEARING_LIGHT: Ability = Ability {
             on_hit: &[apply_condition_rounds(Condition::Blinded, 1)],
             ..SpellTargetEffect::default()
         }),
-        circle: None,
+        circle_effect: None,
         environment_effect: None,
     },
-    animation_color: YELLOW,
-    animation: AbilityAnimation::CastSpell,
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-        sound: SoundId::MechanicNoise,
-    }),
+    audio_visuals: AudioVisuals {
+        animation_color: YELLOW,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::Explosion),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const HEALTH_POTION: Consumable = Consumable {
@@ -2608,7 +2702,7 @@ const fn potion_ability(
     Ability {
         id,
         name,
-        speech: "Ahh...",
+
         description: "",
         icon: IconId::Undefined,
         action_point_cost: 1,
@@ -2629,11 +2723,16 @@ const fn potion_ability(
             environment_effect: None,
         },
 
-        animation_color: PURPLE,
-        animation: AbilityAnimation::CastSpell,
-        initiate_sound: None,
-        resolve_sound: Some(SoundId::Powerup),
-        charge_fx: None,
+        audio_visuals: AudioVisuals {
+            speech: "Ahh...",
+            animation_color: PURPLE,
+            animation: AbilityAnimation::CastSpell,
+            initiate_sound: None,
+            resolve_sound: Some(SoundId::Powerup),
+            charge_fx: None,
+            target_magic_sparks: Some(WHITE),
+            ..AudioVisuals::default()
+        },
     }
 }
 
