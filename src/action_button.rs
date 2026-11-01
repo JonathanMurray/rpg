@@ -290,7 +290,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     if effect.improved_graze {
         t.technical_description
             .push("|<value>-25%| |<keyword>Graze| damage (instead of |<value>-50%|)".to_string());
-        t.keywords.push(Keyword::Graze);
+        t.keywords.push(Keyword::WeakHit);
     }
     if effect.improved_crit {
         t.technical_description

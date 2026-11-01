@@ -29,7 +29,7 @@ pub enum Keyword {
     OpportunityAttack,
     Advantage,
     Pushed,
-    Graze,
+    WeakHit,
     Crit,
     Flanked,
 }
@@ -62,7 +62,7 @@ impl Keyword {
             ),
             Keyword::Advantage => "Advantage / Disadvantage".to_string(),
             Keyword::Pushed => "Pushed".to_string(),
-            Keyword::Graze => "Graze".to_string(),
+            Keyword::WeakHit => "Weak hit".to_string(),
             Keyword::Crit => "Crit".to_string(),
             Keyword::Flanked => "Flanked".to_string(),
             Keyword::Spikes => "spikes (surface)".to_string(),
@@ -85,7 +85,7 @@ impl Keyword {
             Keyword::Pushed => {
                 "Distance: |<value>x| |<faded>(affected by target's |<toughness>||<stat>Toughness|<faded>)|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
             }
-            Keyword::Graze => {
+            Keyword::WeakHit => {
                 "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower.".to_string()
             }
             Keyword::Crit => {
@@ -110,7 +110,7 @@ impl Keyword {
             Keyword::OpportunityAttack => Goodness::Neutral,
             Keyword::Advantage => Goodness::Neutral,
             Keyword::Pushed => Goodness::Bad,
-            Keyword::Graze => Goodness::Bad,
+            Keyword::WeakHit => Goodness::Bad,
             Keyword::Crit => Goodness::Good,
             Keyword::Flanked => Goodness::Bad,
             Keyword::Spikes => Goodness::Bad,

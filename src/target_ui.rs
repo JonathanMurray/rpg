@@ -305,10 +305,10 @@ impl TargetUi {
 
             if !char.player_controlled() {
                 let mut stats_text = String::new();
-                if char.weapon(HandType::MainHand).is_some() {
+                if let Some(s) = char.weapon_damage_str(HandType::MainHand) {
                     stats_text.push_str(&format!(
                         "|<sword>| {}   |<red_dice>| {}",
-                        char.weapon_damage_str(HandType::MainHand),
+                        s,
                         plus_minus(char.attack_modifier(HandType::MainHand)),
                     ));
                 }

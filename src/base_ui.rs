@@ -21,6 +21,7 @@ use std::{
 use crate::{
     drawing::draw_rounded_rectangle_lines,
     game_ui::draw_rectangle_lines2,
+    game_ui_connection::DEBUG,
     sounds::{SoundId, SoundPlayer},
     textures::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, AP_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL,
@@ -883,7 +884,7 @@ pub struct Container {
     pub children: Vec<Element>,
     pub border_between_children: Option<Color>,
     pub scroll: Option<ContainerScroll>,
-    pub tooltip: Option<(Font, String, Vec<String>)>,
+    pub tooltip: Option<(Font, String, Vec<String>, Vec<Keyword>)>,
     pub last_drawn_rectangle: Cell<Rect>,
 }
 
@@ -985,7 +986,7 @@ impl Container {
     pub fn draw_tooltips(&self, x: f32, y: f32) {
         self._draw(x, y, true);
 
-        if let Some((font, header, lines)) = self.tooltip.as_ref() {
+        if let Some((font, header, lines, keywords)) = self.tooltip.as_ref() {
             let (w, h) = self.size();
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
@@ -995,7 +996,7 @@ impl Container {
                     header,
                     None,
                     lines,
-                    &[],
+                    &keywords,
                     None,
                 );
             }
@@ -1353,7 +1354,7 @@ pub fn table(
 }
 
 pub fn draw_debug(x: f32, y: f32, w: f32, h: f32) {
-    if false {
+    if DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
         draw_rectangle_lines2(x, y, w, h, 1.0, MAGENTA);
     }
 }

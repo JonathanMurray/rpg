@@ -10,6 +10,8 @@ use macroquad::input::{
 use macroquad::math::Rect;
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{measure_text, TextParams};
+use macroquad::texture::Texture2D;
+use macroquad::ui::widgets::Texture;
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
@@ -24,7 +26,7 @@ use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection}
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
-use crate::textures::UI_ARROW_TEXTURE;
+use crate::textures::{UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -57,6 +59,7 @@ impl CharacterSheet {
 
     pub fn new(
         simple_font: &Font,
+        big_font: &Font,
         character: Rc<Character>,
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
@@ -77,6 +80,37 @@ impl CharacterSheet {
             450.0,
         );
 
+        let col_header = |text: &str, texture: Option<Texture2D>| {
+            let mut children = vec![Element::Text(
+                TextLine::new(text, 12, WHITE, Some(big_font.clone())).with_depth(BLACK, 1.0),
+            )];
+            if let Some(texture) = texture {
+                children.push(Element::texture(texture));
+            }
+            Element::Container(Container {
+                children,
+                margin: 10.0,
+                align: Align::Center,
+                min_height: Some(32.0),
+                ..Default::default()
+            })
+        };
+
+        let skills_column = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 5.0,
+            align: Align::Center,
+            style: Style {
+                padding: 10.0,
+                ..Default::default()
+            },
+            children: vec![
+                col_header("Skills", Some(UI_SPELLBOOK_TEXTURE.get().unwrap().clone())),
+                Element::Container(spell_book),
+            ],
+            ..Default::default()
+        });
+
         let conditions_list = Rc::new(RefCell::new(conditions_list));
 
         let stats_table = Rc::new(RefCell::new(build_character_stats_table(
@@ -87,8 +121,13 @@ impl CharacterSheet {
         let stats_column = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 5.0,
+            align: Align::Center,
+            style: Style {
+                padding: 10.0,
+                ..Default::default()
+            },
             children: vec![
-                Element::Empty(0.0, 30.0),
+                col_header("Stats", None),
                 Element::RcRefCell(stats_table.clone()),
                 Element::Empty(0.0, 10.0),
                 Element::RcRefCell(conditions_list.clone()),
@@ -103,6 +142,21 @@ impl CharacterSheet {
             sound_player,
         )));
 
+        let equipment_column = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 5.0,
+            align: Align::Center,
+            style: Style {
+                padding: 10.0,
+                ..Default::default()
+            },
+            children: vec![
+                col_header("Equipment", None),
+                Element::RcRefCell(equipment_section.clone()),
+            ],
+            ..Default::default()
+        });
+
         let contents = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
             margin: 15.0,
@@ -116,28 +170,7 @@ impl CharacterSheet {
                 }),
                 ..Default::default()
             },
-            children: vec![
-                Element::Container(Container {
-                    layout_dir: LayoutDirection::Vertical,
-                    margin: 10.0,
-                    align: Align::Center,
-                    style: Style {
-                        padding: 10.0,
-
-                        ..Default::default()
-                    },
-                    children: vec![
-                        Element::Text(
-                            TextLine::new("Skills", 24, WHITE, Some(simple_font.clone()))
-                                .with_depth(BLACK, 2.0),
-                        ),
-                        Element::Container(spell_book),
-                    ],
-                    ..Default::default()
-                }),
-                stats_column,
-                Element::RcRefCell(equipment_section.clone()),
-            ],
+            children: vec![skills_column, stats_column, equipment_column],
             ..Default::default()
         });
 
@@ -153,7 +186,7 @@ impl CharacterSheet {
             },
             children: vec![
                 Element::Text(
-                    TextLine::new(&character.name, 28, SKYBLUE, Some(simple_font.clone()))
+                    TextLine::new(&character.name, 32, SKYBLUE, Some(simple_font.clone()))
                         .with_depth(DARKBLUE, 1.0)
                         .with_padding(10.0, 10.0),
                 ),
@@ -165,6 +198,8 @@ impl CharacterSheet {
         let top_bar_h = container.children[0].size().1;
 
         let equipment_changed = character.listen_to_changed_equipment();
+
+        *screen_position.borrow_mut() = (screen_width() / 2.0 - container.size().0 / 2.0, 300.0);
 
         Self {
             container,
@@ -375,7 +410,7 @@ pub fn build_spell_book(
 ) -> Container {
     let mut spell_book = Container {
         layout_dir: LayoutDirection::Vertical,
-        margin: 5.0,
+        margin: 8.0,
         children: vec![],
         scroll: Some(ContainerScroll::new(40.0)),
         max_height: Some(max_height),
@@ -383,7 +418,7 @@ pub fn build_spell_book(
             padding: 10.0,
             border: Some(Border {
                 color: GRAY,
-                double: Some((GRAY.with_alpha(0.5), 2.0)),
+                double: Some((GRAY.with_alpha(0.5), 3.0)),
                 ..Default::default()
             }),
             bg_color: Some(BLACK.with_alpha(0.2)),

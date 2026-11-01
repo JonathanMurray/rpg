@@ -1217,27 +1217,17 @@ pub async fn load_and_init_static() {
     load_and_init_font_symbols().await;
     load_and_init_ui_textures().await;
 
-    let status_icon_atlas = load_and_init_texture("status.png").await;
-    STATUS_ICONS_TEXTURE.get_or_init(|| status_icon_atlas);
-
-    let icon_atlas = load_and_init_texture("icon.png").await;
-    ICONS_TEXTURE.get_or_init(|| icon_atlas);
+    load_and_init_texture_into("status.png", &STATUS_ICONS_TEXTURE).await;
+    load_and_init_texture_into("icon.png", &ICONS_TEXTURE).await;
 
     let icon_faded_atlas = load_and_init_texture("icon.png").await;
     make_grayscale(&icon_faded_atlas);
     ICONS_FADED_TEXTURE.get_or_init(|| icon_faded_atlas);
 
-    let eq_icon_atlas = load_and_init_texture("equipment_icons.png").await;
-    EQUIPMENT_ICONS_TEXTURE.get_or_init(|| eq_icon_atlas);
-
-    let effects_atlas = load_and_init_texture("effects.png").await;
-    EFFECTS_TEXTURE.get_or_init(|| effects_atlas);
-
-    let effects_atlas = load_and_init_texture("portraits.png").await;
-    PORTRAITS_TEXTURE.get_or_init(|| effects_atlas);
-
-    let lightning_bolt_fx = load_and_init_texture("fx_lightning_bolt.png").await;
-    LIGHTNING_BOLT_FX.get_or_init(|| lightning_bolt_fx);
+    load_and_init_texture_into("equipment_icons.png", &EQUIPMENT_ICONS_TEXTURE).await;
+    load_and_init_texture_into("effects.png", &EFFECTS_TEXTURE).await;
+    load_and_init_texture_into("portraits.png", &PORTRAITS_TEXTURE).await;
+    load_and_init_texture_into("fx_lightning_bolt.png", &LIGHTNING_BOLT_FX).await;
 }
 
 pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -1528,33 +1518,9 @@ async fn load_and_init_font_symbols() {
     TARGET_SYMBOL.get_or_init(|| symbol(6, 4));
 }
 
-async fn load_and_init_ui_textures() {
-    let texture = load_and_init_texture("ui/user_interface.png").await;
-    UI_BG_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/ui_arrow.png").await;
-    UI_ARROW_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/resource_bar.png").await;
-    UI_RESOURCE_BAR_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/action_button.png").await;
-    UI_ACTION_BUTTON_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/action_button_small.png").await;
-    UI_ACTION_BUTTON_SMALL_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/action_button_bg.png").await;
-    UI_ACTION_BUTTON_BG_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("ui/action_button_small_bg.png").await;
-    UI_ACTION_BUTTON_SMALL_BG_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("portrait_bg.png").await;
-    PORTRAIT_BG_TEXTURE.get_or_init(|| texture);
-
-    let texture = load_and_init_texture("portrait_enemy_bg.png").await;
-    PORTRAIT_ENEMY_BG_TEXTURE.get_or_init(|| texture);
+async fn load_and_init_texture_into(path: &str, dst: &OnceLock<Texture2D>) {
+    let texture = load_and_init_texture(path).await;
+    dst.get_or_init(|| texture);
 }
 
 pub static UNCHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
@@ -1609,5 +1575,27 @@ pub static UI_ACTION_BUTTON_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ACTION_BUTTON_SMALL_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ACTION_BUTTON_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ACTION_BUTTON_SMALL_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static UI_SPELLBOOK_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+
+async fn load_and_init_ui_textures() {
+    load_and_init_texture_into("ui/user_interface.png", &UI_BG_TEXTURE).await;
+    load_and_init_texture_into("ui/ui_arrow.png", &UI_ARROW_TEXTURE).await;
+    load_and_init_texture_into("ui/spellbook.png", &UI_SPELLBOOK_TEXTURE).await;
+    load_and_init_texture_into("ui/resource_bar.png", &UI_RESOURCE_BAR_TEXTURE).await;
+    load_and_init_texture_into("ui/action_button.png", &UI_ACTION_BUTTON_TEXTURE).await;
+    load_and_init_texture_into(
+        "ui/action_button_small.png",
+        &UI_ACTION_BUTTON_SMALL_TEXTURE,
+    )
+    .await;
+    load_and_init_texture_into("ui/action_button_bg.png", &UI_ACTION_BUTTON_BG_TEXTURE).await;
+    load_and_init_texture_into(
+        "ui/action_button_small_bg.png",
+        &UI_ACTION_BUTTON_SMALL_BG_TEXTURE,
+    )
+    .await;
+    load_and_init_texture_into("portrait_bg.png", &PORTRAIT_BG_TEXTURE).await;
+    load_and_init_texture_into("portrait_enemy_bg.png", &PORTRAIT_ENEMY_BG_TEXTURE).await;
+}
 
 pub static LIGHTNING_BOLT_FX: OnceLock<Texture2D> = OnceLock::new();

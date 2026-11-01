@@ -6909,14 +6909,15 @@ impl Character {
         self.hand(hand).get().weapon
     }
 
-    pub fn weapon_damage_str(&self, hand: HandType) -> String {
-        let weapon = self.weapon(hand).unwrap();
-        let ferocity = self.get_condition_stacks(Condition::Ferocity);
-        if ferocity > 0 {
-            format!("{} |<keyword>+{}|", weapon.damage, ferocity)
-        } else {
-            weapon.damage.to_string()
-        }
+    pub fn weapon_damage_str(&self, hand: HandType) -> Option<String> {
+        self.weapon(hand).map(|weapon| {
+            let ferocity = self.get_condition_stacks(Condition::Ferocity);
+            if ferocity > 0 {
+                format!("{} |<keyword>+{}|", weapon.damage, ferocity)
+            } else {
+                weapon.damage.to_string()
+            }
+        })
     }
 
     pub fn attack_range(

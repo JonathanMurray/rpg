@@ -280,7 +280,7 @@ pub struct EquipmentConsumption {
 pub struct EquipmentSection {
     pub element: Element,
     pub equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
-    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
+    //equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
     font: Font,
     character: Rc<Character>,
     include_stash: bool,
@@ -299,10 +299,12 @@ impl EquipmentSection {
 
         let (equipped_section, equipped_slots) = build_equipped_section(simple_font);
 
+        /*
         let equipment_stats_table = Rc::new(RefCell::new(EquipmentStatsTable::new(
             character,
             simple_font,
         )));
+         */
 
         equipment_slots.extend_from_slice(&equipped_slots);
 
@@ -349,10 +351,12 @@ impl EquipmentSection {
                 ..Default::default()
             },
             children: vec![
+                /*
                 Element::Text(
                     TextLine::new("Inventory", 22, WHITE, Some(simple_font.clone()))
                         .with_depth(BLACK, 2.0),
                 ),
+                 */
                 inventory_section,
                 Element::Text(
                     TextLine::new("Equipped", 22, WHITE, Some(simple_font.clone()))
@@ -365,22 +369,25 @@ impl EquipmentSection {
             ..Default::default()
         });
 
-        let stats_column = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            margin: 15.0,
-            align: Align::Center,
-            style: Style {
-                padding: 10.0,
-                ..Default::default()
-            },
-            children: vec![
-                Element::Empty(0.0, 15.0),
-                Element::RcRefCell(equipment_stats_table.clone()),
-            ],
-            ..Default::default()
-        });
+        /*
+           let stats_column = Element::Container(Container {
+               layout_dir: LayoutDirection::Vertical,
+               margin: 15.0,
+               align: Align::Center,
+               style: Style {
+                   padding: 10.0,
+                   ..Default::default()
+               },
+               children: vec![
+                   Element::Empty(0.0, 15.0),
+                   Element::RcRefCell(equipment_stats_table.clone()),
+               ],
+               ..Default::default()
+           });
+        */
 
-        let mut children = vec![stats_column, char_eq_column];
+        //let mut children = vec![stats_column, char_eq_column];
+        let mut children = vec![char_eq_column];
         if let Some(col) = stash_column {
             children.push(col);
         }
@@ -396,7 +403,7 @@ impl EquipmentSection {
         let mut this = Self {
             element,
             equipment_slots,
-            equipment_stats_table,
+            //equipment_stats_table,
             font: simple_font.clone(),
             character: Rc::clone(character),
             include_stash,
@@ -407,9 +414,11 @@ impl EquipmentSection {
     }
 
     pub fn repopulate_character_equipment(&mut self) {
+        /*
         self.equipment_stats_table
             .borrow_mut()
             .rebuild(&self.character, &self.font);
+         */
 
         for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
             self.equipment_slots[i].borrow_mut().content =
@@ -859,13 +868,13 @@ impl EquipmentStatsTable {
                     vec!["The unmodified base damage of one attack".to_string()],
                     vec![],
                 ));
-                cells.push(character.weapon_damage_str(hand).to_string().into());
+                cells.push(character.weapon_damage_str(hand).unwrap().into());
 
                 cells.push(TableCell::from("|<red_dice>|").with_tooltip(
                     "Attack modifier",
                     vec!["Added to your |<red_dice>| |<stat>Attack| rolls.".to_string(), 
                     "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
-                    vec![Keyword::Crit, Keyword::Graze]
+                    vec![Keyword::Crit, Keyword::WeakHit]
                 ));
                 // Use the "base" value; don't include buffs, since we don't take care to rebuild
                 // this when buffs change, so it just gets confusing.

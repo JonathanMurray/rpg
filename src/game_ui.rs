@@ -2769,7 +2769,8 @@ fn build_character_uis<'a>(
 
     let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
-    let character_sheet_screen_pos = Rc::new(RefCell::new((100.0, 100.0)));
+    // Will be overridden by the character sheets when they are constructed and know their own dimensions
+    let character_sheet_screen_pos = Rc::new(RefCell::new((0.0, 0.0)));
 
     for character in characters {
         if !character.player_controlled() {
@@ -2935,6 +2936,7 @@ fn build_character_ui(
 
     let character_sheet = CharacterSheet::new(
         simple_font,
+        big_font,
         Rc::clone(character),
         attack_button_for_character_sheet,
         reaction_buttons_for_character_sheet,

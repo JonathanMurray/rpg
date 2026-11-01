@@ -7,11 +7,9 @@ use macroquad::{
 
 use crate::{
     base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Style, TextLine},
-    core::Character,
+    core::{Character, HandType},
     tooltip::Keyword,
 };
-
-type AttributeCell = (&'static str, u32);
 
 pub struct CharacterStatsTable {
     element: Element,
@@ -41,8 +39,11 @@ impl CharacterStatsTable {
     }
 }
 
-pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> CharacterStatsTable {
-    let mut stat_cells = vec![];
+pub fn build_character_stats_table(
+    simple_font: &Font,
+    character: Rc<Character>,
+) -> CharacterStatsTable {
+    let mut main_stat_cells = vec![];
     for (label, value, name, tooltip_lines) in [
         (
             "STR",
@@ -92,8 +93,8 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         ),
     ] {
         let label_line =
-            TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
-        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(font.clone()))
+            TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
+        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(simple_font.clone()))
             .with_depth(BLACK, 2.0);
         let cell = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
@@ -101,58 +102,128 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some((
-                font.clone(),
+                simple_font.clone(),
                 name.to_string(),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
+                vec![],
             )),
             ..Default::default()
         });
-        stat_cells.push(cell);
+        main_stat_cells.push(cell);
     }
 
-    let stat_row = Element::Container(Container {
+    let main_stat_row = Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
         margin: 20.0,
-        children: stat_cells,
-
+        children: main_stat_cells,
         ..Default::default()
     });
 
-    let movement_row = Element::Text(
-        TextLine::new(
-            format!("|<boot>| : {}", character.base_free_movement.get()),
-            16,
-            WHITE,
-            Some(font.clone()),
-        )
-        .with_padding(0.0, 7.0)
-        .with_tooltip(
-            font.clone(),
+    let stats = vec![
+        (
+            "Move |<boot>|",
             "Movement |<boot>|",
+            format!("{}", character.base_free_movement.get()),
             vec!["You can move this far every turn without spending AP.".to_string()],
             vec![],
         ),
-    );
-
-    let spell_mod_row = Element::Text(
-        TextLine::new(
-            format!("|<blue_dice>| : +{}", character.spell_modifier()),
-            16,
-            WHITE,
-            Some(font.clone()),
-        )
-        .with_padding(0.0, 7.0)
-        .with_tooltip(
-            font.clone(),
-            "Spell modifier",
-            vec!["Added to your |<blue_dice>| |<stat>Spell| rolls".to_string(), 
-            "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
-            vec![Keyword::Crit, Keyword::Graze]
+        (
+            "Spell mod |<blue_dice>|",
+            "Spell modifier |<blue_dice>|",
+            format!("+{}", character.spell_modifier()),
+            vec![
+                "Added to your |<blue_dice>| |<stat>Spell| rolls.".to_string(),
+                "Higher rolls mean more favourable outcomes.".to_string(),
+            ],
+            vec![Keyword::Crit, Keyword::WeakHit],
         ),
-    );
+        (
+            "Atk mod |<red_dice>|",
+            "Attack modifier |<red_dice>|",
+            format!("+{}", character.base_attack_modifier(HandType::MainHand)),
+            vec![
+                "Added to your |<red_dice>| |<stat>Attack| rolls.".to_string(),
+                "Higher rolls mean more favourable outcomes.".to_string(),
+            ],
+            vec![Keyword::Crit, Keyword::WeakHit],
+        ),
+        (
+            "Atk dmg |<sword>|",
+            "Attack damage |<sword>|",
+            character
+                .weapon_damage_str(HandType::MainHand)
+                .unwrap_or("-".to_string()),
+            vec!["The unmodified base damage of one attack".to_string()],
+            vec![],
+        ),
+        (
+            "Armor |<shield>|",
+            "Armor |<shield>|",
+            character.armor_str(),
+            vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
+            vec![],
+        ),
+        (
+            "Capacity |<weight>|",
+            "Capacity |<weight>|",
+            format!(
+                "{} / {}",
+                character.equipment_weight(),
+                character.capacity.get()
+            ),
+            vec![
+                "Carrying or equipping more than your capacity makes you |<keyword>Encumbered|."
+                    .to_string(),
+            ],
+            vec![],
+        ),
+    ];
 
-    let defense_header: Element =
-        Element::Text(TextLine::new("Defenses:", 16, WHITE, Some(font.clone())));
+    let stat_row = |(short_header, long_header, value, tooltip, keywords): (
+        &str,
+        &str,
+        String,
+        Vec<String>,
+        Vec<Keyword>,
+    )| {
+        let mut left = TextLine::new(short_header, 16, LIGHTGRAY, Some(simple_font.clone()));
+        left.set_min_width(100.0, true);
+        let right = Container {
+            children: vec![Element::Text(TextLine::new(
+                value,
+                16,
+                LIGHTGRAY,
+                Some(simple_font.clone()),
+            ))],
+            align: Align::Center,
+            layout_dir: LayoutDirection::Vertical,
+            min_width: Some(40.0),
+            ..Default::default()
+        };
+        Element::Container(Container {
+            children: vec![Element::Text(left), Element::Container(right)],
+            tooltip: Some((
+                simple_font.clone(),
+                long_header.to_string(),
+                tooltip,
+                keywords,
+            )),
+            margin: 15.0,
+            align: Align::Center,
+            style: Style {
+                padding: 4.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+
+    let defense_header: Element = Element::Text(TextLine::new(
+        "Defenses:",
+        16,
+        WHITE,
+        Some(simple_font.clone()),
+    ));
 
     let defense_header_row = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
@@ -189,12 +260,12 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         ),
     ] {
         let label_line =
-            TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
+            TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
         let value_line = TextLine::new(
             format!("|{}| {}", icon, value),
             24,
             WHITE,
-            Some(font.clone()),
+            Some(simple_font.clone()),
         )
         .with_depth(BLACK, 2.0);
         let cell = Element::Container(Container {
@@ -203,9 +274,10 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some((
-                font.clone(),
+                simple_font.clone(),
                 format!("{} |{}|", label, icon),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
+                vec![],
             )),
             ..Default::default()
         });
@@ -219,143 +291,42 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         ..Default::default()
     });
 
+    let mut children = vec![
+        Element::Empty(0.0, 4.0),
+        main_stat_row,
+        Element::Empty(0.0, 18.0),
+    ];
+    for stat in stats {
+        children.push(stat_row(stat));
+    }
+    children.extend([
+        Element::Empty(0.0, 12.0),
+        defense_header_row,
+        Element::Empty(0.0, 11.0),
+        defense_row,
+    ]);
+
     let element = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         align: Align::Center,
-        margin: 5.0,
+        margin: 2.0,
         style: Style {
             border: Some(Border {
                 color: GRAY,
-                double: Some((GRAY.with_alpha(0.5), 2.0)),
+                double: Some((GRAY.with_alpha(0.5), 3.0)),
                 ..Default::default()
             }),
             bg_color: Some(BLACK.with_alpha(0.2)),
             padding: 14.0,
             ..Default::default()
         },
-        children: vec![
-            stat_row,
-            Element::Empty(0.0, 8.0),
-            movement_row,
-            spell_mod_row,
-            Element::Empty(0.0, 8.0),
-            defense_header_row,
-            Element::Empty(0.0, 0.0),
-            defense_row,
-        ],
+        children,
         ..Default::default()
     });
 
     CharacterStatsTable {
         element,
-        font: font.clone(),
+        font: simple_font.clone(),
         character,
-    }
-}
-
-/*
-pub fn build_stats_table(
-    font: &Font,
-    attribute_font_size: u16,
-    rows: &[(Option<AttributeCell>, &[(&'static str, StatValue)])],
-) -> Element {
-    let mut attribute_rows = vec![];
-
-    let mut attribute_text_width = 0.0;
-    let mut attribute_text_lines = vec![];
-
-    for row in rows {
-        let text = if let Some(attribute) = row.0 {
-            format!("{}: {}", attribute.0, attribute.1)
-        } else {
-            " ".to_string()
-        };
-
-        let attribute_text = TextLine::new(text, attribute_font_size, WHITE, Some(font.clone()));
-
-        if attribute_text.size().0 > attribute_text_width {
-            attribute_text_width = attribute_text.size().0;
-        }
-        attribute_text_lines.push(attribute_text);
-    }
-
-    // Make the rows of the right colum aligned with eachother
-    for line in &mut attribute_text_lines {
-        line.set_min_width(attribute_text_width, true);
-    }
-
-    for row in rows {
-        attribute_rows.push(Element::Container(attribute_row(
-            attribute_text_lines.remove(0),
-            row.1,
-            font.clone(),
-        )));
-    }
-
-    Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        children: attribute_rows,
-        //border_between_children: Some(DARKGRAY),
-        margin: 7.0,
-        style: Style {
-            border: Some(Border::with_color(LIGHTGRAY)),
-            padding: 5.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    })
-}
-     */
-
-pub enum StatValue {
-    U32(u32),
-    F32(f32),
-    String(String),
-}
-
-impl fmt::Display for StatValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StatValue::U32(x) => f.write_fmt(format_args!("{}", x)),
-            StatValue::F32(x) => f.write_fmt(format_args!("{:.1}", x)),
-            StatValue::String(s) => f.write_str(s),
-        }
-    }
-}
-
-fn attribute_row(
-    attribute_text_line: TextLine,
-    stats: &[(&'static str, StatValue)],
-    font: Font,
-) -> Container {
-    let stat_rows: Vec<Element> = stats
-        .iter()
-        .map(|(name, value)| {
-            Element::Text(TextLine::new(
-                format!("{} = {}", name, value),
-                16,
-                WHITE,
-                Some(font.clone()),
-            ))
-        })
-        .collect();
-
-    let stats_list = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        margin: 8.0,
-        children: stat_rows,
-        ..Default::default()
-    });
-    Container {
-        layout_dir: LayoutDirection::Horizontal,
-        margin: 20.0,
-        align: Align::Center,
-        children: vec![Element::Text(attribute_text_line), stats_list],
-        style: Style {
-            padding: 5.0,
-            ..Default::default()
-        },
-        min_width: Some(200.0),
-        ..Default::default()
     }
 }
