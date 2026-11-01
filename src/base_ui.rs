@@ -464,6 +464,7 @@ impl Drawable for TextLine {
                     lines,
                     keywords,
                     None,
+                    None,
                 );
             }
         }
@@ -997,6 +998,7 @@ impl Container {
                     None,
                     lines,
                     &keywords,
+                    None,
                     None,
                 );
             }

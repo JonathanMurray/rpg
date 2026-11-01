@@ -6,7 +6,11 @@ use std::{
 
 use macroquad::{
     color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
-    input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
+    input::{
+        is_mouse_button_pressed, mouse_position,
+        KeyCode::{self, D},
+        MouseButton,
+    },
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, Font, TextParams},
@@ -50,6 +54,7 @@ pub struct Tooltip {
     pub error: Option<&'static str>,
     pub technical_description: Vec<String>,
     pub keywords: Vec<Keyword>,
+    pub icon: Option<IconId>,
 }
 
 impl Tooltip {
@@ -60,6 +65,7 @@ impl Tooltip {
             error: None,
             technical_description: vec![],
             keywords: vec![],
+            icon: None,
         }
     }
 
@@ -179,9 +185,9 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     Tooltip {
         header,
         description: Some(reaction.description),
-        error: None,
         technical_description,
-        keywords: vec![],
+        icon: Some(reaction.icon),
+        ..Default::default()
     }
 }
 
@@ -202,6 +208,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
         ),
         description: Some(reaction.description),
         technical_description,
+        icon: Some(reaction.icon),
         ..Default::default()
     }
 }
@@ -218,9 +225,8 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
             )
         ),
         description: Some(enhancement.description),
-        error: None,
-        technical_description: vec![],
-        keywords: vec![],
+        icon: Some(enhancement.icon),
+        ..Default::default()
     };
 
     describe_attack_enhancement_effect(&enhancement.effect, &mut t);
@@ -360,9 +366,8 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
             )
         ),
         description: Some(enhancement.description),
-        error: None,
-        technical_description: vec![],
-        keywords: vec![],
+        icon: Some(enhancement.icon),
+        ..Default::default()
     };
 
     if let Some(effect) = enhancement.spell_effect {
@@ -547,13 +552,9 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
         )
     );
 
-    let mut t = Tooltip {
-        header,
-        description: Some(ability.description),
-        error: None,
-        technical_description: vec![],
-        keywords: vec![],
-    };
+    let mut t = Tooltip::new(header);
+    t.description = Some(ability.description);
+    t.icon = Some(ability.icon);
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
@@ -1742,5 +1743,6 @@ pub fn draw_button_tooltip(
         &tooltip.content_lines(detailed),
         &tooltip.keywords,
         None,
+        tooltip.icon,
     );
 }

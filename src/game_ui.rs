@@ -589,6 +589,7 @@ impl CharacterUi {
                 &content,
                 &keywords,
                 None,
+                None,
             );
         }
     }

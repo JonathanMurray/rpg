@@ -5,6 +5,7 @@ use macroquad::{
     math::Rect,
     shapes::{draw_line, draw_rectangle},
     text::{Font, TextParams},
+    texture::draw_texture,
     time::{get_frame_time, get_time},
 };
 
@@ -16,7 +17,7 @@ use crate::{
         Goodness, OnAttackedReaction, OPPORTUNITY_ATTACK_AP_COST, OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     drawing::draw_rounded_rectangle_lines,
-    textures::{draw_status_icon, StatusId},
+    textures::{draw_icon, draw_status_icon, IconId, StatusId},
     util::screen_size,
 };
 
@@ -173,6 +174,7 @@ pub fn draw_regular_tooltip(
         content_lines,
         &[],
         None,
+        None,
     )
 }
 
@@ -184,6 +186,7 @@ pub fn draw_tooltip(
     content_lines: &[impl AsRef<str>],
     has_keywords: &[Keyword],
     header_keyword: Option<Keyword>,
+    icon: Option<IconId>,
 ) -> Rect {
     let header_font_size = if header_keyword.is_some() { 16 } else { 24 };
     let font_size = 16;
@@ -429,6 +432,18 @@ pub fn draw_tooltip(
         }
     }
 
+    if let Some(icon) = icon {
+        let margin = 5.0;
+        let icon_size = (30.0, 24.0);
+        draw_icon(
+            icon,
+            tooltip_rect.right() - icon_size.0 - margin,
+            y + margin,
+            None,
+            false,
+        );
+    }
+
     tooltip_rect
 }
 
@@ -459,6 +474,7 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
             &content_lines,
             &[],
             Some(*keyword),
+            None,
         );
         rect.y += 2.0;
         //y += rect.h;
@@ -477,6 +493,7 @@ pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f
             &content_lines,
             &[],
             Some(*keyword),
+            None,
         );
         y += rect.h;
     }

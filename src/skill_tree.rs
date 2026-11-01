@@ -751,6 +751,7 @@ pub async fn run_skill_tree_scene() {
                             &tooltip.content_lines(true),
                             &tooltip.keywords,
                             None,
+                            tooltip.icon,
                         );
                     }
                 }
@@ -774,6 +775,7 @@ pub async fn run_skill_tree_scene() {
                         None,
                         &[description.to_string()],
                         &[],
+                        None,
                         None,
                     );
                     if claimable.contains(&id) {

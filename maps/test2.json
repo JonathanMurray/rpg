@@ -468,28 +468,6 @@
       "main_hand": null,
       "shield": null,
       "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
-        22,
-        19
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Alice",
-      "pos": [
-        28,
-        16
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
     }
   ]
 }

@@ -490,14 +490,14 @@ impl PlayerPortraits {
         self.row.draw(x, y);
 
         for (_, portrait) in &self.portraits {
-            if let Some((i, info)) = portrait.borrow().hovered_status_rect.get() {
+            if let Some((i, condition_info)) = portrait.borrow().hovered_status_rect.get() {
                 let rect = portrait.borrow().last_drawn_rect.get();
-                let name = if let Some(stacks) = info.stacks {
-                    format!("{} ({})", info.condition.name(), stacks)
+                let name = if let Some(stacks) = condition_info.stacks {
+                    format!("{} ({})", condition_info.condition.name(), stacks)
                 } else {
-                    info.condition.name().to_string()
+                    condition_info.condition.name().to_string()
                 };
-                let populated_description = info.populated_description();
+                let populated_description = condition_info.populated_description();
                 let content_lines: Vec<&str> = populated_description.split("\n").collect();
                 draw_tooltip(
                     &self.tooltip_font,
@@ -509,7 +509,8 @@ impl PlayerPortraits {
                     None,
                     &content_lines,
                     &[],
-                    Some(Keyword::Cond(info.condition, None)),
+                    Some(Keyword::Cond(condition_info.condition, None)),
+                    None,
                 );
             }
         }

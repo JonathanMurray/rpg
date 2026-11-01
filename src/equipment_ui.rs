@@ -1116,6 +1116,7 @@ impl Drawable for EquipmentSlot {
                     &content.tooltip.technical_description,
                     &content.tooltip.keywords,
                     None,
+                    None,
                 );
             } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
                 draw_regular_tooltip(

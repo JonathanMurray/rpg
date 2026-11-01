@@ -67,9 +67,10 @@ use crate::{
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
-        character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, effect_atlas_rect,
-        measure_tiny_font, EffectId, LiquidType, Sprite, SpriteId, StatusId, TerrainId,
-        TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE, LIGHTNING_BOLT_FX,
+        character_sprite_height, draw_icon, draw_status_icon, draw_terrain, draw_tiny_font,
+        effect_atlas_rect, measure_tiny_font, EffectId, IconId, LiquidType, Sprite, SpriteId,
+        StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE,
+        LIGHTNING_BOLT_FX,
     },
     util::{
         are_entities_within_melee, extend_to_range, line_visitor, oscillate, oscillate_loop,
@@ -3775,24 +3776,23 @@ impl GameGrid {
             _ => {}
         }
 
-        let mut front_cursor_text: Option<(
-            Cow<'static, str>,
-            Option<(i32, i32)>,
-            CursorTextColor,
-        )> = None;
+        let mut front_cursor_text: Option<CursorText> = None;
 
         if receptive_to_input {
             let player_action_char_target = match ui_state.players_action_target() {
                 ActionTarget::Character(char_id, _) => Some(char_id),
                 _ => None,
             };
-            let committable_action_str = match ui_state {
+            let committable_action: Option<CommittableAction> = match ui_state {
                 UiState::ConfiguringAction(configured_action) => match configured_action {
-                    ConfiguredAction::Attack { .. } => Some("Attack".to_string()),
+                    // TODO what about ranged attack
+                    ConfiguredAction::Attack { .. } => {
+                        Some(CommittableAction::new("Attack", IconId::MeleeAttack))
+                    }
                     ConfiguredAction::UseAbility { ability, .. } => {
                         let num_targets = self.target_effect_previews.len();
                         if matches!(ability.target, AbilityTarget::Movement { .. }) {
-                            Some(ability.name.to_owned())
+                            Some(CommittableAction::new(ability.name, ability.icon))
                         } else {
                             let target_str = if num_targets == 1 {
                                 let char_id = self.target_effect_previews.keys().next().unwrap();
@@ -3800,15 +3800,19 @@ impl GameGrid {
                             } else {
                                 format!("{} targets", num_targets)
                             };
-                            Some(format!("{}\n|<target>|{}", ability.name, target_str))
+                            Some(CommittableAction::new(
+                                //format!("{}\n|<target>|{}", ability.name, target_str),
+                                format!("|<target>|{}", target_str),
+                                ability.icon,
+                            ))
                         }
                     }
                     ConfiguredAction::ChangeEquipment { .. } => {
-                        Some("Change equipment".to_string())
+                        Some(CommittableAction::new("Change equipment", IconId::Equip))
                     }
-                    ConfiguredAction::SelectConsumableFromInventory { .. } => {
-                        Some("Use consumable".to_string())
-                    }
+                    ConfiguredAction::SelectConsumableFromInventory { .. } => Some(
+                        CommittableAction::new("Use consumable", IconId::UseConsumable),
+                    ),
                     _ => None,
                 },
                 _ => None,
@@ -3826,7 +3830,7 @@ impl GameGrid {
                         Surface::Spikes => "|<warning>| spikes",
                         Surface::Fire => "|<warning>| fire",
                     };
-                    front_cursor_text = Some((Cow::Borrowed(text), None, CursorTextColor::Info));
+                    front_cursor_text = Some(CursorText::new(text, None, CursorTextColor::Info));
                 }
             }
 
@@ -3845,20 +3849,20 @@ impl GameGrid {
                         }
 
                         if is_mouse_pos_out_of_range {
-                            front_cursor_text = Some((
-                                Cow::Borrowed("Out of reach"),
+                            front_cursor_text = Some(CursorText::new(
+                                "Out of reach",
                                 Some(mouse_grid_pos),
                                 CursorTextColor::Error,
                             ));
                         } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                            front_cursor_text = Some((
-                                Cow::Borrowed("Select enemy"),
+                            front_cursor_text = Some(CursorText::new(
+                                "Select enemy",
                                 Some(mouse_grid_pos),
                                 CursorTextColor::Info,
                             ));
                         } else {
-                            front_cursor_text = Some((
-                                Cow::Borrowed("Select ally"),
+                            front_cursor_text = Some(CursorText::new(
+                                "Select ally",
                                 Some(mouse_grid_pos),
                                 CursorTextColor::Info,
                             ));
@@ -3935,38 +3939,38 @@ impl GameGrid {
                         match kind {
                             PointTargetKind::PositionCircle(..) => {
                                 if is_mouse_pos_out_of_range {
-                                    front_cursor_text = Some((
-                                        Cow::Borrowed("Out of reach"),
+                                    front_cursor_text = Some(CursorText::new(
+                                        "Out of reach",
                                         Some(mouse_grid_pos),
                                         CursorTextColor::Error,
                                     ));
                                 } else {
                                     //println!("Shape circle");
-                                    front_cursor_text = Some((
-                                        Cow::Borrowed("Confirm area"),
+                                    front_cursor_text = Some(CursorText::new(
+                                        "Confirm area",
                                         Some(mouse_grid_pos),
                                         CursorTextColor::Info,
                                     ));
                                 }
                             }
                             PointTargetKind::Line => {
-                                front_cursor_text = Some((
-                                    Cow::Borrowed("Confirm aim"),
+                                front_cursor_text = Some(CursorText::new(
+                                    "Confirm aim",
                                     None,
                                     CursorTextColor::Info,
                                 ));
                             }
                             PointTargetKind::Projectile { .. } => {
-                                front_cursor_text = Some((
-                                    Cow::Borrowed("Confirm aim"),
+                                front_cursor_text = Some(CursorText::new(
+                                    "Confirm aim",
                                     None,
                                     CursorTextColor::Info,
                                 ));
                             }
                             PointTargetKind::Movement => {
                                 if let Some(text) = mouse_pos_target_problem {
-                                    front_cursor_text = Some((
-                                        Cow::Borrowed(text),
+                                    front_cursor_text = Some(CursorText::new(
+                                        text,
                                         Some(mouse_grid_pos),
                                         CursorTextColor::Error,
                                     ));
@@ -3980,8 +3984,8 @@ impl GameGrid {
 
                     if hovered_move_route.is_none() {
                         self.draw_invalid_target_marker(mouse_grid_pos);
-                        front_cursor_text = Some((
-                            Cow::Borrowed("Out of reach"),
+                        front_cursor_text = Some(CursorText::new(
+                            "Out of reach",
                             Some(mouse_grid_pos),
                             CursorTextColor::Error,
                         ));
@@ -4001,10 +4005,16 @@ impl GameGrid {
                         self.draw_occupation(OccupationFilter::TallTerrain);
                     }
                     let problem = format!("|<warning>| {}", problem.message());
-                    front_cursor_text = Some((Cow::Owned(problem), None, CursorTextColor::Error));
+                    front_cursor_text =
+                        Some(CursorText::new(problem, None, CursorTextColor::Error));
                 } else {
-                    let text = format!("|<confirm>|{}", committable_action_str.unwrap());
-                    front_cursor_text = Some((Cow::Owned(text), None, CursorTextColor::Info));
+                    let committable_action = committable_action.unwrap();
+                    //let text = format!("|<confirm>|{}", committable_action.label);
+                    let text = committable_action.label;
+                    front_cursor_text = Some(
+                        CursorText::new(text, None, CursorTextColor::Info)
+                            .with_icon(committable_action.icon),
+                    );
 
                     if pressed_left_mouse {
                         println!("Committed action with left click");
@@ -4018,7 +4028,7 @@ impl GameGrid {
                 if let Some(target_str) = target_str {
                     text.push_str(&format!("\n|<target>|{}", target_str));
                 }
-                front_cursor_text = Some((Cow::Owned(text), None, CursorTextColor::Info));
+                front_cursor_text = Some(CursorText::new(text, None, CursorTextColor::Info));
                 if pressed_left_mouse {
                     outcome.committed_action = true;
                 }
@@ -4092,8 +4102,11 @@ impl GameGrid {
                     );
                     let (move_text, dest) =
                         self.draw_player_movement_path(&path.nodes, &mut opportunity_attackers);
-                    front_cursor_text =
-                        Some((Cow::Owned(move_text), Some(dest), CursorTextColor::Move));
+                    front_cursor_text = Some(CursorText::new(
+                        move_text,
+                        Some(dest),
+                        CursorTextColor::Move,
+                    ));
 
                     self.characters[&self.active_character_id]
                         .set_facing_toward(*hovered_route_dst);
@@ -4482,8 +4495,8 @@ impl GameGrid {
 
         self.draw_effects();
 
-        if let Some((text, mouse_grid_pos, color)) = front_cursor_text {
-            self.draw_cursor_text(text, mouse_grid_pos, color);
+        if let Some(cursor_text) = front_cursor_text {
+            self.draw_cursor_text(cursor_text);
         }
 
         let inspect_target = match ui_state.players_action_target() {
@@ -5002,16 +5015,15 @@ impl GameGrid {
         }
     }
 
-    fn draw_cursor_text(
-        &self,
-        text: impl AsRef<str>,
-        mouse_grid_pos: Option<(i32, i32)>,
-        color: CursorTextColor,
-    ) {
+    fn draw_cursor_text(&self, cursor_text: CursorText) {
         let font_scale = 1.0; //oscillate(1.0, 0.9, 1.1);
 
         let font_size = 12;
         let font = Some(&self.big_font);
+
+        let text = &cursor_text.label;
+        let mouse_grid_pos = cursor_text.snapped_mouse_grid_pos;
+        let color = &cursor_text.color;
 
         let lines: Vec<&str> = text.as_ref().split("\n").collect();
         let mut line_dims = vec![];
@@ -5027,8 +5039,18 @@ impl GameGrid {
             line_dims.push(dim);
         }
 
+        rect_size.1 += (lines.len() - 1) as f32 * line_margin;
+
+        let icon_margin = 3.0;
+        let icon_size = if cursor_text.icon.is_some() {
+            (30.0, 24.0)
+        } else {
+            (0.0, 0.0)
+        };
+
         rect_size.0 += pad * 2.0;
-        rect_size.1 += pad * 2.0 + (lines.len() - 1) as f32 * line_margin;
+        rect_size.1 += pad * 2.0;
+        rect_size.1 = rect_size.1.max(icon_size.1);
 
         let (x, y) = if let Some(pos) = mouse_grid_pos {
             let snapped_mouse_pos = self.grid_pos_to_screen(pos);
@@ -5041,17 +5063,21 @@ impl GameGrid {
             (mouse_pos.0, mouse_pos.1 - rect_size.1 / 2.0 - 2.0)
         };
 
-        if mouse_grid_pos.is_none() || color != CursorTextColor::Info {
-            draw_rectangle(
-                x - rect_size.0 / 2.0,
-                y - rect_size.1 / 2.0,
-                rect_size.0,
-                rect_size.1,
-                Color::new(0.0, 0.0, 0.0, 0.7),
-            );
+        let rect = Rect::new(
+            x - (rect_size.0 + icon_size.0) / 2.0,
+            y - rect_size.1 / 2.0,
+            rect_size.0,
+            rect_size.1,
+        );
+
+        let bg_color = Color::new(0.0, 0.0, 0.0, 0.7);
+
+        if mouse_grid_pos.is_none() || color != &CursorTextColor::Info {
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg_color);
         }
 
         let mut y0 = y - rect_size.1 / 2.0 + pad;
+
         for (line, dim) in lines.iter().zip(line_dims) {
             let color = match color {
                 CursorTextColor::Info => WHITE,
@@ -5060,7 +5086,7 @@ impl GameGrid {
             };
             draw_text_with_font_tags(
                 line,
-                x - dim.width / 2.0,
+                rect.center().x - dim.width / 2.0,
                 y0 + dim.offset_y,
                 TextParams {
                     font,
@@ -5072,6 +5098,27 @@ impl GameGrid {
                 true,
             );
             y0 += dim.height + line_margin;
+        }
+
+        if let Some(icon) = cursor_text.icon {
+            let icon_x = (rect.right() + icon_margin).floor();
+            let icon_y = y - icon_size.1 / 2.0;
+            // Color similar to action button background (althbough that's a gradient)
+            let bg_color = rgb(114, 83, 72).with_alpha(0.8);
+            draw_rectangle(icon_x, icon_y, icon_size.0, icon_size.1, bg_color);
+            draw_icon(icon, icon_x, icon_y, None, false);
+            let duration = 0.8;
+            let thickness = oscillate_loop(duration, 4.0, 6.0);
+            let margin = oscillate_loop(duration, 0.0, 2.0);
+            let alpha = oscillate_loop(duration, 1.0, 0.6);
+            draw_rectangle_lines2(
+                icon_x - margin,
+                icon_y - margin,
+                icon_size.0 + margin * 2.0,
+                icon_size.1 + margin * 2.0,
+                thickness,
+                BLACK.with_alpha(alpha),
+            );
         }
     }
 
@@ -6710,6 +6757,47 @@ enum OccupationFilter {
 enum DrawBorder {
     Dashed,
     Line,
+}
+
+struct CommittableAction {
+    label: String,
+    icon: IconId,
+}
+
+impl CommittableAction {
+    fn new(t: impl Into<String>, icon: IconId) -> Self {
+        Self {
+            label: t.into(),
+            icon,
+        }
+    }
+}
+
+struct CursorText {
+    label: Cow<'static, str>,
+    snapped_mouse_grid_pos: Option<Position>,
+    color: CursorTextColor,
+    icon: Option<IconId>,
+}
+
+impl CursorText {
+    fn new(
+        t: impl Into<Cow<'static, str>>,
+        snapped_mouse_grid_pos: Option<Position>,
+        color: CursorTextColor,
+    ) -> Self {
+        Self {
+            label: t.into(),
+            snapped_mouse_grid_pos,
+            color,
+            icon: None,
+        }
+    }
+
+    fn with_icon(mut self, icon: IconId) -> Self {
+        self.icon = Some(icon);
+        self
+    }
 }
 
 #[derive(Debug, Default)]

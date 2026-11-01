@@ -56,6 +56,7 @@ impl Drawable for ConditionsList {
                     condition_info.condition,
                     condition_info.stacks,
                 )),
+                None,
             );
         }
     }
