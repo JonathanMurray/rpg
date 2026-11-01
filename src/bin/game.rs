@@ -8,7 +8,7 @@ use macroquad::miniquad::window::{
     self, screen_size, set_fullscreen, set_window_position, set_window_size,
 };
 
-use macroquad::text::draw_text;
+use macroquad::text::{draw_text, measure_text};
 use macroquad::texture::get_screen_data;
 use macroquad::time::get_time;
 use macroquad::window::{
@@ -30,6 +30,7 @@ use rpg::data::{
     HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
     PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
 };
+use rpg::drawing::draw_loading_text;
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
@@ -77,22 +78,17 @@ async fn main() {
     );
 
     next_frame().await;
-    clear_background(BLACK);
-    draw_text(
-        "Loading...",
-        screen_width() / 2.0,
-        screen_height() / 2.0,
-        32.0,
-        LIGHTGRAY,
-    );
-    next_frame().await;
-    dbg!(get_time());
 
+    draw_loading_text("Loading resources [1]").await;
     let resources = GameResources::load().await;
+
+    draw_loading_text("Loading resources [2]").await;
     load_and_init_static().await;
 
-    let sound_player = SoundPlayer::new().await;
+    draw_loading_text("Loading sounds").await;
+    let sound_player = SoundPlayer::load().await;
 
+    draw_loading_text("Starting game").await;
     run_demo(&resources, sound_player, fight_id).await;
 }
 

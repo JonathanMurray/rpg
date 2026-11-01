@@ -42,7 +42,7 @@ pub async fn run_shop_loop(
 ) -> Vec<Rc<Character>> {
     let characters: Vec<Rc<Character>> = player_characters;
 
-    let sound_player = SoundPlayer::new().await;
+    let sound_player = SoundPlayer::load().await;
 
     {
         let (screen_w, screen_h) = screen_size();

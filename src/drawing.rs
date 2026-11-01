@@ -1,8 +1,10 @@
 use macroquad::{
-    color::{Color, GREEN, MAGENTA},
+    color::{Color, BLACK, GREEN, LIGHTGRAY, MAGENTA},
     math::Rect,
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_triangle},
+    text::{draw_text, measure_text},
     time::get_time,
+    window::{clear_background, next_frame, screen_height, screen_width},
 };
 
 use crate::game_ui::draw_rectangle_lines2;
@@ -411,4 +413,19 @@ pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, 
 
     draw_line(left, top, right, bot, thickness, color);
     draw_line(left, bot, right, top, thickness, color);
+}
+
+pub async fn draw_loading_text(description: &str) {
+    let text = format!("{description} ...");
+    let font_size = 32;
+    let dim = measure_text(&text, None, font_size, 1.0);
+    clear_background(BLACK);
+    draw_text(
+        &text,
+        screen_width() / 2.0 - dim.width / 2.0,
+        screen_height() / 2.0,
+        font_size as f32,
+        LIGHTGRAY,
+    );
+    next_frame().await;
 }

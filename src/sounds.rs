@@ -24,7 +24,7 @@ struct SoundContainer {
 }
 
 impl SoundPlayer {
-    pub async fn new() -> Self {
+    pub async fn load() -> Self {
         let mut sounds_by_id = HashMap::new();
 
         for (id, volume, names) in &[

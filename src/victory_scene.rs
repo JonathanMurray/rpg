@@ -389,7 +389,7 @@ pub async fn run_victory_loop(
 ) -> Vec<Rc<Character>> {
     let characters: Vec<Rc<Character>> = player_characters;
     let mut selected_learnings: Vec<Option<Learning>> = vec![];
-    let sound_player = SoundPlayer::new().await;
+    let sound_player = SoundPlayer::load().await;
     {
         let mut portrait_row = PortraitRow::new(&characters, portrait_textures);
 
