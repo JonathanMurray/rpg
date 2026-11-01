@@ -259,6 +259,7 @@ pub struct TextLine {
     font_size: u16,
     color: Color,
     hover_color: Option<Color>,
+    pub hover_bg_color: Option<Color>,
     min_height: f32,
     max_height: f32,
     min_width: f32,
@@ -292,6 +293,7 @@ impl TextLine {
             offset_y: font_size as f32 * 0.6,
             font_size,
             color,
+            hover_bg_color: None,
             hover_color: None,
             min_height: 0.0,
             max_height: f32::MAX,
@@ -408,6 +410,16 @@ impl Drawable for TextLine {
             x + self.hor_padding
         };
 
+        let (mouse_x, mouse_y) = mouse_position();
+        let hovered =
+            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
+
+        if let Some(hover_bg_color) = self.hover_bg_color {
+            if hovered {
+                draw_rectangle(x, y, self.size.0, self.size.1, hover_bg_color);
+            }
+        }
+
         if let Some((color, depth_offset)) = self.depth {
             let params = TextParams {
                 font_size: self.font_size,
@@ -423,10 +435,6 @@ impl Drawable for TextLine {
                 false,
             );
         }
-
-        let (mouse_x, mouse_y) = mouse_position();
-        let hovered =
-            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
 
         let mut color = self.color;
         if let Some(hover_color) = self.hover_color {

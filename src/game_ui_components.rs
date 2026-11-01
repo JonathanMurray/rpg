@@ -854,10 +854,13 @@ pub struct Log {
     text_lines: Vec<Rc<TextLine>>,
     line_details: Vec<Option<Container>>,
     font: Font,
-    padding: f32,
 }
 
 impl Log {
+    pub fn last_drawn_rect(&self) -> Rect {
+        self.container.last_drawn_rectangle.get()
+    }
+
     pub fn new(font: Font) -> Self {
         let h = 300.0;
         Self {
@@ -889,12 +892,11 @@ impl Log {
             text_lines: vec![],
             line_details: vec![],
             font,
-            padding: 10.0,
         }
     }
 
     pub fn width(&self) -> f32 {
-        self.container.size().0 + self.padding * 2.0
+        self.container.size().0
     }
 
     pub fn add(&mut self, text: impl Into<String>) {
@@ -916,6 +918,9 @@ impl Log {
         text_line.set_padding(3.0, 3.0);
         text_line.set_max_width(self.container.min_width.unwrap());
         text_line.set_min_height(18.0);
+        if !details.is_empty() {
+            text_line.hover_bg_color = Some(WHITE.with_alpha(0.2));
+        }
         let text_line = Rc::new(text_line);
 
         self.text_lines.push(text_line.clone());
@@ -949,7 +954,7 @@ impl Log {
     }
 
     pub fn draw(&self, x: f32, y: f32) {
-        self.container.draw(x + self.padding, y + self.padding);
+        self.container.draw(x, y);
     }
 
     pub fn draw_tooltips(&self, x: f32, y: f32) {
@@ -973,10 +978,7 @@ impl Log {
 
     fn size(&self) -> (f32, f32) {
         let container_size = self.container.size();
-        (
-            container_size.0 + self.padding,
-            container_size.1 + self.padding,
-        )
+        (container_size.0, container_size.1)
     }
 }
 

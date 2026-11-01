@@ -767,6 +767,7 @@ impl UserInterface {
         let popup_rect = self.activity_popup.last_drawn_rectangle;
         let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
         let settings_rect = self.settings.last_drawn_rectangle.get();
+        let log_rect = self.log.last_drawn_rect();
 
         let mouse_pos = mouse_position();
 
@@ -781,12 +782,21 @@ impl UserInterface {
                 .rect()
                 .contains(mouse_pos.into());
 
-        // TODO: Correctly determine if we're hovering log
+        let ui_bg_texture = UI_BG_TEXTURE.get().unwrap();
+
+        let main_ui_rect = Rect::new(
+            ui_x0 - 10.0,
+            ui_y - 10.0,
+            ui_bg_texture.width(),
+            ui_bg_texture.height(),
+        );
+
         let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
             || target_ui_rect.contains(mouse_pos.into())
             || settings_rect.contains(mouse_pos.into())
+            || log_rect.contains(mouse_pos.into())
             || obstructed_by_character_sheet
-            || (mouse_pos.1 >= ui_y - 1.0 && mouse_pos.0 >= ui_x0 - 1.0);
+            || main_ui_rect.contains(mouse_pos.into());
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
 
         let mut hovered_action = None;
@@ -825,21 +835,10 @@ impl UserInterface {
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
 
-        draw_rectangle(
-            ui_x0,
-            ui_y + 5.0,
-            ui_x1 - ui_x0,
-            screen_height() - ui_y,
-            BLACK,
-        );
-        //draw_line(ui_x0, ui_y, ui_x1, ui_y, 1.0, ORANGE);
-        //draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
-        //draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
-
         draw_texture(
             UI_BG_TEXTURE.get().unwrap(),
-            ui_x0 - 10.0,
-            ui_y - 10.0,
+            main_ui_rect.x,
+            main_ui_rect.y,
             WHITE,
         );
 
@@ -920,7 +919,7 @@ impl UserInterface {
         character_ui.draw(ui_x0, ui_y + 5.0);
 
         let log_x = screen_width() - self.log.width();
-        let log_y = ui_y - 100.0;
+        let log_y = screen_height() - 300.0; //TODO
         self.log.draw(log_x, log_y);
 
         self.log.draw_tooltips(log_x, log_y);
