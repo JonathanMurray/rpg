@@ -47,7 +47,11 @@ pub trait Drawable {
 
 pub enum Element {
     Empty(f32, f32),
-    Texture(Texture2D, Option<(f32, f32)>),
+    Texture {
+        texture: Texture2D,
+        dest_size: Option<(f32, f32)>,
+        rotate_quarters: u32,
+    },
     ResizableTexture(Texture2D, Rc<RefCell<(f32, f32)>>),
     Container(Container),
     Text(TextLine),
@@ -65,10 +69,20 @@ impl Element {
         Self::Box(Box::new(e))
     }
 
+    pub fn texture(texture: Texture2D) -> Self {
+        Self::Texture {
+            texture,
+            dest_size: None,
+            rotate_quarters: 0,
+        }
+    }
+
     pub fn size(&self) -> (f32, f32) {
         let size = match self {
             Element::Empty(w, h) => (*w, *h),
-            Element::Texture(texture, dest_size) => dest_size.unwrap_or(texture.size().into()),
+            Element::Texture {
+                texture, dest_size, ..
+            } => dest_size.unwrap_or(texture.size().into()),
             Element::ResizableTexture(_texture, dest_size) => *dest_size.borrow(),
             Element::Container(container) => container.size(),
             Element::Text(text) => text.size(),
@@ -88,10 +102,15 @@ impl Element {
     pub fn draw(&self, x: f32, y: f32) {
         match self {
             Element::Empty(..) => {}
-            Element::Texture(texture, dest_size) => {
+            Element::Texture {
+                texture,
+                dest_size,
+                rotate_quarters,
+            } => {
                 let dest_size = dest_size.map(|s| s.into());
                 let params = DrawTextureParams {
                     dest_size,
+                    rotation: 0.5 * PI * (*rotate_quarters as f32),
                     ..Default::default()
                 };
                 draw_texture_ex(texture, x, y, WHITE, params);
@@ -100,6 +119,7 @@ impl Element {
                 let dest_size = *dest_size.borrow();
                 let params = DrawTextureParams {
                     dest_size: Some(dest_size.into()),
+
                     ..Default::default()
                 };
                 draw_texture_ex(texture, x, y, WHITE, params);

@@ -1900,7 +1900,8 @@ impl UserInterface {
                     GameOverType::Defeat => self.sound_player.play(SoundId::Defeat),
                 }
                 self.banner.set(text, 2.5);
-                self.animation_stopwatch.set_to_at_least(3.0);
+
+                //self.animation_stopwatch.set_to_at_least(3.0);
             }
             GameEvent::SurfaceWasConverted {
                 positions,

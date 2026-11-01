@@ -24,6 +24,7 @@ use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection}
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
+use crate::textures::UI_ARROW_TEXTURE;
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -393,6 +394,14 @@ pub fn build_spell_book(
         ..Default::default()
     };
 
+    let arrow_texture = UI_ARROW_TEXTURE.get().unwrap();
+
+    let arrow_element = || Element::Texture {
+        texture: arrow_texture.clone(),
+        dest_size: None,
+        rotate_quarters: 3,
+    };
+
     if !reaction_buttons.is_empty() {
         let row = buttons_row(
             reaction_buttons
@@ -418,10 +427,14 @@ pub fn build_spell_book(
             Some(font.clone()),
         )));
 
-        let mut buttons = attack_enhancement_buttons;
-        buttons.insert(0, attack_button);
-
-        let row = buttons_row(buttons.into_iter().map(|btn| Element::Rc(btn)).collect());
+        let mut row_elements = vec![Element::Rc(attack_button)];
+        if !attack_enhancement_buttons.is_empty() {
+            row_elements.push(arrow_element());
+        }
+        for btn in attack_enhancement_buttons {
+            row_elements.push(Element::Rc(btn));
+        }
+        let row = buttons_row(row_elements);
 
         spell_book.children.push(row);
     }
@@ -435,16 +448,14 @@ pub fn build_spell_book(
             Some(font.clone()),
         )));
 
-        let mut row_buttons = vec![ability_btn.clone()];
-        for enhancement_btn in enhancement_buttons {
-            row_buttons.push(Rc::clone(&enhancement_btn));
+        let mut row_elements = vec![Element::Rc(ability_btn.clone())];
+        if !enhancement_buttons.is_empty() {
+            row_elements.push(arrow_element());
         }
-        let ability_row = buttons_row(
-            row_buttons
-                .into_iter()
-                .map(|btn| Element::Rc(btn))
-                .collect(),
-        );
+        for enhancement_btn in enhancement_buttons {
+            row_elements.push(Element::Rc(enhancement_btn.clone()));
+        }
+        let ability_row = buttons_row(row_elements);
         spell_book.children.push(ability_row);
     }
 
@@ -514,6 +525,7 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
         layout_dir: LayoutDirection::Horizontal,
         margin: 5.0,
         children: buttons,
+        align: Align::Center,
         ..Default::default()
     })
 }

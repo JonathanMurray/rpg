@@ -227,10 +227,8 @@ pub async fn run_transition_loop(
                             },
                             ..Default::default()
                         }));
-                        col_children.push(Element::Texture(
-                            UI_ARROW_TEXTURE.get().unwrap().clone(),
-                            None,
-                        ));
+                        col_children
+                            .push(Element::texture(UI_ARROW_TEXTURE.get().unwrap().clone()));
                     }
 
                     let btn = Rc::new(ActionButton::new(

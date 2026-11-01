@@ -171,11 +171,11 @@ impl TargetUi {
                     border: Some(Border::with_color(LIGHTGRAY)),
                     ..Default::default()
                 },
-                children: vec![Element::Texture(
-                    portrait_texture(char.portrait),
-                    Some((64.0, 80.0)),
-                    //None, //Some((64.0, 80.0)),
-                )],
+                children: vec![Element::Texture {
+                    texture: portrait_texture(char.portrait),
+                    dest_size: Some((64.0, 80.0)),
+                    rotate_quarters: 0,
+                }],
                 ..Default::default()
             });
 

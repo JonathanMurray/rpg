@@ -293,7 +293,11 @@ impl NonCombatCharacterUi {
                 Element::Container(Container {
                     layout_dir: LayoutDirection::Vertical,
                     children: vec![
-                        Element::Texture(portrait, Some((64.0, 80.0))),
+                        Element::Texture {
+                            texture: portrait,
+                            dest_size: Some((64.0, 80.0)),
+                            rotate_quarters: 0,
+                        },
                         Element::RcRefCell(resource_bars.clone()),
                     ],
                     align: Align::Center,
