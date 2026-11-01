@@ -4,7 +4,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, MAGENTA, RED, SKYBLUE, YELLOW},
+    color::{Color, BLACK, LIGHTGRAY, MAGENTA, RED, SKYBLUE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
     shapes::draw_rectangle,
@@ -20,8 +20,8 @@ use macroquad::{
 use crate::{
     action_button::{ability_tooltip, describe_apply_effect, describe_area_effect, Tooltip},
     base_ui::{
-        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
-        TableCell, TableStyle, TextLine,
+        draw_text_rounded, table, Align, Border, Container, Drawable, Element, LayoutDirection,
+        Style, TableCell, TableStyle, TextLine,
     },
     character_sheet::MoneyText,
     core::{
@@ -289,21 +289,29 @@ pub struct EquipmentSection {
 
 impl EquipmentSection {
     pub fn new(
-        font: &Font,
+        simple_font: &Font,
         character: &Rc<Character>,
         include_stash: bool,
         sound_player: SoundPlayer,
     ) -> Self {
         let (inventory_section, mut equipment_slots) =
-            build_inventory_section(font, &character.inventory, InventoryType::Personal);
+            build_inventory_section(simple_font, &character.inventory, InventoryType::Personal);
 
-        let (equipped_section, equipped_slots, equipment_stats_table) =
-            build_equipped_section(font, character);
+        let (equipped_section, equipped_slots) = build_equipped_section(simple_font);
+
+        let equipment_stats_table = Rc::new(RefCell::new(EquipmentStatsTable::new(
+            character,
+            simple_font,
+        )));
+
         equipment_slots.extend_from_slice(&equipped_slots);
 
         let stash_column = if include_stash {
-            let (stash_section, stash_slots) =
-                build_inventory_section(font, character.party_stash(), InventoryType::PartyStash);
+            let (stash_section, stash_slots) = build_inventory_section(
+                simple_font,
+                character.party_stash(),
+                InventoryType::PartyStash,
+            );
             equipment_slots.extend_from_slice(&stash_slots);
 
             Some(Element::Container(Container {
@@ -316,7 +324,7 @@ impl EquipmentSection {
                 },
                 children: vec![
                     Element::Text(
-                        TextLine::new("Party stash", 22, WHITE, Some(font.clone()))
+                        TextLine::new("Party stash", 22, WHITE, Some(simple_font.clone()))
                             .with_depth(BLACK, 2.0),
                     ),
                     stash_section,
@@ -329,7 +337,7 @@ impl EquipmentSection {
 
         let money_text = MoneyText {
             character: Rc::clone(character),
-            font: font.clone(),
+            font: simple_font.clone(),
         };
 
         let char_eq_column = Element::Container(Container {
@@ -342,12 +350,13 @@ impl EquipmentSection {
             },
             children: vec![
                 Element::Text(
-                    TextLine::new("Inventory", 22, WHITE, Some(font.clone()))
+                    TextLine::new("Inventory", 22, WHITE, Some(simple_font.clone()))
                         .with_depth(BLACK, 2.0),
                 ),
                 inventory_section,
                 Element::Text(
-                    TextLine::new("Equipped", 22, WHITE, Some(font.clone())).with_depth(BLACK, 2.0),
+                    TextLine::new("Equipped", 22, WHITE, Some(simple_font.clone()))
+                        .with_depth(BLACK, 2.0),
                 ),
                 equipped_section,
                 Element::Empty(0.0, 2.0),
@@ -388,7 +397,7 @@ impl EquipmentSection {
             element,
             equipment_slots,
             equipment_stats_table,
-            font: font.clone(),
+            font: simple_font.clone(),
             character: Rc::clone(character),
             include_stash,
             sound_player,
@@ -741,14 +750,7 @@ fn build_inventory_section(
     (section, cloned_slots)
 }
 
-pub fn build_equipped_section(
-    font: &Font,
-    character: &Character,
-) -> (
-    Element,
-    Vec<Rc<RefCell<EquipmentSlot>>>,
-    Rc<RefCell<EquipmentStatsTable>>,
-) {
+pub fn build_equipped_section(font: &Font) -> (Element, Vec<Rc<RefCell<EquipmentSlot>>>) {
     let placeholder_text = "Draw something from your inventory to equip it";
     let mut slots: Vec<Rc<RefCell<EquipmentSlot>>> = [
         EquipmentSlot::new(
@@ -826,9 +828,7 @@ pub fn build_equipped_section(
         ..Default::default()
     });
 
-    let stats_table = Rc::new(RefCell::new(EquipmentStatsTable::new(character, font)));
-
-    (slots_container, cloned_slots, stats_table)
+    (slots_container, cloned_slots)
 
     //(container, cloned_slots, stats_table)
 }
@@ -922,6 +922,7 @@ impl EquipmentStatsTable {
             TableStyle {
                 background_color: Some(SKYBLUE),
                 default_text_color: BLACK,
+                outer_border_color: Some(LIGHTGRAY),
                 min_width: Some(90.0),
                 ..Default::default()
             },
@@ -999,8 +1000,12 @@ impl EquipmentSlot {
             font,
             style: Style {
                 bg_color: Some(SKYBLUE),
-                border_color: Some(GRAY),
-                border_width: Some(2.0),
+                border: Some(Border {
+                    color: LIGHTGRAY,
+                    thickness: 2.0,
+                    double: Some((GRAY, 1.0)),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             size: (40.0, 40.0),

@@ -15,8 +15,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, TextLine,
+        draw_text_rounded, Align, Border, Container, ContainerScroll, Drawable, Element,
+        LayoutDirection, Rectangle, Style, TextLine,
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::{draw_cross, draw_rounded_rectangle_lines},
@@ -865,16 +865,22 @@ impl Log {
                 //reverse_vertical: false,
                 children: vec![],
                 margin: 4.0,
-                align: Align::End,
+                align: Align::Start,
                 scroll: Some(ContainerScroll::default()),
                 //min_width: Some(450.0),
                 min_width: Some(430.0),
                 min_height: Some(h),
                 max_height: Some(h),
                 style: Style {
-                    border_color: Some(GRAY),
+                    border: Some(Border {
+                        color: GRAY,
+                        thickness: 2.0,
+                        double: Some((DARKGRAY, 2.0)),
+                        corner_ornamentation: Some((COL_GOLD.with_alpha(0.5), 4.0, 4.0)),
+                        ..Default::default()
+                    }),
                     bg_color: Some(Color::new(0.0, 0.0, 0.0, 0.85)),
-                    padding: 5.0,
+                    padding: 12.0,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -921,7 +927,7 @@ impl Log {
                 style: Style {
                     bg_color: Some(BLACK),
                     padding: 5.0,
-                    border_color: Some(COL_GOLD),
+                    border: Some(Border::with_color(COL_GOLD)),
                     ..Default::default()
                 },
                 children: details

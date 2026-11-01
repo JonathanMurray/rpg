@@ -12,7 +12,8 @@ use macroquad::{
 use crate::{
     action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     base_ui::{
-        draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
+        draw_text_rounded, Align, Border, Container, Drawable, Element, LayoutDirection, Style,
+        TextLine,
     },
     core::{
         Ability, BaseAction, Character, EquipmentEntry, EquipmentSlotRole, HandType, Party,
@@ -342,8 +343,11 @@ pub async fn run_transition_loop(
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             style: Style {
-                border_color: Some(DARKGRAY),
-                border_inner_rounding: Some(5.0),
+                border: Some(Border {
+                    color: DARKGRAY,
+                    inner_rounding: Some(5.0),
+                    ..Default::default()
+                }),
                 padding: 80.0,
                 ..Default::default()
             },

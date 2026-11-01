@@ -866,7 +866,7 @@ pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
 
-    description: "Deal |<value>3| damage and inflict |<keyword>Dazed|",
+    description: "Deal |<value>3| damage and inflict |<keyword>Dazed| for |<value>1| round",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
     stamina_cost: 1,
@@ -1086,7 +1086,7 @@ pub const EMPOWER: AttackEnhancement = AttackEnhancement {
 
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
-    description: "Attempt to |<keyword>Hinder| the target",
+    description: "Attempt to |<keyword>Hinder| the target for |<value>1| round",
     icon: IconId::CripplingShot,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
@@ -1488,7 +1488,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
 
-    description: "|<keyword>Slow| and |<keyword>Expose| an enemy",
+    description: "Attempt to |<keyword>Slow| and |<keyword>Expose| an enemy",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
     mana_cost: 2,
@@ -1983,7 +1983,7 @@ pub const HASTE: Ability = Ability {
 
 pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
     name: "Ruthless",
-    description: "Also make targets |<keyword>Ruthless|",
+    description: "Also make targets |<keyword>Ruthless| for |<value>2| rounds",
     icon: IconId::Rage,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -1997,7 +1997,7 @@ pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
 
-    description: "|<keyword>Inspire| nearby allies",
+    description: "|<keyword>Inspire| nearby allies for |<keyword>3| rounds",
     icon: IconId::Inspire,
     action_point_cost: 2,
     mana_cost: 2,
@@ -2042,7 +2042,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
 
-    description: "|<keyword>Inspire| nearby allies",
+    description: "|<keyword>Inspire| nearby allies for |<keyword>2| rounds",
     icon: IconId::Inspire,
     action_point_cost: 3,
     mana_cost: 0,
@@ -2362,7 +2362,7 @@ pub const FIREBALL: Ability = Ability {
 pub const FIRE_BOLT: Ability = Ability {
     id: AbilityId::FireBolt,
     name: "Fire bolt",
-    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first enemy hit, and |<value>4| to its surroundings",
+    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| to its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2514,7 +2514,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
 
-    description: "Deal |<value>7| |<lightning>|lightning damage in a line",
+    description: "Deal |<value>7| |<lightning>|lightning damage to all targets in a line",
     icon: IconId::LightningBolt,
     action_point_cost: 3,
     mana_cost: 2,

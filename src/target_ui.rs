@@ -17,8 +17,8 @@ use crate::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{
-        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
-        TextLine,
+        table, Align, Border, Container, Drawable, Element, LayoutDirection, Style, TableCell,
+        TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
@@ -130,7 +130,7 @@ impl TargetUi {
                 0.25,
                 Style {
                     bg_color: Some(BLACK),
-                    border_color: Some(WHITE),
+                    border: Some(Border::with_color(WHITE)),
                     ..Default::default()
                 },
             );
@@ -168,7 +168,7 @@ impl TargetUi {
             let portrait = Element::Container(Container {
                 style: Style {
                     bg_color: Some(Color::new(0.5, 0.5, 0.5, 0.3)),
-                    border_color: Some(LIGHTGRAY),
+                    border: Some(Border::with_color(LIGHTGRAY)),
                     ..Default::default()
                 },
                 children: vec![Element::Texture(
@@ -363,8 +363,11 @@ impl TargetUi {
                 margin: 15.0,
                 style: Style {
                     bg_color: Some(BG_COLOR),
-                    border_color: Some(LIGHTGRAY),
-                    border_inner_rounding: Some(6.0),
+                    border: Some(Border {
+                        color: LIGHTGRAY,
+                        inner_rounding: Some(6.0),
+                        ..Default::default()
+                    }),
                     padding: 10.0,
                     ..Default::default()
                 },

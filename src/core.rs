@@ -66,8 +66,8 @@ impl CoreGame {
     }
 
     pub async fn run(mut self) -> Result<(), QuitEvent> {
-        self.log("The battle begins").await;
-        self.log("~ ~ ~ ~ ~ ~ ~ ~").await;
+        //self.log("The battle begins").await;
+        //self.log("~ ~ ~ ~ ~ ~ ~ ~").await;
 
         for character in self.characters.iter() {
             character.on_battle_start();

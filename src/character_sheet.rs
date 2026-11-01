@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::process::id;
 use std::rc::Rc;
 
-use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
+use macroquad::color::{DARKBLUE, DARKGRAY, GRAY, SKYBLUE};
 
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
@@ -16,7 +16,7 @@ use macroquad::{
     text::Font,
 };
 
-use crate::base_ui::{draw_text_rounded, Drawable};
+use crate::base_ui::{draw_text_rounded, Border, Drawable};
 use crate::conditions_ui::ConditionsList;
 use crate::core::{ActionTarget, EquipmentEntry, EquipmentSlotRole};
 use crate::drawing::draw_cross;
@@ -55,7 +55,7 @@ impl CharacterSheet {
     }
 
     pub fn new(
-        font: &Font,
+        simple_font: &Font,
         character: Rc<Character>,
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
@@ -67,7 +67,7 @@ impl CharacterSheet {
         sound_player: SoundPlayer,
     ) -> Self {
         let spell_book = build_spell_book(
-            font,
+            simple_font,
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,
@@ -79,7 +79,7 @@ impl CharacterSheet {
         let conditions_list = Rc::new(RefCell::new(conditions_list));
 
         let stats_table = Rc::new(RefCell::new(build_character_stats_table(
-            font,
+            simple_font,
             Rc::clone(&character),
         )));
 
@@ -96,7 +96,7 @@ impl CharacterSheet {
         });
 
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
-            font,
+            simple_font,
             &character,
             false,
             sound_player,
@@ -108,8 +108,11 @@ impl CharacterSheet {
             style: Style {
                 bg_color: Some(CHARACTER_SHEET_BG_COLOR),
                 padding: 10.0,
-                border_color: Some(BLACK),
-                border_inner_rounding: Some(5.0),
+                border: Some(Border {
+                    color: BLACK,
+                    inner_rounding: Some(5.0),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             children: vec![
@@ -124,7 +127,7 @@ impl CharacterSheet {
                     },
                     children: vec![
                         Element::Text(
-                            TextLine::new("Skills", 24, WHITE, Some(font.clone()))
+                            TextLine::new("Skills", 24, WHITE, Some(simple_font.clone()))
                                 .with_depth(BLACK, 2.0),
                         ),
                         Element::Container(spell_book),
@@ -149,7 +152,7 @@ impl CharacterSheet {
             },
             children: vec![
                 Element::Text(
-                    TextLine::new(&character.name, 28, SKYBLUE, Some(font.clone()))
+                    TextLine::new(&character.name, 28, SKYBLUE, Some(simple_font.clone()))
                         .with_depth(DARKBLUE, 1.0)
                         .with_padding(10.0, 10.0),
                 ),
@@ -377,7 +380,12 @@ pub fn build_spell_book(
         max_height: Some(max_height),
         style: Style {
             padding: 10.0,
-            border_color: Some(LIGHTGRAY),
+            border: Some(Border {
+                color: GRAY,
+                double: Some((GRAY.with_alpha(0.5), 2.0)),
+                ..Default::default()
+            }),
+            bg_color: Some(BLACK.with_alpha(0.2)),
             ..Default::default()
         },
         // To maintain alignment when switching between different characters' character sheet, and their spellbook contents differ in width

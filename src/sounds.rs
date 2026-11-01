@@ -168,7 +168,7 @@ impl SoundPlayer {
     }
 
     pub fn play(&self, sound_id: SoundId) {
-        dbg!(sound_id);
+        //dbg!(sound_id);
         if !self.enabled.get() {
             return;
         }
@@ -190,7 +190,7 @@ impl SoundPlayer {
     }
 
     pub fn play_delayed(&self, sound_id: SoundId, delay: f32) {
-        dbg!((sound_id, delay));
+        //dbg!((sound_id, delay));
         if delay == 0.0 {
             self.play(sound_id);
         } else {

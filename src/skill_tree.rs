@@ -27,7 +27,7 @@ use crate::action_button::{
     button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
     InternalUiEvent,
 };
-use crate::base_ui::{Container, Drawable, Element, LayoutDirection, Style};
+use crate::base_ui::{Border, Container, Drawable, Element, LayoutDirection, Style};
 use crate::core::BaseAction;
 
 use crate::data::{
@@ -274,7 +274,7 @@ pub async fn run_editor() {
         margin: 10.0,
         style: Style {
             bg_color: Some(Color::new(0.1, 0.1, 0.1, 1.0)),
-            border_color: Some(LIGHTGRAY),
+            border: Some(Border::with_color(LIGHTGRAY)),
             padding: 5.0,
             ..Default::default()
         },

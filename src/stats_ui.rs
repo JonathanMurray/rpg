@@ -6,7 +6,7 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::Character,
     tooltip::Keyword,
 };
@@ -224,8 +224,13 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         align: Align::Center,
         margin: 5.0,
         style: Style {
-            border_color: Some(GRAY),
-            padding: 10.0,
+            border: Some(Border {
+                color: GRAY,
+                double: Some((GRAY.with_alpha(0.5), 2.0)),
+                ..Default::default()
+            }),
+            bg_color: Some(BLACK.with_alpha(0.2)),
+            padding: 14.0,
             ..Default::default()
         },
         children: vec![
@@ -248,6 +253,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
     }
 }
 
+/*
 pub fn build_stats_table(
     font: &Font,
     attribute_font_size: u16,
@@ -292,13 +298,14 @@ pub fn build_stats_table(
         //border_between_children: Some(DARKGRAY),
         margin: 7.0,
         style: Style {
-            border_color: Some(GRAY),
+            border: Some(Border::with_color(LIGHTGRAY)),
             padding: 5.0,
             ..Default::default()
         },
         ..Default::default()
     })
 }
+     */
 
 pub enum StatValue {
     U32(u32),

@@ -497,7 +497,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             .push(format!("  |<value>{}| |<heart>| healing", n)),
         ApplyEffect::Condition(apply_condition) => {
             let mut line = format!(
-                "  Gain: |<status>{:?}| |<keyword>{}|",
+                "  |<status>{:?}| |<keyword>{}|",
                 apply_condition.condition.status_id(),
                 apply_condition.condition.name()
             );
@@ -1065,6 +1065,7 @@ impl ActionButton {
             //border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
+        /*
         match action {
             ButtonAction::Action(..) => {}
             ButtonAction::Passive(..) => {
@@ -1076,6 +1077,7 @@ impl ActionButton {
                 style.border_outer_rounding = Some((BLACK, 4.0));
             }
         }
+         */
 
         let hover_border_color = YELLOW;
 
@@ -1172,8 +1174,10 @@ impl ActionButton {
 
     pub fn set_parent_bg_color(&mut self, color: Color) {
         self.parent_bg_color = Some(color);
-        if let Some((rounding_color, _width)) = &mut self.style.border_outer_rounding {
-            *rounding_color = color;
+        if let Some(border) = &mut self.style.border {
+            if let Some((c, _width)) = &mut border.outer_rounding {
+                *c = color;
+            }
         }
     }
 
@@ -1403,9 +1407,11 @@ impl Drawable for ActionButton {
                 let mut outer = None;
                 let mut inner = 5.0;
                 if let Some(color) = self.parent_bg_color {
-                    if let Some((.., rounding)) = self.style.border_outer_rounding {
-                        outer = Some((color, rounding - 1.0));
-                        inner = rounding + 1.0;
+                    if let Some(border) = self.style.border {
+                        if let Some((_, rounding)) = border.outer_rounding {
+                            outer = Some((color, rounding - 1.0));
+                            inner = rounding + 1.0;
+                        }
                     }
                 }
                 draw_rounded_rectangle_lines(

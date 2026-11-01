@@ -25,7 +25,7 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     banner::Banner,
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
+    base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
     character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
@@ -780,6 +780,7 @@ impl UserInterface {
                 .rect()
                 .contains(mouse_pos.into());
 
+        // TODO: Correctly determine if we're hovering log
         let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
             || target_ui_rect.contains(mouse_pos.into())
             || settings_rect.contains(mouse_pos.into())
@@ -2950,7 +2951,7 @@ fn build_character_ui(
     let button_placeholder = Rectangle {
         size: REGULAR_ACTION_BUTTON_SIZE,
         style: Style {
-            border_color: Some(GRAY),
+            border: Some(Border::with_color(GRAY)),
             bg_color: Some(ACTION_BUTTON_BG_COLOR),
             ..Default::default()
         },
@@ -2983,7 +2984,7 @@ fn build_character_ui(
         (20.0, 20.0),
         0.25,
         Style {
-            border_color: Some(GRAY),
+            border: Some(Border::with_color(GRAY)),
             ..Default::default()
         },
     );
@@ -3060,9 +3061,12 @@ impl ResourceBars {
             align: Align::Start,
             children,
             style: Style {
-                border_color: Some(DARKGRAY),
-                border_inner_rounding: Some(3.0),
-                border_outer_rounding: Some((BLACK, 2.0)),
+                border: Some(Border {
+                    color: DARKGRAY,
+                    inner_rounding: Some(3.0),
+                    outer_rounding: Some((BLACK, 2.0)),
+                    ..Default::default()
+                }),
                 padding: 5.0,
                 ..Default::default()
             },

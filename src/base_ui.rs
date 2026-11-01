@@ -689,11 +689,40 @@ impl Rectangle {
 pub struct Style {
     pub bg_color: Option<Color>,
     pub fg_color: Option<Color>,
-    pub border_color: Option<Color>,
-    pub border_inner_rounding: Option<f32>,
-    pub border_outer_rounding: Option<(Color, f32)>,
-    pub border_width: Option<f32>,
+    pub border: Option<Border>,
     pub padding: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Border {
+    pub color: Color,
+    pub inner_rounding: Option<f32>,
+    pub outer_rounding: Option<(Color, f32)>,
+    pub thickness: f32,
+    pub double: Option<(Color, f32)>,
+    pub corner_ornamentation: Option<(Color, f32, f32)>,
+}
+
+impl Default for Border {
+    fn default() -> Self {
+        Self {
+            color: Default::default(),
+            inner_rounding: None,
+            outer_rounding: None,
+            thickness: 1.0,
+            double: None,
+            corner_ornamentation: None,
+        }
+    }
+}
+
+impl Border {
+    pub fn with_color(color: Color) -> Self {
+        Self {
+            color,
+            ..Default::default()
+        }
+    }
 }
 
 impl Style {
@@ -712,21 +741,45 @@ impl Style {
         if let Some(color) = self.fg_color {
             draw_rectangle(x, y, size.0, size.1, color);
         }
-        if let Some(color) = self.border_color {
-            let thickness = self.border_width.unwrap_or(1.0);
-            if let Some(rounding) = self.border_inner_rounding {
+        if let Some(border) = self.border {
+            if let Some(rounding) = border.inner_rounding {
                 draw_rounded_rectangle_lines(
                     x,
                     y,
                     size.0,
                     size.1,
-                    thickness,
-                    color,
+                    border.thickness,
+                    border.color,
                     rounding,
-                    self.border_outer_rounding,
+                    border.outer_rounding,
                 );
             } else {
-                draw_rectangle_lines2(x, y, size.0, size.1, thickness, color);
+                draw_rectangle_lines2(x, y, size.0, size.1, border.thickness, border.color);
+            }
+
+            if let Some((color, margin)) = border.double {
+                draw_rectangle_lines2(
+                    x + margin,
+                    y + margin,
+                    size.0 - 2.0 * margin,
+                    size.1 - 2.0 * margin,
+                    border.thickness,
+                    color,
+                );
+            }
+            if let Some((color, margin, w)) = border.corner_ornamentation {
+                let thickness = 2.0;
+                draw_rectangle_lines2(x + margin, y + margin, w, w, thickness, color);
+                draw_rectangle_lines2(x + size.0 - margin - w, y + margin, w, w, thickness, color);
+                draw_rectangle_lines2(x + margin, y + size.1 - margin - w, w, w, thickness, color);
+                draw_rectangle_lines2(
+                    x + size.0 - margin - w,
+                    y + size.1 - margin - w,
+                    w,
+                    w,
+                    thickness,
+                    color,
+                );
             }
         }
     }
@@ -1268,7 +1321,7 @@ pub fn table(
     Container {
         layout_dir: LayoutDirection::Horizontal,
         style: Style {
-            border_color: style.outer_border_color,
+            border: style.outer_border_color.map(Border::with_color),
             bg_color: style.background_color,
             ..Default::default()
         },
