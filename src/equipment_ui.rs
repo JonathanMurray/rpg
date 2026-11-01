@@ -85,7 +85,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let a = consumable.ability;
     let mut tooltip = ability_tooltip(a, None);
     let line = format!(
-        "|<faded>Use item|{} :",
+        "|<faded>Right-click to use item|{} :",
         cost_string(a.action_point_cost, a.stamina_cost, a.mana_cost,)
     );
     tooltip.technical_description.insert(0, line);
@@ -1108,15 +1108,16 @@ impl Drawable for EquipmentSlot {
         if hover {
             let rect = Rect::new(x, y, self.size.0, self.size.1);
             if let Some(content) = &self.content {
+                let tooltip = &content.tooltip;
                 draw_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
-                    &content.tooltip.header,
+                    &tooltip.header,
                     None,
-                    &content.tooltip.technical_description,
-                    &content.tooltip.keywords,
+                    &tooltip.technical_description,
+                    &tooltip.keywords,
                     None,
-                    None,
+                    tooltip.icon,
                 );
             } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
                 draw_regular_tooltip(

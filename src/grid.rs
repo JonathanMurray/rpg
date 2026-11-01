@@ -141,11 +141,11 @@ pub struct TargetEffectPreview {
 #[derive(Debug)]
 struct CharacterActionAnticipation {
     kind: AnticipationKind,
-    facing: Option<CharacterFacing>,
+    facing: Option<(Position, Position)>,
 }
 
 impl CharacterActionAnticipation {
-    fn other(facing: Option<CharacterFacing>) -> Self {
+    fn other(facing: Option<(Position, Position)>) -> Self {
         Self {
             facing,
             kind: AnticipationKind::Other,
@@ -155,7 +155,7 @@ impl CharacterActionAnticipation {
 
 #[derive(Debug)]
 enum AnticipationKind {
-    RangedAttack,
+    RangedAttack { aiming: bool },
     MeleeAttack,
     Throw { color: Color },
     CastSpell { color: Color },
@@ -2776,12 +2776,25 @@ impl GameGrid {
         if let Some(anticipation) = anticipation {
             let dx;
 
-            if let Some(facing) = anticipation.facing {
-                params.flip_x = facing.is_east();
+            let mut facing_rotation = None;
+
+            if let Some((from, to)) = anticipation.facing {
+                params.flip_x = CharacterFacing::of(from, to).is_east();
+                facing_rotation =
+                    Some(((to.1 - from.1) as f32).atan2((to.0 - from.0).abs() as f32));
             }
             match anticipation.kind {
-                AnticipationKind::RangedAttack => {
+                AnticipationKind::RangedAttack { aiming } => {
                     weapon_rotation_modifier = -PI * 0.15;
+                    if aiming {
+                        if let Some(rot) = facing_rotation {
+                            //dbg!(rot);
+                            // First callibrate so that the bow aims straight horizontally
+                            weapon_rotation_modifier -= PI * 0.1;
+                            // Limit rotation of ranged weapon to keep it from looking too silly
+                            weapon_rotation_modifier += rot.max(-0.3).min(0.7);
+                        }
+                    }
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
@@ -4546,40 +4559,40 @@ impl GameGrid {
     ) -> Option<CharacterActionAnticipation> {
         let ch_id = character.id();
 
-        let attack_anticipation = |character: &Character, facing: Option<CharacterFacing>| {
-            let kind = if character.has_equipped_ranged_weapon() {
-                AnticipationKind::RangedAttack
-            } else {
-                AnticipationKind::MeleeAttack
+        let attack_anticipation =
+            |character: &Character, facing: Option<(Position, Position)>, aiming: bool| {
+                let kind = if character.has_equipped_ranged_weapon() {
+                    AnticipationKind::RangedAttack { aiming }
+                } else {
+                    AnticipationKind::MeleeAttack
+                };
+                CharacterActionAnticipation { facing, kind }
             };
-            CharacterActionAnticipation { facing, kind }
-        };
 
         let maybe_attack_anticipation =
             |character: &Character, will_attack: bool, target: CharacterId| {
-                let facing = CharacterFacing::of(
-                    character.pos(),
-                    self.characters.get(&target).unwrap().pos(),
-                );
+                let facing = (character.pos(), self.characters.get(&target).unwrap().pos());
                 if will_attack {
-                    attack_anticipation(character, Some(facing))
+                    attack_anticipation(character, Some(facing), true)
                 } else {
                     CharacterActionAnticipation::other(Some(facing))
                 }
             };
 
         if opportunity_attackers.contains(&ch_id) {
-            return Some(attack_anticipation(character, None));
+            return Some(attack_anticipation(character, None, true));
         }
 
         match ui_state {
             UiState::ConfiguringAction(a) if ch_id == self.active_character_id => match a {
                 ConfiguredAction::Attack { target, .. } => {
-                    let mut facing = None;
-                    if target.is_none() {
-                        facing = Some(CharacterFacing::of(character.pos(), mouse_grid_pos));
-                    }
-                    return Some(attack_anticipation(character, facing));
+                    let dst = match target {
+                        Some(ch_id) => self.characters.get(ch_id).unwrap().pos(),
+                        None => mouse_grid_pos,
+                    };
+                    let facing = Some((character.pos(), dst));
+                    let aiming = target.is_some();
+                    return Some(attack_anticipation(character, facing, aiming));
                 }
                 ConfiguredAction::Move { .. } => {
                     return Some(CharacterActionAnticipation {
@@ -4591,13 +4604,32 @@ impl GameGrid {
                     ability, target, ..
                 } => {
                     let mut facing = None;
-                    if ability.requires_target() && target == &ActionTarget::None {
-                        facing = Some(CharacterFacing::of(character.pos(), mouse_grid_pos));
+                    let mut aiming = true;
+                    if ability.requires_target() {
+                        let dst: Position = match target {
+                            ActionTarget::Character(ch_id, _movement) => {
+                                self.characters.get(ch_id).unwrap().pos()
+                            }
+                            ActionTarget::Position(pos) => *pos,
+                            ActionTarget::Line(target_line) => target_line.destination,
+                            ActionTarget::Projectile(target_line) => target_line.destination,
+                            ActionTarget::None => mouse_grid_pos,
+                        };
+                        if ability.targets_single_character()
+                            && matches!(target, ActionTarget::None)
+                        {
+                            aiming = false;
+                        }
+                        facing = Some((character.pos(), dst));
                     }
 
                     let kind = match ability.audio_visuals.animation {
                         AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
                         AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
+                        AbilityAnimation::RangedWeaponAttack => {
+                            AnticipationKind::RangedAttack { aiming }
+                        }
+                        AbilityAnimation::MeleeWeaponAttack => AnticipationKind::MeleeAttack,
                         AbilityAnimation::CastSpell => AnticipationKind::CastSpell {
                             color: ability.audio_visuals.animation_color,
                         },
@@ -4612,7 +4644,7 @@ impl GameGrid {
                 attacker, reactor, ..
             } => {
                 if ch_id == *attacker {
-                    return Some(attack_anticipation(character, None));
+                    return Some(attack_anticipation(character, None, true));
                 } else if ch_id == *reactor {
                     return Some(CharacterActionAnticipation::other(None));
                 }
@@ -4639,7 +4671,7 @@ impl GameGrid {
                 ..
             } => {
                 if ch_id == *attacker {
-                    return Some(attack_anticipation(character, None));
+                    return Some(attack_anticipation(character, None, true));
                 } else if ch_id == *reactor {
                     return Some(maybe_attack_anticipation(character, *selected, *attacker));
                 }
@@ -4795,7 +4827,7 @@ impl GameGrid {
         let mut ability_knockback = ability.knockback();
 
         for enhancement in selected_enhancements {
-            dbg!(enhancement);
+            //dbg!(enhancement);
             if let Some(e) = enhancement.spell_effect {
                 for apply_effect in e.target_on_hit.iter() {
                     if let ApplyEffect::Pushed(amount) = *apply_effect {
@@ -6293,12 +6325,12 @@ impl GameGrid {
         animated: bool,
     ) {
         let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w() / 2.0;
-        let actor_y = self.grid_y_to_screen(actor_pos.1);
+        let actor_y = self.grid_y_to_screen(actor_pos.1) - self.cell_w() / 2.0;
         let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w() / 2.0;
 
         let target_y = if is_targetting_character {
             // show the crosshair closer to the target's chest rather than at their feet
-            self.grid_y_to_screen(target_pos.1)
+            self.grid_y_to_screen(target_pos.1) - self.cell_w() / 2.0
         } else {
             self.grid_y_to_screen(target_pos.1) + self.cell_w() / 2.0
         };

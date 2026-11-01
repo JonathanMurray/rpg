@@ -448,9 +448,9 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Bob",
+      "type_": "Ogre",
       "pos": [
-        19,
+        22,
         16
       ],
       "health": null,
@@ -459,10 +459,10 @@
       "name": null
     },
     {
-      "type_": "Ogre",
+      "type_": "Alice",
       "pos": [
-        22,
-        16
+        25,
+        22
       ],
       "health": null,
       "main_hand": null,

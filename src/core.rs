@@ -4336,7 +4336,7 @@ impl AbilityResolvedEvent {
         let mut affected_targets = HashMap::default();
         if let Some(o) = &self.target_outcome {
             // TODO
-            dbg!(o);
+            //dbg!(o);
             affected_targets.insert(
                 o.target_id,
                 TargetResult {

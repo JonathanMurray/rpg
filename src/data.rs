@@ -815,7 +815,7 @@ const fn grenade_ability(
         name,
 
         description: "",
-        icon: IconId::Undefined,
+        icon: IconId::UseConsumable,
         action_point_cost: 2,
         mana_cost: 0,
         stamina_cost: 0,
@@ -2704,7 +2704,7 @@ const fn potion_ability(
         name,
 
         description: "",
-        icon: IconId::Undefined,
+        icon: IconId::UseConsumable,
         action_point_cost: 1,
         mana_cost: 0,
         stamina_cost: 0,
