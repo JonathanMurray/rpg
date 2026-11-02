@@ -293,7 +293,7 @@ pub const ZERO_SWORD: Weapon = Weapon {
     name: "Useless sword",
     range: WeaponRange::Melee,
     action_point_cost: 0,
-    damage: 0,
+    damage: 2,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -1403,9 +1403,10 @@ pub const BRACE: Ability = Ability {
 
     description: "",
     icon: IconId::Brace,
-    action_point_cost: 1,
+    // TODO:
+    action_point_cost: 0,
     mana_cost: 0,
-    stamina_cost: 1,
+    stamina_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
     roll: None,
     possible_enhancements: &[],
@@ -1428,6 +1429,8 @@ pub const BRACE: Ability = Ability {
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
         }),
+        // TODO
+        target_effect_id: Some((EffectId::Bonk, 0.3)),
         ..AudioVisuals::default()
     },
 };
@@ -2547,7 +2550,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
         }),
-        target_effect_id: Some(EffectId::Zap),
+        target_effect_id: Some((EffectId::Zap, 0.5)),
         ..AudioVisuals::default()
     },
 };

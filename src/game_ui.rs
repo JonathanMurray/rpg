@@ -43,7 +43,7 @@ use crate::{
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
-        ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, PlayerPortraits,
+        ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, LogStyle, PlayerPortraits,
         TopCharacterPortraits,
     },
     grid::{
@@ -738,7 +738,7 @@ impl UserInterface {
             big_font: resources.big_font.clone(),
 
             hovered_button: None,
-            log: Log::new(resources.simple_font.clone()),
+            log: Log::new(resources.simple_font.clone(), resources.big_font.clone()),
             character_uis,
             event_queue: Rc::clone(&event_queue),
             activity_popup,
@@ -1606,8 +1606,14 @@ impl UserInterface {
         //dbg!(&event);
 
         match *event {
+            GameEvent::NewRoundStarted(round_index) => {
+                self.log.add(
+                    format!("=== ROUND {} ===", round_index + 1),
+                    LogStyle::RoundStart,
+                );
+            }
             GameEvent::LogLine(line) => {
-                self.log.add(line);
+                self.log.add(line, LogStyle::Regular);
             }
             GameEvent::CharacterReactedToAttacked { reactor } => {
                 self.animate_reaction(reactor);
@@ -1615,10 +1621,10 @@ impl UserInterface {
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
 
-                self.log.add(format!(
-                    "|{}| made an opportunity attack:",
-                    reactor.name_tag()
-                ));
+                self.log.add(
+                    format!("|{}| made an opportunity attack:", reactor.name_tag()),
+                    LogStyle::Regular,
+                );
                 self.animate_reaction(reactor.id());
             }
             GameEvent::CharacterReactedToHit {
@@ -1627,7 +1633,8 @@ impl UserInterface {
                 reactor,
             } => {
                 let reactor = self.characters.get(reactor);
-                self.log.add_with_details(main_line, &detail_lines);
+                self.log
+                    .add_with_details(main_line, &detail_lines, LogStyle::Regular);
                 self.animate_reaction(reactor.id());
             }
             GameEvent::AttackWasInitiated {
@@ -1676,11 +1683,14 @@ impl UserInterface {
             }
             GameEvent::ConsumableWasUsed { user, consumable } => {
                 //self.sound_player.play(SoundId::Powerup);
-                self.log.add(format!(
-                    "|{}| lost item: {}",
-                    self.characters.get(user).name_tag(),
-                    consumable.name
-                ));
+                self.log.add(
+                    format!(
+                        "|{}| lost item: {}",
+                        self.characters.get(user).name_tag(),
+                        consumable.name
+                    ),
+                    LogStyle::Regular,
+                );
             }
             GameEvent::CharactersDying { characters } => {
                 let mut someone_died = false;
@@ -1702,11 +1712,10 @@ impl UserInterface {
                 for char_id in characters {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {
-                        self.log.add(format!(
-                            "|{}| died |<status>{:?}|",
-                            char.name_tag(),
-                            StatusId::Dead
-                        ));
+                        self.log.add(
+                            format!("|{}| died |<status>{:?}|", char.name_tag(), StatusId::Dead),
+                            LogStyle::Regular,
+                        );
                     }
                 }
 
@@ -1725,6 +1734,7 @@ impl UserInterface {
                 self.log.add_with_details(
                     format!("Player gained money: |<value>{}|", amount),
                     &[format!("Source: |<keyword>{}|", source)],
+                    LogStyle::Regular,
                 );
                 self.sound_player.play(SoundId::Coin);
                 for char in self.characters.iter() {
@@ -2026,7 +2036,7 @@ impl UserInterface {
                 format!("gained {n} AP")
             }
             AppliedEffect::LostHealth(n, source, dmg_type) => match source {
-                DamageSource::Attack(..) | DamageSource::Ability(..) => {
+                DamageSource::Attack { .. } | DamageSource::Ability(..) => {
                     format!("was hit for |<value>{}| {}", n, dmg_type.dmg_str())
                 }
                 DamageSource::KnockbackCollision { .. } => {
@@ -2076,9 +2086,10 @@ impl UserInterface {
         if !verb_phrase.is_empty() {
             let line = format!("|{name_tag}| {verb_phrase}");
             if detail_lines.is_empty() {
-                self.log.add(line);
+                self.log.add(line, LogStyle::Regular);
             } else {
-                self.log.add_with_details(line, detail_lines);
+                self.log
+                    .add_with_details(line, detail_lines, LogStyle::Regular);
             }
         }
     }
@@ -2093,7 +2104,7 @@ impl UserInterface {
     fn handle_area_outcomes(
         &mut self,
         label: &str,
-        actor: CharacterId,
+        actor_id: CharacterId,
         start_time: f32,
         animation_color: Color,
         circle: Option<ConcreteCircle>,
@@ -2145,11 +2156,14 @@ impl UserInterface {
 
             let mut effects = vec![];
             o.outcome
-                .collect_applied_effects(actor, o.target_id, &mut effects);
+                .collect_applied_effects(actor_id, o.target_id, &mut effects);
 
             if let Some(a) = ability {
                 if o.outcome.hit_type() != HitType::Miss {
+                    let actor = self.characters.get(actor_id);
+                    let source_pos = circle.map(|c| c.center).unwrap_or(actor.pos());
                     self.game_grid.animate_ability_target_hit(
+                        source_pos,
                         o.target_id,
                         &a.audio_visuals,
                         start_time + delay,
@@ -2199,7 +2213,7 @@ impl UserInterface {
             };
             let line = format!("|{}| escaped{}", actor_name_tag, with_gold);
 
-            self.log.add(line);
+            self.log.add(line, LogStyle::Regular);
             return;
         }
 
@@ -2212,14 +2226,15 @@ impl UserInterface {
         if let Some(o) = &target_outcome {
             let target_name_tag = self.characters.get(o.target_id).name_tag();
             line.push_str(&format!(" on |{}|", target_name_tag));
-            self.log.add_with_details(line, &o.detail_lines);
+            self.log
+                .add_with_details(line, &o.detail_lines, LogStyle::Regular);
         } else {
             if let Some(o) = &area_outcome {
                 let num_targets = o.targets.len();
                 let suffix = if num_targets > 1 { "s" } else { "" };
                 line.push_str(&format!(" |<faded>({} target{})|", num_targets, suffix));
             }
-            self.log.add(line);
+            self.log.add(line, LogStyle::Regular);
         }
 
         if let Some(sound_id) = ability.audio_visuals.resolve_sound {
@@ -2236,8 +2251,13 @@ impl UserInterface {
                 self.handle_effect_was_applied(0.0, ch_id, e, &detail_lines);
             }
             if o.outcome.hit_type() != HitType::Miss {
-                self.game_grid
-                    .animate_ability_target_hit(o.target_id, &ability.audio_visuals, 0.0);
+                let actor = self.characters.get(actor_id);
+                self.game_grid.animate_ability_target_hit(
+                    actor.pos(),
+                    o.target_id,
+                    &ability.audio_visuals,
+                    0.0,
+                );
             }
             if o.outcome.hit_type() == HitType::Critical {
                 self.game_grid
@@ -2259,7 +2279,7 @@ impl UserInterface {
         }
 
         for line in extra_logs {
-            self.log.add(line);
+            self.log.add(line, LogStyle::Regular);
         }
 
         // Tiny delay before we proceed to e.g. pushing targets
@@ -2325,7 +2345,8 @@ impl UserInterface {
             self.characters.get(target).name_tag()
         );
 
-        self.log.add_with_details(line, detail_lines);
+        self.log
+            .add_with_details(line, detail_lines, LogStyle::Regular);
 
         let mut effects = vec![];
         // Don't collect circle effects here - they are handled separately further down (code reuse with ability AoE effects)
@@ -2360,72 +2381,76 @@ impl UserInterface {
     fn show_applied_effect(
         &mut self,
         applied_effect: AppliedEffect,
-        character_id: CharacterId,
+        ch_id: CharacterId,
         start_time: f32,
     ) -> bool {
         match applied_effect {
             AppliedEffect::LostActionPoints(n) => {
-                self.game_grid.animate_character_lost_ap(character_id, n);
+                self.game_grid.animate_character_lost_ap(ch_id, n);
             }
             AppliedEffect::GainedActionPoints(n) => {
                 self.sound_player
                     .play_delayed(SoundId::GainedAP, start_time);
             }
             AppliedEffect::LostHealth(amount, source, _dmg_type) => {
-                let character = self.characters.get(character_id);
+                let character = self.characters.get(ch_id);
                 if amount > 0 {
                     if source == DamageSource::Condition(Condition::Burning) {
                         self.sound_player.play_delayed(SoundId::Burning, start_time);
                     }
                     self.sound_player
                         .play_delayed(character.hurt_sound, start_time);
-                    let prev_health = self.characters.get(character_id).health.current() + amount;
+                    let prev_health = self.characters.get(ch_id).health.current() + amount;
                     self.game_grid
-                        .animate_character_health_change(character_id, prev_health, 0.9);
+                        .animate_character_health_change(ch_id, prev_health, 0.9);
 
                     match source {
                         DamageSource::KnockbackCollision { move_direction } => {
                             if move_direction != (0, 0) {
                                 self.game_grid.animate_character_bumping_into_something(
-                                    character_id,
+                                    ch_id,
                                     start_time,
                                     move_direction,
                                 );
                             } else {
-                                self.game_grid
-                                    .animate_character_shaking(character_id, start_time);
-                                self.game_grid
-                                    .animate_effect(character_id, 0.5, EffectId::Pow);
+                                self.game_grid.animate_character_shaking(ch_id, start_time);
+                                self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
                             }
                         }
                         DamageSource::Falling => {
-                            self.game_grid
-                                .animate_character_shaking(character_id, start_time);
-                            self.game_grid
-                                .animate_effect(character_id, 0.5, EffectId::Pow);
+                            self.game_grid.animate_character_shaking(ch_id, start_time);
+                            self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
                         }
-                        DamageSource::Attack(attack_type, hit_type) => {
-                            self.game_grid
-                                .animate_character_shaking(character_id, start_time);
+                        DamageSource::Attack {
+                            attack_type,
+                            hit_type,
+                            attacker_pos,
+                        } => {
+                            self.game_grid.animate_character_reeling_back_from_hit(
+                                attacker_pos,
+                                ch_id,
+                                start_time,
+                            );
                             self.play_attack_hit_sound(attack_type, hit_type, start_time);
+                            self.game_grid.animate_effect(ch_id, 0.5, EffectId::Blood);
                         }
 
                         _ => {}
                     }
                 } else {
-                    if matches!(source, DamageSource::Attack(..)) {
+                    if matches!(source, DamageSource::Attack { .. }) {
                         self.sound_player
                             .play_delayed(SoundId::ArmorAbsorbed, start_time);
+                        self.game_grid.animate_character_shaking(ch_id, start_time);
                         self.game_grid
-                            .animate_character_shaking(character_id, start_time);
+                            .animate_effect(ch_id, 0.4, EffectId::ArmorClank);
                     }
                 }
             }
             AppliedEffect::Dodged => {
                 self.sound_player
                     .play_delayed(SoundId::AttackMiss, start_time);
-                self.game_grid
-                    .animate_character_shaking(character_id, start_time);
+                self.game_grid.animate_character_shaking(ch_id, start_time);
             }
             AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => match condition {
                 Condition::Ferocity => {
@@ -2439,11 +2464,8 @@ impl UserInterface {
             _ => {}
         };
 
-        self.game_grid.add_text_effect(
-            character_id,
-            start_time,
-            TextEffect::ApplyEffect(applied_effect),
-        )
+        self.game_grid
+            .add_text_effect(ch_id, start_time, TextEffect::ApplyEffect(applied_effect))
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {

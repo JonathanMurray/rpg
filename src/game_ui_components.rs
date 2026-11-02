@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{MAGENTA, SKYBLUE, YELLOW},
+    color::{DARKBROWN, DARKPURPLE, MAGENTA, SKYBLUE, YELLOW},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
@@ -853,7 +853,14 @@ pub struct Log {
     container: Container,
     text_lines: Vec<Rc<TextLine>>,
     line_details: Vec<Option<Container>>,
-    font: Font,
+    simple_font: Font,
+    big_font: Font,
+}
+
+#[derive(PartialEq)]
+pub enum LogStyle {
+    Regular,
+    RoundStart,
 }
 
 impl Log {
@@ -861,7 +868,7 @@ impl Log {
         self.container.last_drawn_rectangle.get()
     }
 
-    pub fn new(font: Font) -> Self {
+    pub fn new(simple_font: Font, big_font: Font) -> Self {
         let h = 300.0;
         Self {
             container: Container {
@@ -891,7 +898,8 @@ impl Log {
             },
             text_lines: vec![],
             line_details: vec![],
-            font,
+            simple_font,
+            big_font,
         }
     }
 
@@ -899,11 +907,16 @@ impl Log {
         self.container.size().0
     }
 
-    pub fn add(&mut self, text: impl Into<String>) {
-        self.add_with_details(text, &[]);
+    pub fn add(&mut self, text: impl Into<String>, style: LogStyle) {
+        self.add_with_details(text, &[], style);
     }
 
-    pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
+    pub fn add_with_details(
+        &mut self,
+        text: impl Into<String>,
+        details: &[String],
+        style: LogStyle,
+    ) {
         const MAX_LINES: usize = 50;
         let text = text.into();
         if self.container.children.len() == MAX_LINES {
@@ -914,8 +927,20 @@ impl Log {
         let font_size = 16;
         //let font_size = 12;
         // TODO Support setting max width for TextLine, and having it line-wrap to fit inside the given width
-        let mut text_line = TextLine::new(text, font_size, WHITE, Some(self.font.clone()));
-        text_line.set_padding(3.0, 3.0);
+        let mut text_line = match style {
+            LogStyle::Regular => {
+                TextLine::new(text, font_size, WHITE, Some(self.simple_font.clone()))
+                    .with_padding(3.0, 3.0)
+            }
+            LogStyle::RoundStart => {
+                let mut line = TextLine::new(text, 12, WHITE, Some(self.big_font.clone()))
+                    .with_depth(BLACK, 1.0)
+                    .with_padding(3.0, 7.0);
+                line.bg_color = Some(DARKBROWN.with_alpha(0.8));
+                line
+            }
+        };
+
         text_line.set_max_width(self.container.min_width.unwrap());
         text_line.set_min_height(18.0);
         if !details.is_empty() {
@@ -939,7 +964,8 @@ impl Log {
                 children: details
                     .iter()
                     .map(|s| {
-                        let mut text = TextLine::new(s, font_size, WHITE, Some(self.font.clone()));
+                        let mut text =
+                            TextLine::new(s, font_size, WHITE, Some(self.simple_font.clone()));
                         text.set_min_height(20.0);
                         text.set_max_height(20.0);
                         Element::Text(text)

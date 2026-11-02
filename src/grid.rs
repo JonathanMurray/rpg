@@ -68,7 +68,7 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_icon, draw_status_icon, draw_terrain, draw_tiny_font,
-        effect_atlas_rect, measure_tiny_font, EffectId, IconId, LiquidType, Sprite, SpriteId,
+        measure_tiny_font, EffectId, FlipbookAnimation, IconId, LiquidType, Sprite, SpriteId,
         StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE,
         LIGHTNING_BOLT_FX,
     },
@@ -1607,24 +1607,6 @@ impl GameGrid {
                 );
             }
 
-            self.add_effect(
-                attacker_pos,
-                target_pos,
-                EffectData {
-                    start_time: delay + 0.1,
-                    end_time: delay + 0.4,
-                    variant: EffectVariant::At(
-                        EffectPosition::Destination,
-                        EffectGraphics::Circle {
-                            radius: 25.0,
-                            end_radius: Some(5.0),
-                            fill: None,
-                            stroke: Some((RED, 2.0)),
-                            fade: true,
-                        },
-                    ),
-                },
-            );
             0.1
         };
 
@@ -1892,9 +1874,74 @@ impl GameGrid {
         ));
     }
 
+    pub fn animate_character_reeling_back_from_hit(
+        &mut self,
+        attacker_pos: Position,
+        character_id: CharacterId,
+        start: f32,
+    ) {
+        let duration = 0.4;
+        let char = self.characters.get(&character_id).unwrap();
+
+        let mut rotation = PI * 0.2;
+        let dx = char.pos().0 - attacker_pos.0;
+        let dy = char.pos().1 - attacker_pos.1;
+        let attacked_from_west = dx > 0;
+        if attacked_from_west != char.is_facing_east() {
+            rotation *= -1.0;
+        }
+        let offset_cell_w = 0.2;
+        let timelines = vec![
+            (
+                SpriteProperty::CharacterRotateForward,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, rotation),
+                    PropertyUpdate::linear(0.7, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::FlipX,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, 0.15),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::SinkIntoGroundRatio,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.1, 0.1),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::CharacterXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.3, offset_cell_w * dx.signum() as f32),
+                    PropertyUpdate::fixed(0.6),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::CharacterYOffsetCellW { jump: false },
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.3, offset_cell_w * dy.signum() as f32),
+                    PropertyUpdate::fixed(0.6),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+        ];
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            start,
+            duration,
+            AnimationDetails::TransformSprite { timelines },
+        ));
+    }
+
     pub fn animate_character_spawn_from_ground(&mut self, character_id: CharacterId) -> f32 {
         let duration = 1.5;
-        //  self.animate_effect(character_id, duration, EffectId::Cloud);
 
         self.character_animations.push(CharacterAnimation::new(
             character_id,
@@ -1969,31 +2016,33 @@ impl GameGrid {
 
     pub fn animate_ability_target_hit(
         &mut self,
+        source_pos: Position,
         target_id: CharacterId,
         audio_visuals: &AudioVisuals,
         start_time: f32,
     ) {
-        if let Some(effect_id) = audio_visuals.target_effect_id {
-            self.animate_effect(target_id, 0.5, effect_id);
+        if let Some((effect_id, duration)) = audio_visuals.target_effect_id {
+            self.animate_effect(target_id, duration, effect_id);
         }
 
         if let Some(color) = audio_visuals.target_magic_sparks {
             self.animate_magic_sparks(target_id, color);
         }
 
-        self.animate_character_shaking(target_id, start_time);
+        if !self.characters.get(&target_id).unwrap().is_being_pushed() {
+            self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
+        } else {
+            self.animate_effect(target_id, 0.5, EffectId::Poof);
+        }
     }
 
     pub fn animate_effect(&mut self, character_id: CharacterId, duration: f32, effect: EffectId) {
         let pos = self.characters.get(&character_id).unwrap().pos();
-        let pos = (pos.0 as f32, pos.1 as f32 - 0.5);
+        let pos = (pos.0 as f32 + 0.5, pos.1 as f32);
         self.animate_effect_at_pos(pos, duration, effect);
     }
 
     pub fn animate_effect_at_pos(&mut self, grid_pos: (f32, f32), duration: f32, effect: EffectId) {
-        let texture = EFFECTS_TEXTURE.get().unwrap();
-
-        let rect = effect_atlas_rect(effect);
         self.effects.push(ConcreteEffect {
             age: 0.0,
             source_grid_pos: grid_pos,
@@ -2003,7 +2052,7 @@ impl GameGrid {
                 end_time: duration,
                 variant: EffectVariant::At(
                     EffectPosition::Source,
-                    EffectGraphics::Texture(texture.clone(), Some(rect)),
+                    EffectGraphics::FlipBook(FlipbookAnimation::from_effect(effect)),
                 ),
             },
         });
@@ -2051,7 +2100,7 @@ impl GameGrid {
         )];
 
         let collision_point;
-        let dist = 1.0;
+        let dist = 0.7;
         if direction.0 != 0 {
             let dx = dist * direction.0.signum() as f32;
             collision_point = (char.pos().0 as f32 + dx, char.pos().1 as f32);
@@ -2076,7 +2125,7 @@ impl GameGrid {
             ));
         }
 
-        self.animate_effect_at_pos(collision_point, 0.5, EffectId::Pow);
+        self.animate_effect_at_pos(collision_point, 0.5, EffectId::Bonk);
 
         self.character_animations.push(CharacterAnimation::new(
             character_id,
@@ -7018,7 +7067,7 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Texture(Texture2D, Option<Rect>),
+    FlipBook(FlipbookAnimation),
 }
 
 #[derive(Debug, Clone)]
@@ -7119,17 +7168,10 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Texture(texture, source) => {
-                draw_texture_ex(
-                    texture,
-                    x,
-                    y,
-                    WHITE,
-                    DrawTextureParams {
-                        source: *source,
-                        ..Default::default()
-                    },
-                );
+            EffectGraphics::FlipBook(flipbook) => {
+                let num_frames = flipbook.num_frames as f32;
+                let i = (t * num_frames).floor().min(num_frames - 1.0) as u32;
+                flipbook.draw((x, y), i);
             }
         }
     }

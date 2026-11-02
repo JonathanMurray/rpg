@@ -96,20 +96,13 @@
     "(31, 34)": "High",
     "(37, 34)": "High",
     "(37, 37)": "High",
-    "(34, 37)": "High"
+    "(34, 37)": "High",
+    "(16, 16)": "Wall",
+    "(16, 19)": "Wall",
+    "(13, 19)": "Wall",
+    "(13, 16)": "Wall"
   },
-  "terrain_objects": {
-    "(8, 12)": "BarrelsObstacle3",
-    "(26, 11)": "BarrelsObstacle",
-    "(30, 9)": "BarrelsObstacle2",
-    "(29, 11)": "BarrelsObstacle3",
-    "(31, 11)": "BarrelsObstacle3",
-    "(31, 4)": "BarrelsObstacle4",
-    "(37, 11)": "SackObstacle",
-    "(6, 11)": "SackObstacle",
-    "(13, 10)": "BarrelsObstacle4",
-    "(37, 4)": "BoxesObstacle"
-  },
+  "terrain_objects": {},
   "background": {
     "(-2, 4)": "Floor2",
     "(-2, 7)": "Floor2",
@@ -388,50 +381,16 @@
     "(40, 16)": "Floor9"
   },
   "decorations": {
-    "(25, 31)": "Staircase",
-    "(13, 19)": "Torch",
-    "(16, 7)": "StaircaseTall",
-    "(16, 19)": "WallWindow2",
-    "(1, 22)": "WallOpeningNorth"
+    "(16, 7)": "StaircaseTall"
   },
-  "surfaces": {
-    "(19, 21)": "FireSurfaceSingleCell",
-    "(13, 21)": "FireSurfaceSingleCell",
-    "(13, 23)": "FireSurfaceSingleCell",
-    "(19, 23)": "FireSurfaceSingleCell",
-    "(16, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 10)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(34, 16)": "FireSurfaceSingleCell"
-  },
+  "surfaces": {},
   "control_points": {},
   "characters": [
     {
-      "type_": "Ghoul2",
+      "type_": "Bob",
       "pos": [
-        30,
-        27
+        25,
+        16
       ],
       "health": null,
       "main_hand": null,
@@ -439,54 +398,10 @@
       "name": null
     },
     {
-      "type_": "Alice",
+      "type_": "SkeletonLeader",
       "pos": [
-        27,
-        26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        31,
-        34
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        36,
-        30
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        33,
-        28
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        34,
-        25
+        28,
+        16
       ],
       "health": null,
       "main_hand": null,

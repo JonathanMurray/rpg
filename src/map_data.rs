@@ -14,14 +14,14 @@ use crate::{
     data::{
         ADRENALIN_POTION, ARCANE_BOW, ARCANE_RING, ASSASSINS_VIAL, BAD_BOW, BAD_DAGGER, BAD_RAPIER,
         BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, BOSS_AXE,
-        CHAIN_MAIL, CHEAT_BOW, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE,
+        BRACE, CHAIN_MAIL, CHEAT_BOW, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE,
         DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
         ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS,
         FIRE_BOLT, HEALING_NOVA, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
         ICE_BOLT, INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
         LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
         SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH,
-        TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW,
+        TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW, ZERO_SWORD,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
@@ -231,7 +231,7 @@ impl CharacterType {
             CharacterType::Lootgoblin => SpriteId::Lootgoblin,
             CharacterType::Ogre => SpriteId::Ogre,
             CharacterType::Huldra => SpriteId::Huldra,
-            CharacterType::Enslaved => SpriteId::Skeleton2,
+            CharacterType::Enslaved => SpriteId::Enslaved,
             CharacterType::Ghoul1 => SpriteId::Pyromaniac,
             CharacterType::Ghoul2 => SpriteId::Ghoul,
             CharacterType::Scoundrel => SpriteId::Scoundrel,
@@ -645,24 +645,24 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
 pub fn make_high_bob(party: &Rc<Party>) -> Character {
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
-        "Bob",
+        "Test fighter",
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
         Attributes::new(5, 3, 3, 5),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_weapon(HandType::MainHand, ZERO_SWORD);
     bob.set_shield(SPIKE_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
-    bob.learn_ability(&SWEEP_ATTACK);
+    bob.learn_ability(&LIGHTNING_BOLT);
     bob.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
     // TODO: lunge attack, not working properly? Weird targetting and resulted in a
     // stackoverflow when trying to commit it
     bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(&LIGHTNING_BOLT);
+    bob.learn_ability(&BRACE);
     // TODO
     //bob.learn_ability(&KILL);
     bob.learn_ability(&DASH);

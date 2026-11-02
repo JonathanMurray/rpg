@@ -25,7 +25,6 @@ pub enum SpriteId {
     Huldra,
     Skeleton,
     SkeletonBoss,
-    Skeleton2,
     Enslaved,
     Draug,
     Lootgoblin,
@@ -64,7 +63,6 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Huldra, "huldra.png"),
         (SpriteId::Skeleton, "skeleton.png"),
         (SpriteId::SkeletonBoss, "skeleton_boss.png"),
-        (SpriteId::Skeleton2, "skeleton2.png"),
         (SpriteId::Enslaved, "enslaved.png"),
         (SpriteId::Draug, "draug.png"),
         (SpriteId::Lootgoblin, "lootgoblin.png"),
@@ -127,7 +125,6 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Huldra => 26,
         SpriteId::Skeleton => 26,
         SpriteId::SkeletonBoss => 29,
-        SpriteId::Skeleton2 => 26,
         SpriteId::Enslaved => 26,
         SpriteId::Ogre => 26,
         SpriteId::Magi => 25,
@@ -249,14 +246,6 @@ pub enum IconId {
     WeaponProficiency,
     CriticalCharge,
     Reaper,
-}
-
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum EffectId {
-    Pow,
-    Zap,
-    Bonk,
-    Cloud,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -1402,17 +1391,67 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>, fa
     );
 }
 
-pub fn effect_atlas_rect(effect: EffectId) -> Rect {
-    let (col, row) = match effect {
-        EffectId::Pow => (0, 0),
-        EffectId::Zap => (1, 0),
-        EffectId::Bonk => (0, 1),
-        EffectId::Cloud => (1, 1),
-    };
-    let icon_w = 32.0;
-    let icon_h = 32.0;
+#[derive(Debug)]
+pub struct FlipbookAnimation {
+    pub texture: Texture2D,
+    pub source_pos: (f32, f32),
+    pub source_size: (f32, f32),
+    pub num_frames: u32,
+}
 
-    Rect::new(col as f32 * icon_w, row as f32 * icon_h, icon_w, icon_h)
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum EffectId {
+    Zap,
+    Bonk,
+    Blood,
+    ArmorClank,
+    Poof,
+}
+
+impl FlipbookAnimation {
+    pub fn from_effect(effect: EffectId) -> Self {
+        let row = match effect {
+            EffectId::Zap => 0,
+            EffectId::Bonk => 1,
+            EffectId::Blood => 2,
+            EffectId::ArmorClank => 3,
+            EffectId::Poof => 4,
+        };
+        let source_size = (32.0, 32.0);
+
+        Self {
+            texture: EFFECTS_TEXTURE.get().unwrap().clone(),
+            source_pos: (0.0, row as f32 * source_size.1),
+            source_size,
+            num_frames: 3,
+        }
+    }
+
+    pub fn source_rect(&self, animation_idx: u32) -> Rect {
+        Rect::new(
+            self.source_pos.0 + self.source_size.0 * animation_idx as f32,
+            self.source_pos.1,
+            self.source_size.0,
+            self.source_size.1,
+        )
+    }
+
+    pub fn draw(&self, screen_pos: (f32, f32), animation_idx: u32) {
+        let source = self.source_rect(animation_idx);
+
+        let dest_size = (self.source_size.0 * 2.0, self.source_size.1 * 2.0);
+        draw_texture_ex(
+            &self.texture,
+            screen_pos.0 - dest_size.0 / 2.0,
+            screen_pos.1 - dest_size.1 / 2.0,
+            WHITE,
+            DrawTextureParams {
+                source: Some(source),
+                dest_size: Some(dest_size.into()),
+                ..Default::default()
+            },
+        );
+    }
 }
 
 pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {

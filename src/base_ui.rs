@@ -259,6 +259,7 @@ pub struct TextLine {
     font_size: u16,
     color: Color,
     hover_color: Option<Color>,
+    pub bg_color: Option<Color>,
     pub hover_bg_color: Option<Color>,
     min_height: f32,
     max_height: f32,
@@ -293,6 +294,7 @@ impl TextLine {
             offset_y: font_size as f32 * 0.6,
             font_size,
             color,
+            bg_color: None,
             hover_bg_color: None,
             hover_color: None,
             min_height: 0.0,
@@ -387,7 +389,6 @@ impl TextLine {
             measure_text_with_font_tags(&self.string, self.font.as_ref(), self.font_size, 1.0);
         self.size = (
             dim.width.max(0.0) + self.hor_padding * 2.0,
-            //dim.height.max(0.0) + self.vert_padding * 2.0,
             dim.offset_y.max(0.0) + self.vert_padding * 2.0,
         );
         self.size.1 = self.size.1.max(self.min_height).min(self.max_height);
@@ -414,6 +415,9 @@ impl Drawable for TextLine {
         let hovered =
             (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
 
+        if let Some(bg_color) = self.bg_color {
+            draw_rectangle(x, y, self.size.0, self.size.1, bg_color);
+        }
         if let Some(hover_bg_color) = self.hover_bg_color {
             if hovered {
                 draw_rectangle(x, y, self.size.0, self.size.1, hover_bg_color);

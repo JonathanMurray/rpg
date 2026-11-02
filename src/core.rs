@@ -91,7 +91,7 @@ impl CoreGame {
             self.set_character_part_of_active_group(player_char).await;
         }
 
-        self.log_round_start().await;
+        self.ui_handle_event(GameEvent::NewRoundStarted(0)).await;
 
         loop {
             println!(
@@ -341,7 +341,8 @@ impl CoreGame {
 
                     self.round_index += 1;
 
-                    self.log_round_start().await;
+                    self.ui_handle_event(GameEvent::NewRoundStarted(self.round_index))
+                        .await;
                 }
 
                 let game_time = self.current_time();
@@ -363,14 +364,6 @@ impl CoreGame {
                 }
             }
         }
-    }
-
-    async fn log_round_start(&self) {
-        self.log(format!(
-            "~ |<sword>| ROUND {} |<sword>| ~",
-            self.round_index + 1
-        ))
-        .await;
     }
 
     async fn spawn_undeads_at_start_of_battle(&self) {
@@ -404,7 +397,7 @@ impl CoreGame {
         // First collect everyone that is being pushed
         let mut pushed_chars: HashMap<CharacterId, PushVector> = Default::default();
         for ch in self.characters.iter() {
-            if let Some(vector) = ch.is_being_pushed.take() {
+            if let Some(vector) = ch.push_vector.take() {
                 pushed_chars.insert(ch.id(), vector);
             }
         }
@@ -1545,7 +1538,7 @@ impl CoreGame {
                 let push_amount = effective_push_amount(base_push_amount, giver, receiver);
                 if push_amount > 0 {
                     let vector = pushed_vector(source_pos, receiver.pos(), push_amount);
-                    receiver.is_being_pushed.set(Some(vector));
+                    receiver.push_vector.set(Some(vector));
                     actual_effect = Some(AppliedEffect::WasPushed(base_push_amount));
                     format!(
                         "  |{}| was knocked back ({})",
@@ -2510,7 +2503,11 @@ impl CoreGame {
                         } else {
                             AttackType::Melee
                         };
-                        DamageSource::Attack(attack_type, hit_type)
+                        DamageSource::Attack {
+                            attack_type,
+                            hit_type,
+                            attacker_pos: caster.pos(),
+                        }
                     });
 
                 applied_effects.push(AppliedEffect::LostHealth(
@@ -2649,12 +2646,14 @@ impl CoreGame {
         }
         target.set_engaged_by(Rc::clone(actor));
         actor.engagement_target.set(Some(target.id()));
+        actor.set_facing_toward(target.pos());
 
         // Counter engagement happens automatically if the target was "idle"
         println!("--------------");
         dbg!(target.engagement_target.get());
         if target.engagement_target.get().is_none() {
             target.engagement_target.set(Some(actor.id()));
+            target.set_facing_toward(actor.pos());
             actor.set_engaged_by(Rc::clone(target));
         }
         dbg!(target.engagement_target.get());
@@ -3179,7 +3178,11 @@ impl CoreGame {
 
                     applied_to_target.push(AppliedEffect::LostHealth(
                         damage,
-                        DamageSource::Attack(attack_type, hit_type),
+                        DamageSource::Attack {
+                            attack_type,
+                            hit_type,
+                            attacker_pos: attacker.pos(),
+                        },
                         DamageType::Regular,
                     ));
 
@@ -4281,6 +4284,7 @@ pub struct MovedEvent {
 
 #[derive(Debug, Clone)]
 pub enum GameEvent {
+    NewRoundStarted(u32),
     LogLine(String),
     GameOver(GameOverType),
     PlayerGainedMoney {
@@ -4372,11 +4376,17 @@ pub struct CollisionEvent {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DamageSource {
     Condition(Condition),
-    KnockbackCollision { move_direction: (i32, i32) },
+    KnockbackCollision {
+        move_direction: (i32, i32),
+    },
     Falling,
     SpikesSurface,
     FireSurface,
-    Attack(AttackType, HitType),
+    Attack {
+        attack_type: AttackType,
+        hit_type: HitType,
+        attacker_pos: Position,
+    },
     Ability(AbilityId),
     Unknown,
     Thorns,
@@ -5656,7 +5666,7 @@ pub struct AudioVisuals {
     pub resolve_sound: Option<SoundId>,
     pub charge_fx: Option<AbilityChargeFx>,
     pub speech: &'static str,
-    pub target_effect_id: Option<EffectId>,
+    pub target_effect_id: Option<(EffectId, f32)>,
     pub target_magic_sparks: Option<Color>,
 }
 
@@ -6596,7 +6606,7 @@ pub struct Character {
     recently_received_damage_types: RefCell<HashSet<DamageType>>,
 
     pub facing: Cell<CharacterFacing>,
-    is_being_pushed: Cell<Option<PushVector>>,
+    push_vector: Cell<Option<PushVector>>,
     pub has_escaped_from_battle: Cell<bool>,
 }
 
@@ -6684,9 +6694,13 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             recently_received_damage_types: Default::default(),
             facing: Cell::new(CharacterFacing::West),
-            is_being_pushed: Cell::new(None),
+            push_vector: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
         }
+    }
+
+    pub fn is_being_pushed(&self) -> bool {
+        self.push_vector.get().is_some()
     }
 
     /// How far can the character move this turn, given its current resources
@@ -7408,7 +7422,7 @@ impl Character {
                         self.pos(),
                         target_position,
                     ) {
-                        (Range::Melee, ActionReach::YesButDisadvantage("Too close"))
+                        (Range::Melee, ActionReach::YesButDisadvantage("Melee"))
                     } else {
                         (weapon_range.into_range(), ActionReach::Yes)
                     }
