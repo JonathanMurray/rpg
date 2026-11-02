@@ -36,7 +36,7 @@ use rpg::textures::{
     WallOrientation, WaterOrientation,
 };
 
-const DEFAULT_FILENAME: &str = "ogre_room.json";
+const DEFAULT_FILENAME: &str = "test2.json";
 
 #[macroquad::main(window_conf)]
 async fn main() {

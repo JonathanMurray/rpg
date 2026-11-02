@@ -256,12 +256,7 @@ impl CoreGame {
                 }
             }
 
-            for ch in self.characters.iter() {
-                // TODO push all the characters in parallel, instead of each one separately
-                if let Some(vector) = ch.is_being_pushed_along_vector.take() {
-                    self.perform_character_pushed(ch, vector).await?;
-                }
-            }
+            self.perform_pushed_characters().await?;
 
             // We must make sure to have a valid (alive, existing) active_character_id before handing over control
             // to the UI, as it may ask us about the active character.
@@ -405,164 +400,256 @@ impl CoreGame {
         }
     }
 
-    async fn perform_character_pushed(
-        &self,
-        character: &Rc<Character>,
-        vector: (i32, i32),
-    ) -> Result<(), QuitEvent> {
-        assert!(
-            vector != (0, 0) && (vector.0 == 0 || vector.1 == 0),
-            "invalid push vector: {:?}",
-            vector
-        );
-        let char_pos = character.pos();
-        let dx = vector.0.signum();
-        let dy = vector.1.signum();
-        let planned_distance = vector.0.abs() + vector.1.abs();
+    async fn perform_pushed_characters(&self) -> Result<(), QuitEvent> {
+        // First collect everyone that is being pushed
+        let mut pushed_chars: HashMap<CharacterId, PushVector> = Default::default();
+        for ch in self.characters.iter() {
+            if let Some(vector) = ch.is_being_pushed.take() {
+                pushed_chars.insert(ch.id(), vector);
+            }
+        }
 
-        let mut colliding_chars: Vec<&Character> = Vec::new();
-        let mut grounded_paths = vec![vec![]];
-        {
-            let mut falling = false;
-            let mut pos = char_pos;
-            for i in 0.. {
-                dbg!(pos);
-                if let Some(collision) = self
-                    .pathfind_grid
-                    .check_collision(Some(Occupation::Character(character.id())), pos)
-                {
-                    dbg!(&collision);
-                    match collision {
-                        Collision::Characters(chars) => {
-                            if !falling {
-                                colliding_chars = vec![character];
-                                for other_id in chars {
-                                    colliding_chars.push(self.characters.get(other_id));
+        while !pushed_chars.is_empty() {
+            let mut not_yet_handled: HashSet<CharacterId> = pushed_chars.keys().copied().collect();
+            let mut handled: HashSet<CharacterId> = Default::default();
+            let mut pending_moves = vec![];
+            let mut pending_collisions = vec![];
+            let mut movement_deadlock = false;
+            while !not_yet_handled.is_empty() {
+                let n = not_yet_handled.len();
+                dbg!(&handled);
+                dbg!(&not_yet_handled);
+                for (ch_id, vector) in pushed_chars.iter_mut() {
+                    if handled.contains(ch_id) {
+                        // Was already handled in a previous iteration - should not be moved further right now
+                        println!("Already handled char...");
+                        continue;
+                    }
+
+                    let char = self.characters.get_rc(*ch_id);
+                    println!("Performing 'push one step' ...");
+                    let outcome = self
+                        .perform_character_pushed_one_step(char, *vector)
+                        .await?;
+
+                    dbg!(&outcome);
+
+                    //dbg!((char.id(), &outcome));
+
+                    let mut defer_this_char = false;
+                    // If all remaining characters have become deadlocked, they shouldn't defer any longer.
+                    // It's probably a frontal collision.
+                    if !movement_deadlock {
+                        if let PushOutcome::Collision { others } = &outcome {
+                            for other_id in others {
+                                if not_yet_handled.contains(other_id) {
+                                    // We are colliding into a character that hasn't yet performed its movement.
+                                    // Let that character (potentially) move, and then retry in the next iteration
+                                    println!("Deferring this char...");
+                                    defer_this_char = true;
                                 }
-                            }
-                            // Even if falling, we break here. Cannot fall down on characters on lower elevation.
-                            // Would require moving the character to make space for this one, which we don't bother with yet
-                            break;
-                        }
-                        Collision::Elevation => {
-                            if !falling {
-                                if self.pathfind_grid.elevation(char_pos).is_some() {
-                                    let remaining = planned_distance - i;
-                                    falling = true;
-                                    // The current grounded path is now complete and a new may begin after landing
-                                    grounded_paths.push(vec![]);
-                                    if remaining < 2 {
-                                        // Not enough speed => character will keep their balance and not fall over the edge
-                                        break;
-                                    }
-                                } else {
-                                    // Colliding into a wall
-                                    colliding_chars = vec![character];
-                                    break;
-                                }
-                            }
-                        }
-                        Collision::Terrain => {
-                            // Ignore terrain collision while falling, to not collide with a ledge that we're falling off
-                            if !falling {
-                                colliding_chars = vec![character];
-                                break;
                             }
                         }
                     }
-                } else {
-                    falling = false;
-                    let current_path = grounded_paths.last_mut().unwrap();
-                    current_path.push(pos);
-                }
 
-                // No more momentum => character comes to a stop without colliding
-                if !falling && i >= planned_distance {
-                    break;
-                }
+                    if !defer_this_char {
+                        match &outcome {
+                            PushOutcome::Collision { others } => {
+                                let collision_force = vector.distance();
+                                let description = if others.is_empty() {
+                                    "Collision into terrain"
+                                } else {
+                                    "Collision into others"
+                                };
 
-                pos.0 += dx;
-                pos.1 += dy;
+                                pending_collisions.push(CollisionEvent {
+                                    character_id: *ch_id,
+                                    damage: collision_force,
+                                    description: description.to_string(),
+                                    move_direction: vector.xy(),
+                                });
+                                let char_name = &self.characters.get(*ch_id).name;
+                                for collider in others {
+                                    pending_collisions.push(CollisionEvent {
+                                        character_id: *collider,
+                                        damage: collision_force,
+                                        description: format!("Collision by {}", char_name),
+                                        move_direction: (0, 0),
+                                    });
+                                }
+                                // Collision => No longer being pushed.
+                                *vector = PushVector::zero();
+                            }
+                            PushOutcome::BalanceOnLedge => {
+                                self.ui_handle_event(GameEvent::CharacterBalancedOnEdge {
+                                    character: *ch_id,
+                                    direction: vector.xy(),
+                                })
+                                .await;
+                                // Stopped at ledge => No longer being pushed
+                                *vector = PushVector::zero();
+                            }
+                            PushOutcome::Move {
+                                destination,
+                                move_type,
+                            } => {
+                                let distance = ((destination.0 - char.pos().0).abs()
+                                    + (destination.1 - char.pos().1).abs())
+                                    as u32;
+                                dbg!(distance);
+
+                                // We will animate the movement of all characters concurrently, later
+                                pending_moves.push((
+                                    *ch_id,
+                                    char.pos(),
+                                    *destination,
+                                    move_type.movement_type(),
+                                ));
+                                // But we have to update the character's position here already, to free the position
+                                // for any other character moving behind us, along the same path
+                                self.change_character_position(char, *destination).await;
+
+                                vector.decrement(distance);
+                            }
+                        }
+
+                        handled.insert(*ch_id);
+                        not_yet_handled.remove(ch_id);
+                    }
+                }
+                // All characters were delayed in this iteration, i.e. they all wait for eachother to (possibly) move before committing to
+                // a collision outcome. Now they'll be forbidden to defer.
+                movement_deadlock = n == not_yet_handled.len();
             }
+
+            pushed_chars.retain(|_, vector| !vector.is_zero());
+
+            dbg!(&pending_moves);
+            dbg!(&pending_collisions);
+
+            self.animate_pending_moves(&pending_moves).await?;
+
+            // All the characters that are being pushed lose all their engagements (incoming and outgoing)
+            // (You can't actively engage in melee combat with someone who's being pushed around)
+            for (ch_id, ..) in pending_moves.iter().copied() {
+                let char = self.characters.get(ch_id);
+                for other in self.characters.iter() {
+                    other.set_not_engaged_by(ch_id);
+                    other.set_not_engaging(ch_id);
+                    char.set_not_engaged_by(other.id());
+                    char.set_not_engaging(other.id());
+                }
+            }
+
+            self.on_character_positions_changed();
+
+            self.perform_pending_collisions(pending_collisions).await;
         }
 
-        dbg!(&grounded_paths);
-        let destination = grounded_paths
-            .iter()
-            .filter(|p| !p.is_empty())
-            .last()
-            .unwrap()
-            .last()
-            .unwrap();
-        dbg!(destination);
-        let total_distance =
-            (destination.0 - char_pos.0).abs() + (destination.1 - char_pos.1).abs();
-        dbg!(total_distance);
-
-        let mut previous_pos = char_pos;
-        for path in grounded_paths {
-            dbg!("Moving along path:", &path);
-            if !path.is_empty() {
-                if previous_pos != path[0] {
-                    self.perform_movement(
-                        character.id(),
-                        vec![previous_pos, path[0]],
-                        MovementType::Falling,
-                    )
-                    .await?;
-
-                    self.perform_losing_health(
-                        character,
-                        2,
-                        DamageSource::Falling,
-                        DamageType::Regular,
-                    )
-                    .await;
-                }
-                previous_pos = *path.last().unwrap();
-                if path.len() > 1 {
-                    self.perform_movement(character.id(), path, MovementType::KnockedBack)
-                        .await?;
-                }
-            } else {
-                self.ui_handle_event(GameEvent::CharacterBalancedOnEdge {
-                    character: character.id(),
-                    direction: vector,
-                })
-                .await;
-            }
-        }
-
-        let original_distance = vector.0.abs() + vector.1.abs();
-        dbg!(vector, original_distance);
-        let total_collision_dmg =
-            (original_distance - total_distance.min(original_distance)) as usize;
-        dbg!(total_collision_dmg);
-
-        if total_collision_dmg > 0 && !colliding_chars.is_empty() {
-            // Dive the damage evenly among all colliding characters
-            let collision_dmg = (total_collision_dmg / colliding_chars.len()) as u32;
-            let mut remainder = (total_collision_dmg % colliding_chars.len()) as u32;
-            for ch in colliding_chars {
-                let mut dmg = collision_dmg;
-                if remainder > 0 {
-                    remainder -= 1;
-                    dmg += 1;
-                }
-                let dmg = total_collision_dmg as u32;
-                if dmg > 0 {
-                    self.perform_losing_health(
-                        ch,
-                        dmg,
-                        DamageSource::KnockbackCollision,
-                        DamageType::Regular,
-                    )
-                    .await;
-                }
-            }
-        }
+        println!("DONE");
 
         Ok(())
+    }
+
+    async fn perform_pending_collisions(&self, pending_collisions: Vec<CollisionEvent>) {
+        let mut collisions = vec![];
+        for mut collision in pending_collisions {
+            let health_lost = self.character_lose_health(
+                self.characters.get(collision.character_id),
+                collision.damage,
+                Some(DamageType::Regular),
+            );
+            collision.damage = health_lost;
+            collisions.push(collision);
+        }
+        self.ui_handle_event(GameEvent::CharactersCollided { collisions })
+            .await;
+    }
+
+    async fn perform_character_pushed_one_step(
+        &self,
+        character: &Character,
+        vector: PushVector,
+    ) -> Result<PushOutcome, QuitEvent> {
+        let vector = vector.xy();
+
+        let dx = vector.0.signum();
+        let dy = vector.1.signum();
+        let remaining_dist = vector.0.abs() + vector.1.abs();
+
+        let mut falling = false;
+        let mut next_pos = character.pos();
+
+        const MAX_ITERATIONS: u32 = 10;
+
+        for _ in 0..MAX_ITERATIONS {
+            next_pos.0 += dx;
+            next_pos.1 += dy;
+            dbg!(next_pos);
+            if let Some(collision) = self
+                .pathfind_grid
+                .check_collision(Some(Occupation::Character(character.id())), next_pos)
+            {
+                dbg!(&collision);
+                match collision {
+                    Collision::Characters(chars) => {
+                        if falling {
+                            // Landing spot blocked by characters => just pretend we never fell of the ledge, to keep things simple
+                            return Ok(PushOutcome::BalanceOnLedge);
+                        } else {
+                            // Colliding with other characters
+                            let mut others = vec![];
+                            for other_id in chars {
+                                others.push(other_id);
+                            }
+                            return Ok(PushOutcome::Collision { others });
+                        }
+                    }
+                    Collision::Elevation => {
+                        if !falling {
+                            if self.pathfind_grid.elevation(character.pos()).is_some() {
+                                if remaining_dist < 2 {
+                                    // Too low speed to fall of the ledge; the character manages to keep their balance
+                                    return Ok(PushOutcome::BalanceOnLedge);
+                                } else {
+                                    // Falling of a ledge
+                                    falling = true;
+                                    println!("Started falling.");
+                                }
+                            } else {
+                                // Colliding into a wall
+                                return Ok(PushOutcome::Collision { others: vec![] });
+                            }
+                        }
+                    }
+                    Collision::Terrain => {
+                        // Ignore terrain collision while falling, to not collide with a ledge that we're falling off
+                        if !falling {
+                            return Ok(PushOutcome::Collision { others: vec![] });
+                        }
+                    }
+                }
+            } else {
+                // No collision => either we landed after falling, or we moved successfully along the ground
+                let move_type = if falling {
+                    PushMoveType::Air
+                } else {
+                    PushMoveType::Ground
+                };
+
+                return Ok(PushOutcome::Move {
+                    destination: next_pos,
+                    move_type,
+                });
+            }
+
+            // We're simulating a fall; keep iterating and look for a landing spot
+            assert_eq!(falling, true);
+        }
+
+        // No successful destination was found even after all iterations (can happen if the push vector leads out of the game grid)
+        // Treat as "balancing on ledge"
+        return Ok(PushOutcome::BalanceOnLedge);
     }
 
     async fn notify_ui_of_new_active_char(&self) {
@@ -926,6 +1013,36 @@ impl CoreGame {
         }
     }
 
+    async fn animate_pending_moves(
+        &self,
+        moves: &[(CharacterId, Position, Position, MovementType)],
+    ) -> Result<(), QuitEvent> {
+        let mut moved_events = vec![];
+        for (ch_id, from, to, movement_type) in moves.iter().copied() {
+            moved_events.push(MovedEvent {
+                character: ch_id,
+                from,
+                to,
+                movement_type,
+                // TODO: is it a problem that we pretend zero step_idx here? no footstep sounds since knockback...
+                step_idx: 0,
+            })
+        }
+
+        self.ui_handle_event(GameEvent::ManyMoved(moved_events))
+            .await;
+
+        for (ch_id, _from, _to, movement_type) in moves.iter().copied() {
+            if movement_type == MovementType::Falling {
+                let char = self.characters.get(ch_id);
+                self.perform_losing_health(char, 2, DamageSource::Falling, DamageType::Regular)
+                    .await;
+            }
+        }
+
+        Ok(())
+    }
+
     async fn perform_movement(
         &self,
         character_id: CharacterId,
@@ -1018,69 +1135,23 @@ impl CoreGame {
                 break;
             }
 
-            let prev_position = character.position.get();
             let id = character.id();
-
-            self.pathfind_grid
-                .remove_occupied(prev_position, Occupation::Character(id));
-            self.pathfind_grid
-                .set_occupied(new_position, Occupation::Character(id));
 
             if movement_type != MovementType::KnockedBack {
                 character.set_facing_toward(new_position);
             }
 
-            let new_surface = self.pathfind_grid.surface(new_position);
-
-            self.ui_handle_event(GameEvent::Moved {
+            self.ui_handle_event(GameEvent::Moved(MovedEvent {
                 character: id,
-                from: prev_position,
+                from: character.pos(),
                 to: new_position,
                 movement_type,
                 step_idx,
-                surface: new_surface,
-            })
+            }))
             .await;
 
-            let prev_surface = self.pathfind_grid.surface(character.pos());
-            if character.is_swamp_dweller() {
-                if new_surface.is_none() && prev_surface == Some(Surface::Poison) {
-                    self.handle_swamp_dweller_left_poison(character).await;
-                }
-            }
-
-            if new_surface == Some(Surface::Spikes) {
-                self.perform_losing_health(
-                    character,
-                    1,
-                    DamageSource::SpikesSurface,
-                    DamageType::Regular,
-                )
+            self.change_character_position(character, new_position)
                 .await;
-            }
-
-            if let Some(surface) = new_surface {
-                if prev_surface != new_surface {
-                    self.on_enter_or_start_turn_in_surface(character, surface)
-                        .await;
-                }
-            }
-
-            character.set_position(new_position);
-
-            if character.is_swamp_dweller() {
-                let surface = self.pathfind_grid.surface(character.pos());
-                if surface == Some(Surface::Water) {
-                    self.perform_environment_effect(
-                        EnvironmentEffect::ConvertSurface(Surface::Water, Surface::Poison),
-                        character.pos(),
-                        &mut vec![],
-                    )
-                    .await;
-                }
-            }
-
-            self.handle_character_standing_on_surface(character).await;
 
             positions.remove(0);
             step_idx += 1;
@@ -1128,6 +1199,8 @@ impl CoreGame {
         )
         .await;
         self.on_non_ability_attack(event).await;
+        self.ui_handle_event(GameEvent::AfterOpportunityAttack)
+            .await;
     }
 
     async fn on_enter_or_start_turn_in_surface(&self, character: &Character, surface: Surface) {
@@ -1200,7 +1273,7 @@ impl CoreGame {
         }
     }
 
-    async fn handle_swamp_dweller_left_poison(&self, character: &Rc<Character>) {
+    async fn handle_swamp_dweller_left_poison(&self, character: &Character) {
         let mut poison_area = vec![];
         self.pathfind_grid.traverse_surface_cells(
             character.pos(),
@@ -1272,6 +1345,54 @@ impl CoreGame {
         }
 
         num_adjacent_enemies
+    }
+
+    async fn change_character_position(&self, character: &Character, new_position: Position) {
+        let prev_position = character.pos();
+        let new_surface = self.pathfind_grid.surface(new_position);
+
+        self.pathfind_grid
+            .change_character_position(character.id(), prev_position, new_position);
+
+        let prev_surface = self.pathfind_grid.surface(character.pos());
+        if character.is_swamp_dweller() {
+            if new_surface.is_none() && prev_surface == Some(Surface::Poison) {
+                self.handle_swamp_dweller_left_poison(character).await;
+            }
+        }
+
+        if new_surface == Some(Surface::Spikes) {
+            self.perform_losing_health(
+                character,
+                1,
+                DamageSource::SpikesSurface,
+                DamageType::Regular,
+            )
+            .await;
+        }
+
+        if let Some(surface) = new_surface {
+            if prev_surface != new_surface {
+                self.on_enter_or_start_turn_in_surface(character, surface)
+                    .await;
+            }
+        }
+
+        character.set_position(new_position);
+
+        if character.is_swamp_dweller() {
+            let surface = self.pathfind_grid.surface(character.pos());
+            if surface == Some(Surface::Water) {
+                self.perform_environment_effect(
+                    EnvironmentEffect::ConvertSurface(Surface::Water, Surface::Poison),
+                    character.pos(),
+                    &mut vec![],
+                )
+                .await;
+            }
+        }
+
+        self.handle_character_standing_on_surface(character).await;
     }
 
     fn on_character_positions_changed(&self) {
@@ -1424,7 +1545,7 @@ impl CoreGame {
                 let push_amount = effective_push_amount(base_push_amount, giver, receiver);
                 if push_amount > 0 {
                     let vector = pushed_vector(source_pos, receiver.pos(), push_amount);
-                    receiver.is_being_pushed_along_vector.set(Some(vector));
+                    receiver.is_being_pushed.set(Some(vector));
                     actual_effect = Some(AppliedEffect::WasPushed(base_push_amount));
                     format!(
                         "  |{}| was knocked back ({})",
@@ -2461,7 +2582,9 @@ impl CoreGame {
                     detail_lines.push(format!("|{}| lost |<keyword>Protected|", target.name_tag()));
                 }
 
-                if are_entities_within_melee(caster.pos(), target.pos()) {
+                if caster.has_equipped_melee_weapon()
+                    && are_entities_within_melee(caster.pos(), target.pos())
+                {
                     game.update_engagement(caster, target);
                 }
             }
@@ -3237,9 +3360,6 @@ impl CoreGame {
 
         if let Some(arrow) = used_arrow.as_ref() {
             if let Some(circle_effect) = &arrow.circle_effect {
-                detail_lines.push("".to_string());
-                detail_lines.push(format!("{}:", arrow.name));
-
                 // Need box pin to avoid
                 // error[E0733]: recursion in an async fn requires boxing
                 let area_target_outcomes = Box::pin(Self::perform_ability_area_effect(
@@ -3652,13 +3772,13 @@ pub fn effective_push_amount(base_amount: u32, pusher: &Character, target: &Char
     (base_amount as i32 + change).max(0) as u32
 }
 
-pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) -> (i32, i32) {
+pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) -> PushVector {
     let dx = receiver_pos.0 - source_pos.0;
     let dy = receiver_pos.1 - source_pos.1;
     if dx.abs() >= dy.abs() {
-        (amount as i32 * dx.signum(), 0)
+        PushVector::X(amount as i32 * dx.signum())
     } else {
-        (0, amount as i32 * dy.signum())
+        PushVector::Y(amount as i32 * dy.signum())
     }
 }
 
@@ -4151,6 +4271,15 @@ pub enum GameOverType {
 }
 
 #[derive(Debug, Clone)]
+pub struct MovedEvent {
+    pub character: CharacterId,
+    pub from: Position,
+    pub to: Position,
+    pub movement_type: MovementType,
+    pub step_idx: u32,
+}
+
+#[derive(Debug, Clone)]
 pub enum GameEvent {
     LogLine(String),
     GameOver(GameOverType),
@@ -4171,14 +4300,8 @@ pub enum GameEvent {
         character: CharacterId,
         positions: Vec<Position>,
     },
-    Moved {
-        character: CharacterId,
-        from: Position,
-        to: Position,
-        movement_type: MovementType,
-        step_idx: u32,
-        surface: Option<Surface>,
-    },
+    ManyMoved(Vec<MovedEvent>),
+    Moved(MovedEvent),
     CharacterReactedToAttacked {
         reactor: CharacterId,
     },
@@ -4196,6 +4319,7 @@ pub enum GameEvent {
         target_reaction: Option<(CharacterId, bool)>,
     },
     Attacked(AttackedEvent),
+    AfterOpportunityAttack,
     AbilityWasInitiated {
         actor: CharacterId,
         ability: &'static Ability,
@@ -4227,6 +4351,9 @@ pub enum GameEvent {
         applied_effect: AppliedEffect,
         source: &'static str,
     },
+    CharactersCollided {
+        collisions: Vec<CollisionEvent>,
+    },
     CharacterChangedEquipment,
     CharacterBalancedOnEdge {
         character: CharacterId,
@@ -4234,10 +4361,18 @@ pub enum GameEvent {
     },
 }
 
+#[derive(Debug, Clone)]
+pub struct CollisionEvent {
+    pub character_id: CharacterId,
+    pub damage: u32,
+    pub description: String,
+    pub move_direction: (i32, i32),
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DamageSource {
     Condition(Condition),
-    KnockbackCollision,
+    KnockbackCollision { move_direction: (i32, i32) },
     Falling,
     SpikesSurface,
     FireSurface,
@@ -4251,7 +4386,7 @@ impl DamageSource {
     pub fn name(&self) -> &'static str {
         match self {
             DamageSource::Condition(condition) => condition.name(),
-            DamageSource::KnockbackCollision => "Collision",
+            DamageSource::KnockbackCollision { .. } => "Collision",
             DamageSource::Falling => "Falling",
             DamageSource::SpikesSurface => "Spikes",
             DamageSource::FireSurface => "Fire",
@@ -4689,6 +4824,33 @@ impl Characters {
 
     pub fn as_map(&self) -> HashMap<CharacterId, Rc<Character>> {
         self.0.iter().map(|ch| (ch.id(), Rc::clone(ch))).collect()
+    }
+}
+
+#[derive(Debug)]
+enum PushOutcome {
+    Collision {
+        others: Vec<CharacterId>,
+    },
+    BalanceOnLedge,
+    Move {
+        destination: Position,
+        move_type: PushMoveType,
+    },
+}
+
+#[derive(Debug)]
+enum PushMoveType {
+    Ground,
+    Air,
+}
+
+impl PushMoveType {
+    fn movement_type(&self) -> MovementType {
+        match self {
+            PushMoveType::Ground => MovementType::KnockedBack,
+            PushMoveType::Air => MovementType::Falling,
+        }
     }
 }
 
@@ -6333,6 +6495,53 @@ impl CharacterFacing {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum PushVector {
+    X(i32),
+    Y(i32),
+}
+
+impl PushVector {
+    pub fn xy(&self) -> (i32, i32) {
+        match self {
+            PushVector::X(x) => (*x, 0),
+            PushVector::Y(y) => (0, *y),
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.xy() == (0, 0)
+    }
+
+    fn distance(&self) -> u32 {
+        let (x, y) = self.xy();
+        (x.abs() + y.abs()) as u32
+    }
+
+    fn zero() -> Self {
+        Self::X(0)
+    }
+
+    pub fn decrement(&mut self, n: u32) {
+        match self {
+            PushVector::X(x) => {
+                if *x < 0 {
+                    *x = (*x + n as i32).min(0)
+                } else if *x > 0 {
+                    *x = (*x - n as i32).max(0)
+                }
+            }
+            PushVector::Y(y) => {
+                if *y < 0 {
+                    *y = (*y + n as i32).min(0)
+                } else if *y > 0 {
+                    *y = (*y - n as i32).max(0)
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Character {
     id: Cell<Option<CharacterId>>,
@@ -6347,7 +6556,7 @@ pub struct Character {
     pub name: String,
     pub portrait: PortraitId,
 
-    pub damage_sound: SoundId,
+    pub hurt_sound: SoundId,
     pub sprite: SpriteId,
     pub kind: CharacterKind,
     pub position: Cell<Position>,
@@ -6378,6 +6587,8 @@ pub struct Character {
     pub known_ability_enhancements: RefCell<Vec<&'static AbilityEnhancement>>,
     pub known_passive_skills: RefCell<Vec<PassiveSkill>>,
 
+    // TODO: simplify - remove is_engaged_by and only rely on each character to track who it's engaging instead?
+    // Too errorprone and cumbersome to track both directions. Most likely not worth the micro-optimization
     pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
     pub engagement_target: Cell<Option<CharacterId>>,
 
@@ -6385,7 +6596,7 @@ pub struct Character {
     recently_received_damage_types: RefCell<HashSet<DamageType>>,
 
     pub facing: Cell<CharacterFacing>,
-    is_being_pushed_along_vector: Cell<Option<(i32, i32)>>,
+    is_being_pushed: Cell<Option<PushVector>>,
     pub has_escaped_from_battle: Cell<bool>,
 }
 
@@ -6401,7 +6612,7 @@ impl Character {
     pub fn new(
         kind: CharacterKind,
         name: impl Into<String>,
-        damage_sound: SoundId,
+        hurt_sound: SoundId,
         portrait: PortraitId,
         sprite: SpriteId,
         base_attributes: Attributes,
@@ -6421,7 +6632,6 @@ impl Character {
         let max_stamina = base_attributes.max_stamina();
         let capacity = base_attributes.capacity();
         let action_points = NumberedResource::new(MAX_ACTION_POINTS);
-        action_points.current.set(ACTION_POINTS_PER_TURN);
         Self {
             id: Cell::new(None),
             index_in_round: Cell::new(None),
@@ -6431,7 +6641,7 @@ impl Character {
             has_used_off_hand_reaction_this_round: Cell::new(false),
             is_part_of_active_group: Cell::new(false),
             portrait,
-            damage_sound,
+            hurt_sound,
             sprite,
             kind,
             position: Cell::new(position),
@@ -6474,7 +6684,7 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             recently_received_damage_types: Default::default(),
             facing: Cell::new(CharacterFacing::West),
-            is_being_pushed_along_vector: Cell::new(None),
+            is_being_pushed: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
         }
     }
@@ -6534,6 +6744,10 @@ impl Character {
         } else if dx < 0 {
             self.facing.set(CharacterFacing::West);
         }
+    }
+
+    pub fn is_facing_east(&self) -> bool {
+        self.facing.get().is_east()
     }
 
     fn set_position(&self, new_pos: Position) {

@@ -411,7 +411,7 @@ pub fn create_character(
             // TODO these should have archer behaviour, i.e. run away from melee
             let ghoul = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 11.0),
-                "Ghoul",
+                "Troublemaker",
                 SoundId::Damage,
                 PortraitId::Pyromaniac,
                 char_data.type_.sprite_id(),
@@ -679,7 +679,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
     let alice = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
-        "Ylva",
+        "Test archer",
         SoundId::DamageFemale,
         PortraitId::Alice,
         SpriteId::Alice,
@@ -688,7 +688,9 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     );
     alice.set_weapon(HandType::MainHand, BAD_BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(&FIRE_ARROWS, 3)));
+    alice
+        .arrows
+        .set(Some(ArrowStack::new(&EXPLODING_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
         &EXPLODING_ARROWS,
         2,

@@ -1,0 +1,111 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Debug unit tests in library 'rpg'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'editor'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=editor"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'editor'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=editor"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'game'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=game"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'game'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=game"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'skilltree'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=skilltree"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'skilltree'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=skilltree"
+                ]
+            }
+        },
+        {
+            "name": "Debug example 'letterbox'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--example=letterbox"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in example 'letterbox'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--example=letterbox"
+                ]
+            }
+        }
+    ]
+}

@@ -10,22 +10,22 @@
     "(40, 25)": "High",
     "(40, 22)": "Wall",
     "(1, 4)": "Wall",
-    "(7, 22)": "Wall",
+    "(28, 25)": "High",
     "(1, 1)": "Wall",
     "(10, 1)": "Wall",
-    "(10, 22)": "Wall",
+    "(25, 25)": "High",
     "(1, 22)": "Wall",
     "(7, 1)": "Wall",
     "(4, 1)": "Wall",
-    "(7, 25)": "Wall",
+    "(31, 31)": "High",
     "(7, 7)": "Wall",
     "(19, 4)": "Wall",
-    "(4, 25)": "Wall",
+    "(31, 28)": "High",
     "(4, 37)": "Wall",
     "(1, 13)": "Wall",
     "(25, 28)": "High",
     "(16, 4)": "Wall",
-    "(10, 25)": "Wall",
+    "(28, 34)": "High",
     "(19, 1)": "Wall",
     "(4, 7)": "Wall",
     "(40, 31)": "Wall",
@@ -34,7 +34,7 @@
     "(7, 37)": "Wall",
     "(1, 37)": "Wall",
     "(1, 34)": "Wall",
-    "(22, 31)": "High",
+    "(31, 25)": "High",
     "(1, 43)": "Wall",
     "(25, 31)": "High",
     "(22, 40)": "Wall",
@@ -76,7 +76,7 @@
     "(4, 4)": "Wall",
     "(37, 46)": "High",
     "(1, 10)": "Wall",
-    "(22, 28)": "High",
+    "(31, 37)": "High",
     "(7, 4)": "Wall",
     "(10, 4)": "Wall",
     "(13, 4)": "Wall",
@@ -85,8 +85,18 @@
     "(13, 7)": "Wall",
     "(10, 7)": "Wall",
     "(28, 31)": "High",
-    "(4, 19)": "Wall",
-    "(4, 22)": "Wall"
+    "(28, 37)": "High",
+    "(34, 31)": "High",
+    "(34, 28)": "High",
+    "(34, 25)": "High",
+    "(37, 25)": "High",
+    "(37, 28)": "High",
+    "(37, 31)": "High",
+    "(34, 34)": "High",
+    "(31, 34)": "High",
+    "(37, 34)": "High",
+    "(37, 37)": "High",
+    "(34, 37)": "High"
   },
   "terrain_objects": {
     "(8, 12)": "BarrelsObstacle3",
@@ -378,14 +388,11 @@
     "(40, 16)": "Floor9"
   },
   "decorations": {
-    "(16, 25)": "Staircase",
-    "(31, 22)": "StaircaseTall",
+    "(25, 31)": "Staircase",
+    "(13, 19)": "Torch",
     "(16, 7)": "StaircaseTall",
     "(16, 19)": "WallWindow2",
-    "(1, 22)": "WallOpeningNorth",
-    "(13, 19)": "Torch",
-    "(25, 31)": "Staircase",
-    "(7, 25)": "StaircaseTall"
+    "(1, 22)": "WallOpeningNorth"
   },
   "surfaces": {
     "(19, 21)": "FireSurfaceSingleCell",
@@ -416,42 +423,15 @@
         "Water"
       ]
     },
-    "(31, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(34, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(31, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(34, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(31, 25)": "FireSurfaceSingleCell",
-    "(34, 25)": "FireSurfaceSingleCell",
-    "(31, 28)": "FireSurfaceSingleCell",
     "(34, 16)": "FireSurfaceSingleCell"
   },
   "control_points": {},
   "characters": [
     {
-      "type_": "Ogre",
+      "type_": "Ghoul2",
       "pos": [
-        22,
-        16
+        30,
+        27
       ],
       "health": null,
       "main_hand": null,
@@ -461,8 +441,52 @@
     {
       "type_": "Alice",
       "pos": [
-        25,
-        22
+        27,
+        26
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        31,
+        34
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        36,
+        30
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        33,
+        28
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        34,
+        25
       ],
       "health": null,
       "main_hand": null,

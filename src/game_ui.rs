@@ -35,9 +35,9 @@ use crate::{
         ApplyEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
         AttackOutcome, AttackType, AttackedEvent, BaseAction, Character, CharacterFacing,
         CharacterId, Characters, CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval,
-        DamageSource, DecoratedTargetOutcome, GameEvent, GameOverType, HandType, HitType,
-        IncludeCircleEffects, MovementType, OnAttackedReaction, OnHitReaction, Position,
-        TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        DamageSource, DamageType, DecoratedTargetOutcome, GameEvent, GameOverType, HandType,
+        HitType, IncludeCircleEffects, MovedEvent, MovementType, OnAttackedReaction, OnHitReaction,
+        Position, TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::{INSPIRE, KILL},
     drawing::draw_dashed_line_ex,
@@ -1640,6 +1640,10 @@ impl UserInterface {
             GameEvent::Attacked(event) => {
                 self.handle_attacked_event(&event, 0);
             }
+            GameEvent::AfterOpportunityAttack => {
+                // There should be a small pause after an opportunity attack and the action that it interrupted
+                self.animation_stopwatch.set_to_at_least(0.5);
+            }
             GameEvent::AbilityWasInitiated {
                 actor,
                 ability,
@@ -1684,7 +1688,6 @@ impl UserInterface {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {
                         self.game_grid.animate_death(char_id);
-                        //self.animation_stopwatch.set_to_at_least(duration);
                         someone_died = true;
                     }
                 }
@@ -1793,79 +1796,70 @@ impl UserInterface {
                 character,
                 direction,
             } => {
-                let duration = self
+                let _duration = self
                     .game_grid
                     .animate_character_balancing_on_edge(character, direction);
-                self.animation_stopwatch.set_to_at_least(duration);
+                //self.animation_stopwatch.set_to_at_least(duration);
             }
-            GameEvent::Moved {
+            GameEvent::CharactersCollided { collisions } => {
+                let mut delay = 0.0;
+                for collision in collisions {
+                    let damage_source = DamageSource::KnockbackCollision {
+                        move_direction: collision.move_direction,
+                    };
+                    self.handle_effect_was_applied(
+                        delay,
+                        collision.character_id,
+                        AppliedEffect::LostHealth(
+                            collision.damage,
+                            damage_source,
+                            DamageType::Regular,
+                        ),
+                        &[collision.description],
+                    );
+                    delay += 0.15;
+                }
+                //self.animation_stopwatch.set_to_at_least(0.1);
+            }
+            GameEvent::ManyMoved(moved_events) => {
+                let mut max_duration: f32 = 0.0;
+                for e in &moved_events {
+                    let duration = self.calculate_movement_duration(
+                        e.character,
+                        e.from,
+                        e.to,
+                        e.movement_type,
+                    );
+                    max_duration = max_duration.max(duration);
+                }
+
+                for e in moved_events {
+                    // Since the characters are meant to perform synchronized movement, we must slow down anyone who's faster
+                    // to prevent them from finishing their (partial) move before the others and then standing still waiting
+                    // for the others to catch up.
+                    // For example, falling a long distance still just counts as one "movement step", and therefore travels
+                    // at higher speed
+                    self.do_movement(
+                        e.character,
+                        e.from,
+                        e.to,
+                        e.movement_type,
+                        e.step_idx,
+                        max_duration,
+                    );
+                }
+
+                self.animation_stopwatch.set_to_at_least(max_duration);
+            }
+            GameEvent::Moved(MovedEvent {
                 character,
                 from,
                 to,
                 movement_type,
                 step_idx,
-                surface,
-            } => {
-                let mover = self.characters.get(character);
-
-                let base_duration = if self.faster_movement.get() {
-                    //0.07
-                    0.04
-                } else {
-                    0.10
-                };
-
-                let mut duration = base_duration;
-
-                if movement_type == MovementType::Dash {
-                    // Dash makes an immediate jump between two positions that aren't necessarily adjacent,
-                    let dist = distance_between(from, to);
-                    // Dash should appear significantly faster than regular movement
-                    duration = base_duration * dist * 0.5;
-                } else if movement_type == MovementType::Falling {
-                    // Falling makes an immediate jump between two positions that aren't necessarily adjacent,
-                    let dist = distance_between(from, to);
-                    // Falling in slow motion
-                    duration = base_duration * dist * 1.5;
-                    self.game_grid
-                        .animate_character_speaking(character, 0.0, duration, "Aaahh");
-                } else {
-                    if from.0 != to.0 || from.1 != to.1 {
-                        // diagonal takes longer
-                        duration *= 1.41;
-                    }
-
-                    // Indicate when the character has a temporarily modified move speed (from some Condition)
-                    if movement_type != MovementType::KnockedBack {
-                        duration /= mover.move_speed_modifier();
-                    }
-
-                    if movement_type == MovementType::AbilityEngage {
-                        // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by special surface
-                        duration *= 0.7;
-                    } else if surface.is_some() && movement_type != MovementType::KnockedBack {
-                        duration *= MOVE_COST_FACTOR_IN_LIQUID;
-                    }
-                }
-
-                self.game_grid.set_character_motion(
-                    character,
-                    from,
-                    to,
-                    duration,
-                    movement_type,
-                    step_idx,
-                    surface,
-                );
-                if movement_type == MovementType::Dash || movement_type == MovementType::Falling {
-                    self.sound_player.play(SoundId::Dash);
-                } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
-                    if surface.map(|s| s.is_liquid()).unwrap_or(false) {
-                        self.sound_player.play(SoundId::WalkWater);
-                    } else {
-                        self.sound_player.play(SoundId::Walk);
-                    }
-                }
+            }) => {
+                let duration = self.calculate_movement_duration(character, from, to, movement_type);
+                self.do_movement(character, from, to, movement_type, step_idx, duration);
                 self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharactersSpawning { characters } => {
@@ -1887,7 +1881,6 @@ impl UserInterface {
                     character,
                     applied_effect,
                     &[format!("Source: |<keyword>{source}|")],
-                    None,
                 );
             }
             GameEvent::GameOver(type_) => {
@@ -1924,16 +1917,99 @@ impl UserInterface {
         }
     }
 
+    fn do_movement(
+        &mut self,
+        mover_id: u32,
+        from: Position,
+        to: Position,
+        movement_type: MovementType,
+        step_idx: u32,
+        duration: f32,
+    ) {
+        let surface = self.game_grid.pathfind_grid.surface(to);
+        self.game_grid.set_character_motion(
+            mover_id,
+            from,
+            to,
+            duration,
+            movement_type,
+            step_idx,
+            surface,
+        );
+        if movement_type == MovementType::Falling {
+            self.game_grid
+                .animate_character_speaking(mover_id, 0.0, duration, "Aaahh");
+        }
+        if movement_type == MovementType::Dash || movement_type == MovementType::Falling {
+            self.sound_player.play(SoundId::Dash);
+        } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
+            if surface.map(|s| s.is_liquid()).unwrap_or(false) {
+                self.sound_player.play(SoundId::WalkWater);
+            } else {
+                self.sound_player.play(SoundId::Walk);
+            }
+        }
+    }
+
+    fn calculate_movement_duration(
+        &mut self,
+        mover_id: u32,
+        from: Position,
+        to: Position,
+        movement_type: MovementType,
+    ) -> f32 {
+        let mover = self.characters.get(mover_id);
+        let base_duration = if self.faster_movement.get() {
+            //0.07
+            0.04
+        } else {
+            0.10
+        };
+
+        let mut duration = base_duration;
+
+        let surface = self.game_grid.pathfind_grid.surface(to);
+
+        if movement_type == MovementType::Dash {
+            // Dash makes an immediate jump between two positions that aren't necessarily adjacent,
+            let dist = distance_between(from, to);
+            // Dash should appear significantly faster than regular movement
+            duration = base_duration * dist * 0.5;
+        } else if movement_type == MovementType::Falling {
+            // Falling makes an immediate jump between two positions that aren't necessarily adjacent,
+            let dist = distance_between(from, to);
+            // Falling in slow motion
+            duration = base_duration * dist * 1.5;
+        } else {
+            if from.0 != to.0 || from.1 != to.1 {
+                // diagonal takes longer
+                duration *= 1.41;
+            }
+
+            // Indicate when the character has a temporarily modified move speed (from some Condition)
+            if movement_type != MovementType::KnockedBack {
+                duration /= mover.move_speed_modifier();
+            }
+
+            if movement_type == MovementType::AbilityEngage {
+                // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by special surface
+                duration *= 0.7;
+            } else if surface.is_some() && movement_type != MovementType::KnockedBack {
+                duration *= MOVE_COST_FACTOR_IN_LIQUID;
+            }
+        }
+        duration
+    }
+
     fn handle_effect_was_applied(
         &mut self,
         start_time: f32,
         character: u32,
         applied_effect: AppliedEffect,
         detail_lines: &[String],
-        ability: Option<AbilityId>,
     ) {
         self.log_applied_effect(character, applied_effect, detail_lines);
-        self.show_applied_effect(applied_effect, character, start_time, ability);
+        self.show_applied_effect(applied_effect, character, start_time);
     }
 
     fn log_applied_effect(
@@ -1953,6 +2029,10 @@ impl UserInterface {
                 DamageSource::Attack(..) | DamageSource::Ability(..) => {
                     format!("was hit for |<value>{}| {}", n, dmg_type.dmg_str())
                 }
+                DamageSource::KnockbackCollision { .. } => {
+                    format!("took |<value>{}| collision damage", n)
+                }
+                DamageSource::Falling => format!("took |<value>{}| falling damage", n),
                 _ => format!("lost |<value>{}| health", n),
             },
             AppliedEffect::GainedHealth(n) => {
@@ -2055,7 +2135,7 @@ impl UserInterface {
             }
         }
 
-        let mut delay = 0.1;
+        let mut delay = 0.0;
         for (i, o) in outcomes.iter().enumerate() {
             let details_header = format!("|<keyword>{}| |<faded>AoE (target {})|:", label, i + 1);
             let mut lines = vec![details_header];
@@ -2069,18 +2149,24 @@ impl UserInterface {
 
             if let Some(a) = ability {
                 if o.outcome.hit_type() != HitType::Miss {
-                    self.game_grid
-                        .animate_ability_target_hit(o.target_id, &a.audio_visuals, delay);
+                    self.game_grid.animate_ability_target_hit(
+                        o.target_id,
+                        &a.audio_visuals,
+                        start_time + delay,
+                    );
                 }
             }
 
             if o.outcome.hit_type() == HitType::Critical {
-                self.game_grid
-                    .add_text_effect(o.target_id, delay, TextEffect::CriticalHit);
+                self.game_grid.add_text_effect(
+                    o.target_id,
+                    start_time + delay,
+                    TextEffect::CriticalHit,
+                );
             }
 
             for (ch_id, e) in effects {
-                self.handle_effect_was_applied(start_time, ch_id, e, &lines, ability_id);
+                self.handle_effect_was_applied(start_time + delay, ch_id, e, &lines);
             }
 
             delay += 0.1;
@@ -2147,7 +2233,7 @@ impl UserInterface {
             let mut detail_lines = vec![format!("|<keyword>{}|:", ability.name)];
             detail_lines.extend_from_slice(&o.detail_lines);
             for (ch_id, e) in effects {
-                self.handle_effect_was_applied(0.0, ch_id, e, &detail_lines, Some(ability.id));
+                self.handle_effect_was_applied(0.0, ch_id, e, &detail_lines);
             }
             if o.outcome.hit_type() != HitType::Miss {
                 self.game_grid
@@ -2157,7 +2243,7 @@ impl UserInterface {
                 self.game_grid
                     .add_text_effect(o.target_id, 0.0, TextEffect::CriticalHit);
             }
-            self.animation_stopwatch.set_to_at_least(0.15);
+            //self.animation_stopwatch.set_to_at_least(0.15);
         }
 
         if let Some(AbilityAreaOutcome { targets, circle }) = &area_outcome {
@@ -2175,6 +2261,9 @@ impl UserInterface {
         for line in extra_logs {
             self.log.add(line);
         }
+
+        // Tiny delay before we proceed to e.g. pushing targets
+        self.animation_stopwatch.set_to_at_least(0.1);
     }
 
     fn handle_attack_initiated(
@@ -2243,7 +2332,7 @@ impl UserInterface {
         event.collect_applied_effects(attacker_id, target, &mut effects, IncludeCircleEffects::No);
 
         for (ch_id, e) in effects {
-            self.handle_effect_was_applied(0.0, ch_id, e, detail_lines, None);
+            self.handle_effect_was_applied(0.0, ch_id, e, detail_lines);
         }
 
         if let Some(effect_id) = event.outcome.visual_effect {
@@ -2265,14 +2354,7 @@ impl UserInterface {
             );
         }
 
-        let duration = if self.characters.get(attacker_id).player_controlled() {
-            // player behaviour should be snappy
-            0.3
-        } else {
-            // enemy behaviour should be readable
-            0.6
-        };
-        self.animation_stopwatch.set_to_at_least(duration);
+        self.animation_stopwatch.set_to_at_least(0.1);
     }
 
     fn show_applied_effect(
@@ -2280,7 +2362,6 @@ impl UserInterface {
         applied_effect: AppliedEffect,
         character_id: CharacterId,
         start_time: f32,
-        ability: Option<AbilityId>,
     ) -> bool {
         match applied_effect {
             AppliedEffect::LostActionPoints(n) => {
@@ -2290,20 +2371,34 @@ impl UserInterface {
                 self.sound_player
                     .play_delayed(SoundId::GainedAP, start_time);
             }
-            AppliedEffect::LostHealth(amount, source, dmg_type) => {
+            AppliedEffect::LostHealth(amount, source, _dmg_type) => {
                 let character = self.characters.get(character_id);
                 if amount > 0 {
                     if source == DamageSource::Condition(Condition::Burning) {
                         self.sound_player.play_delayed(SoundId::Burning, start_time);
                     }
                     self.sound_player
-                        .play_delayed(character.damage_sound, start_time);
+                        .play_delayed(character.hurt_sound, start_time);
                     let prev_health = self.characters.get(character_id).health.current() + amount;
                     self.game_grid
                         .animate_character_health_change(character_id, prev_health, 0.9);
 
                     match source {
-                        DamageSource::KnockbackCollision | DamageSource::Falling => {
+                        DamageSource::KnockbackCollision { move_direction } => {
+                            if move_direction != (0, 0) {
+                                self.game_grid.animate_character_bumping_into_something(
+                                    character_id,
+                                    start_time,
+                                    move_direction,
+                                );
+                            } else {
+                                self.game_grid
+                                    .animate_character_shaking(character_id, start_time);
+                                self.game_grid
+                                    .animate_effect(character_id, 0.5, EffectId::Pow);
+                            }
+                        }
+                        DamageSource::Falling => {
                             self.game_grid
                                 .animate_character_shaking(character_id, start_time);
                             self.game_grid
@@ -2317,7 +2412,6 @@ impl UserInterface {
 
                         _ => {}
                     }
-                    if ability.is_some() {}
                 } else {
                     if matches!(source, DamageSource::Attack(..)) {
                         self.sound_player
@@ -2325,9 +2419,6 @@ impl UserInterface {
                         self.game_grid
                             .animate_character_shaking(character_id, start_time);
                     }
-                }
-                if source == DamageSource::KnockbackCollision {
-                    self.animation_stopwatch.set_to_at_least(0.15);
                 }
             }
             AppliedEffect::Dodged => {
@@ -2685,7 +2776,7 @@ impl UserInterface {
                     } => {
                         let total_distance =
                             selected_movement_path.last().unwrap().distance_from_start;
-                        let positions: Vec<(i32, i32)> = selected_movement_path
+                        let positions: Vec<Position> = selected_movement_path
                             .iter()
                             .map(|node| node.position)
                             .collect();

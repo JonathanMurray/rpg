@@ -50,8 +50,8 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, ActionReach, ActionTarget,
         AppliedEffect, ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
         AttackEnhancementOnHitEffect, AudioVisuals, BaseAction, Character, CharacterFacing,
-        CircleEffect, Condition, Goodness, HitType, MovementType, Position, TargetAcquisition,
-        TargetLine, TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        CircleEffect, Condition, Goodness, HitType, MovementType, Position, PushVector,
+        TargetAcquisition, TargetLine, TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -98,7 +98,7 @@ const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.8);
 const HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ABILITY_MOVEMENT_DST_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
-const HOVER_NEUTRAL_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
+const HOVER_NEUTRAL_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_ENEMY_COLOR: Color = Color::new(0.8, 0.2, 0.2, 1.0);
 //const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
 const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
@@ -909,6 +909,13 @@ impl GameGrid {
 
         match movement_type {
             MovementType::KnockedBack => {
+                let pushed_from_west = from.0 < to.0;
+                let facing_east = self.characters.get(&character_id).unwrap().is_facing_east();
+                let rotation_factor = if pushed_from_west == facing_east {
+                    1.0
+                } else {
+                    -1.0
+                };
                 self.character_animations.push(CharacterAnimation::new(
                     character_id,
                     0.0,
@@ -916,7 +923,10 @@ impl GameGrid {
                     AnimationDetails::TransformSprite {
                         timelines: vec![(
                             SpriteProperty::CharacterRotateForward,
-                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, PI * 0.1)]),
+                            PropertyTimeline(vec![PropertyUpdate::linear(
+                                0.0,
+                                PI * 0.1 * rotation_factor,
+                            )]),
                         )],
                     },
                 ));
@@ -947,6 +957,13 @@ impl GameGrid {
                 ));
             }
             MovementType::Falling => {
+                let pushed_from_west = from.0 < to.0;
+                let facing_east = self.characters.get(&character_id).unwrap().is_facing_east();
+                let rotation_factor = if pushed_from_west == facing_east {
+                    1.0
+                } else {
+                    -1.0
+                };
                 let jump_height = 3.2;
                 self.character_animations.push(CharacterAnimation::new(
                     character_id,
@@ -956,7 +973,10 @@ impl GameGrid {
                         timelines: vec![
                             (
                                 SpriteProperty::CharacterRotateForward,
-                                PropertyTimeline(vec![PropertyUpdate::linear(0.7, 0.7 * PI)]),
+                                PropertyTimeline(vec![PropertyUpdate::linear(
+                                    0.7,
+                                    0.7 * PI * rotation_factor,
+                                )]),
                             ),
                             (
                                 SpriteProperty::CharacterYOffsetCellW { jump: true },
@@ -1073,11 +1093,11 @@ impl GameGrid {
         // Don't show preview for player ability; they issued it and it should feel snappy.
         if !actor.player_controlled() {
             if let Some(target_pos) = destination {
-                delay = 0.5;
+                delay = 0.7;
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
                     0.0,
-                    0.3,
+                    0.5,
                     AnimationDetails::AttackCrosshairPreview { target_pos },
                 ));
             }
@@ -1505,11 +1525,11 @@ impl GameGrid {
 
         // Don't show preview for player attack; they issued it and it should feel snappy.
         if !attacker.player_controlled() {
-            delay = 0.5;
+            delay = 0.7;
             self.character_animations.push(CharacterAnimation::new(
                 attacker.id(),
                 0.0,
-                0.3,
+                0.5,
                 AnimationDetails::AttackCrosshairPreview { target_pos },
             ));
         }
@@ -1967,13 +1987,17 @@ impl GameGrid {
     pub fn animate_effect(&mut self, character_id: CharacterId, duration: f32, effect: EffectId) {
         let pos = self.characters.get(&character_id).unwrap().pos();
         let pos = (pos.0 as f32, pos.1 as f32 - 0.5);
+        self.animate_effect_at_pos(pos, duration, effect);
+    }
+
+    pub fn animate_effect_at_pos(&mut self, grid_pos: (f32, f32), duration: f32, effect: EffectId) {
         let texture = EFFECTS_TEXTURE.get().unwrap();
 
         let rect = effect_atlas_rect(effect);
         self.effects.push(ConcreteEffect {
             age: 0.0,
-            source_grid_pos: pos,
-            destination_grid_pos: pos,
+            source_grid_pos: grid_pos,
+            destination_grid_pos: grid_pos,
             data: EffectData {
                 start_time: 0.0,
                 end_time: duration,
@@ -1995,6 +2019,75 @@ impl GameGrid {
         ));
     }
 
+    pub fn animate_character_bumping_into_something(
+        &mut self,
+        character_id: CharacterId,
+        start_time: f32,
+        direction: (i32, i32),
+    ) -> f32 {
+        assert!(
+            direction != (0, 0) && (direction.0 == 0 || direction.1 == 0),
+            "Invalid direction: {:?}",
+            direction
+        );
+
+        let char = &self.characters[&character_id];
+
+        let moving_west = direction.0 < 0;
+        let mut rotation = PI * 0.25;
+        if char.is_facing_east() == moving_west {
+            rotation *= -1.0;
+        }
+
+        let mut timelines = vec![(
+            SpriteProperty::CharacterRotateForward,
+            PropertyTimeline(vec![
+                PropertyUpdate::linear(0.0, rotation),
+                PropertyUpdate::linear(0.75, rotation * 0.7),
+                PropertyUpdate::linear(0.85, 0.0),
+                PropertyUpdate::linear(0.95, -rotation * 0.3),
+                PropertyUpdate::linear(1.0, 0.0),
+            ]),
+        )];
+
+        let collision_point;
+        let dist = 1.0;
+        if direction.0 != 0 {
+            let dx = dist * direction.0.signum() as f32;
+            collision_point = (char.pos().0 as f32 + dx, char.pos().1 as f32);
+            timelines.push((
+                SpriteProperty::CharacterXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, dx),
+                    PropertyUpdate::fixed(0.75),
+                    PropertyUpdate::linear(0.9, 0.0),
+                ]),
+            ));
+        } else {
+            let dy = dist * direction.1.signum() as f32;
+            collision_point = (char.pos().0 as f32, char.pos().1 as f32 + dy);
+            timelines.push((
+                SpriteProperty::CharacterYOffsetCellW { jump: false },
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, dy),
+                    PropertyUpdate::fixed(0.75),
+                    PropertyUpdate::linear(0.9, 0.0),
+                ]),
+            ));
+        }
+
+        self.animate_effect_at_pos(collision_point, 0.5, EffectId::Pow);
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            start_time,
+            0.5,
+            AnimationDetails::TransformSprite { timelines },
+        ));
+
+        1.3
+    }
+
     pub fn animate_character_balancing_on_edge(
         &mut self,
         character_id: CharacterId,
@@ -2010,7 +2103,7 @@ impl GameGrid {
 
         let falling_west = direction.0 < 0;
         let mut rotation = PI * 0.15;
-        if self.characters[&character_id].facing.get().is_east() == falling_west {
+        if self.characters[&character_id].is_facing_east() == falling_west {
             rotation *= -1.0;
         }
 
@@ -2612,7 +2705,7 @@ impl GameGrid {
         let size = self.default_entity_draw_size();
         let mut params = DrawTextureParams {
             dest_size: Some(size.into()),
-            flip_x: character.facing.get().is_east(),
+            flip_x: character.is_facing_east(),
             ..Default::default()
         };
 
@@ -2724,7 +2817,7 @@ impl GameGrid {
                                 show_regular_hald_hend = false;
                             }
                             SpriteProperty::CharacterRotateForward => {
-                                params.rotation = if character.facing.get().is_east() {
+                                params.rotation = if character.is_facing_east() {
                                     value
                                 } else {
                                     -value
@@ -2900,7 +2993,7 @@ impl GameGrid {
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some((self.rect_w as f32, self.rect_w as f32).into()),
-                    flip_x: character.facing.get().is_east(),
+                    flip_x: character.is_facing_east(),
                     ..Default::default()
                 },
             );
@@ -3387,6 +3480,8 @@ impl GameGrid {
                         | (Ordering::Equal, Ordering::Greater) => (1, 0),
                         (Ordering::Equal, Ordering::Equal) => unreachable!(),
                     };
+                // Offset the engagement lines by a deterministic amount. This reduces visual clutter
+                // by avoiding overlapping lines
                 let factor = if engager.id() < character.id() {
                     7.0
                 } else {
@@ -4158,28 +4253,20 @@ impl GameGrid {
                             4.0,
                             true,
                         );
-                        let cannot_reach = matches!(
+                        let can_reach = !matches!(
                             range_indicator,
                             Some((_, _, RangeIndicatorType::CannotReach, _))
                         );
-                        self.draw_target_crosshair(
-                            self.characters[&self.active_character_id].pos(),
-                            hovered_char.pos(),
-                            true,
-                            HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                            CROSSHAIR_ARROW_THIN,
-                            !cannot_reach,
+                        let actor_pos = self.characters[&self.active_character_id].pos();
+                        self.draw_crosshair_for_valid_player_target(
+                            actor_pos,
+                            hovered_char,
+                            can_reach,
                         );
                     } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                     } else {
-                        self.draw_cornered_outline(
-                            self.grid_pos_to_screen(hovered_char.pos()),
-                            HOVER_NEUTRAL_COLOR,
-                            2.0,
-                            1.0,
-                            false,
-                        );
+                        self.draw_hovered_neutral_outline(hovered_char);
                     }
 
                     if pressed_left_mouse && !outcome.committed_action {
@@ -4250,29 +4337,20 @@ impl GameGrid {
                                 positions,
                             );
                         } else {
-                            let cannot_reach = matches!(
+                            let can_reach = !matches!(
                                 range_indicator,
                                 Some((_, _, RangeIndicatorType::CannotReach, _))
                             );
-                            self.draw_target_crosshair(
+                            self.draw_crosshair_for_valid_player_target(
                                 active_char_pos,
-                                hovered_char.pos(),
-                                true,
-                                HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                                CROSSHAIR_ARROW_THIN,
-                                !cannot_reach,
+                                hovered_char,
+                                can_reach,
                             );
                         }
                     } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                     } else {
-                        self.draw_cornered_outline(
-                            self.grid_pos_to_screen(hovered_char.pos()),
-                            HOVER_NEUTRAL_COLOR,
-                            2.0,
-                            1.0,
-                            false,
-                        );
+                        self.draw_hovered_neutral_outline(hovered_char);
                     }
 
                     if pressed_left_mouse && !outcome.committed_action {
@@ -4820,7 +4898,7 @@ impl GameGrid {
         &self,
         ability: &Ability,
         selected_enhancements: &[&AbilityEnhancement],
-        pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
+        pushed_targets: &mut Vec<(CharacterId, PushVector)>,
     ) {
         let active_char_pos = self.characters[&self.active_character_id].pos();
 
@@ -4872,7 +4950,7 @@ impl GameGrid {
         &self,
         target_id: CharacterId,
         selected_enhancements: &[AttackEnhancement],
-        pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
+        pushed_targets: &mut Vec<(CharacterId, PushVector)>,
     ) {
         for enhancement in selected_enhancements {
             // PREVIEW ARROW EFFECTS
@@ -4923,7 +5001,7 @@ impl GameGrid {
         }
     }
 
-    fn draw_pushed_targets(&self, pushed_targets: &[(CharacterId, (i32, i32))]) {
+    fn draw_pushed_targets(&self, pushed_targets: &[(CharacterId, PushVector)]) {
         for (pushed_target_id, pushed_vec) in pushed_targets {
             let mut target_screen_pos =
                 self.character_screen_pos(&self.characters[&pushed_target_id]);
@@ -4932,11 +5010,13 @@ impl GameGrid {
                 target_screen_pos.1 + self.cell_w() / 2.0,
             );
 
+            let vector = pushed_vec.xy();
+
             draw_dashed_line_ex(
                 target_screen_pos,
                 (
-                    target_screen_pos.0 + self.cell_w() * pushed_vec.0 as f32,
-                    target_screen_pos.1 + self.cell_w() * pushed_vec.1 as f32,
+                    target_screen_pos.0 + self.cell_w() * vector.0 as f32,
+                    target_screen_pos.1 + self.cell_w() * vector.1 as f32,
                 ),
                 8.0,
                 RED,
@@ -6001,6 +6081,16 @@ impl GameGrid {
         draw_circle(x + self.cell_w() / 2.0, y + self.cell_w() / 2.0, r, color);
     }
 
+    fn draw_hovered_neutral_outline(&self, hovered_char: &Character) {
+        self.draw_cornered_outline(
+            self.grid_pos_to_screen(hovered_char.pos()),
+            HOVER_NEUTRAL_COLOR,
+            2.0,
+            1.0,
+            false,
+        );
+    }
+
     fn draw_cornered_outline(
         &self,
         screen_pos: (f32, f32),
@@ -6312,6 +6402,22 @@ impl GameGrid {
             segment_len,
             depth,
             true,
+        );
+    }
+
+    fn draw_crosshair_for_valid_player_target(
+        &self,
+        actor_pos: Position,
+        hovered_char: &Character,
+        can_reach: bool,
+    ) {
+        self.draw_target_crosshair(
+            actor_pos,
+            hovered_char.pos(),
+            true,
+            HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+            CROSSHAIR_ARROW_THIN,
+            can_reach,
         );
     }
 

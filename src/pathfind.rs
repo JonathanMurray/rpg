@@ -435,6 +435,16 @@ impl PathfindGrid {
          */
     }
 
+    pub fn change_character_position(
+        &self,
+        id: CharacterId,
+        prev_pos: Position,
+        new_pos: Position,
+    ) {
+        self.remove_occupied(prev_pos, Occupation::Character(id));
+        self.set_occupied(new_pos, Occupation::Character(id));
+    }
+
     pub fn remove_occupied(&self, center_pos: Position, occupation: Occupation) {
         //println!("Remove occupied {:?}: {:?}", center_pos, occupation);
 

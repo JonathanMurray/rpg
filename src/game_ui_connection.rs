@@ -366,7 +366,7 @@ impl _GameUserInterfaceConnection {
                 player_choice = Some(choice);
             }
 
-            if get_keys_pressed().contains(&KeyCode::Space) {
+            if get_keys_pressed().contains(&KeyCode::D) {
                 DEBUG.fetch_not(Ordering::SeqCst);
                 //dbg!(DEBUG.load(Ordering::SeqCst));
             }

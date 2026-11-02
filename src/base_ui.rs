@@ -648,7 +648,7 @@ pub fn draw_text_with_font_tags(
                 if render_tags {
                     params.color = match part {
                         "Bob" | "Gorm" => COL_BOB,
-                        "Alice" | "Ylva" => COL_ALICE,
+                        "Alice" | "Ylva" | "Test archer" => COL_ALICE,
                         "Clara" | "Idun" | "Test mage" => COL_CLARA,
                         _ => COL_ENEMY,
                     };
