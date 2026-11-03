@@ -649,7 +649,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(5, 3, 3, 5),
+        Attributes::new(5, 3, 1, 1),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, ZERO_SWORD);

@@ -11,7 +11,10 @@ use std::{
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use macroquad::{
-    color::{Color, BLACK, BROWN, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PINK, SKYBLUE, YELLOW},
+    color::{
+        Color, BLACK, BROWN, DARKGRAY, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PINK, SKYBLUE,
+        YELLOW,
+    },
     input::mouse_wheel,
     math::{Rect, Vec2},
     miniquad::window::dpi_scale,
@@ -55,7 +58,7 @@ use crate::{
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
-        draw_dashed_rectangle_sides, draw_rectangle_sides,
+        draw_dashed_rectangle_sides, draw_rectangle_sides, draw_rounded_rectangle_lines,
     },
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
@@ -247,6 +250,12 @@ enum AnimationDetails {
         timelines: Vec<(SpriteProperty, PropertyTimeline)>,
     },
     HideLabel,
+}
+
+impl AnimationDetails {
+    fn speech(text: &'static str) -> Self {
+        Self::SpeechBubble { text }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1071,11 +1080,11 @@ impl GameGrid {
 
     pub fn animate_initiating_ability(
         &mut self,
-        actor: CharacterId,
+        actor_id: CharacterId,
         ability: &Ability,
         destination: Option<Position>,
     ) -> (f32, f32) {
-        let actor = self.characters.get(&actor).unwrap();
+        let actor = self.characters.get(&actor_id).unwrap();
 
         let shape = match &ability.target {
             AbilityTarget::PositionCircle { circle_effect, .. } => {
@@ -1107,19 +1116,17 @@ impl GameGrid {
                 ability.name
             };
             self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
+                actor_id,
                 0.0,
                 1.0,
-                AnimationDetails::SpeechBubble { text },
+                AnimationDetails::speech(text),
             ));
         } else if ability.audio_visuals.speech != "" {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
                 0.0,
                 1.0,
-                AnimationDetails::SpeechBubble {
-                    text: ability.audio_visuals.speech,
-                },
+                AnimationDetails::speech(ability.audio_visuals.speech),
             ));
         }
 
@@ -2210,7 +2217,7 @@ impl GameGrid {
             character_id,
             delay,
             duration,
-            AnimationDetails::SpeechBubble { text },
+            AnimationDetails::speech(text),
         ));
     }
 
@@ -5342,20 +5349,31 @@ impl GameGrid {
     fn draw_speech_bubble(&self, text: &str, character_id: CharacterId, text_y_offset: f32) {
         let font_size = 24;
         let text_dim = measure_text_with_font_tags(text, Some(&self.big_font), font_size, 1.0);
-        let padding = 3.0;
+        let padding = 5.0;
         let bubble_h = text_dim.height + padding * 2.0;
-        let bubble_w = (text_dim.width + padding * 2.0); //.max(self.cell_w * 1.5);
+        let bubble_w = text_dim.width + padding * 2.0; //.max(self.cell_w * 1.5);
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        let x0 = x + self.cell_w() * 2.0;
-        let y0 = y - self.cell_w();
+        let x0 = (x + self.cell_w() * 2.0).round();
+        let y0 = (y - self.cell_w()).round();
         let triangle_h = 10.0;
         let v1 = (x0 + 5.0, y0 - 5.0);
         let v2 = (x0 + 10.0, y0 - 5.0 - triangle_h);
         let v3 = (x0 + 15.0, y0 - 5.0 - triangle_h);
-        let bg_color = Color::new(0.9, 0.9, 0.9, 1.0);
+        let bg_color = Color::new(0.8, 0.8, 0.9, 1.0);
         draw_triangle(v1.into(), v2.into(), v3.into(), bg_color);
         let bubble_x = x0.max(v2.0 + (v3.0 - v2.0) / 2.0 - (bubble_w / 2.0).round());
-        draw_rectangle(bubble_x, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
+        let rect = Rect::new(bubble_x, v2.1 - bubble_h, bubble_w, bubble_h);
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg_color);
+        draw_rounded_rectangle_lines(
+            rect.x,
+            rect.y,
+            rect.w,
+            rect.h,
+            2.0,
+            BLACK.with_alpha(0.7),
+            3.0,
+            None,
+        );
         draw_text_with_font_tags(
             text,
             (bubble_x + bubble_w / 2.0 - text_dim.width / 2.0).round(),
