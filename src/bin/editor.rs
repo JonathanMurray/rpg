@@ -65,10 +65,16 @@ async fn main() {
     draw_loading_text("Loading map").await;
     let mut map_data = MapData::load_from_file(&filepath);
 
-    let sound_player = SoundPlayer::load_with_progress(async |i, total| {
-        draw_loading_text_progress("Loading sounds", Some((i, total))).await;
-    })
-    .await;
+    let sounds_enabled = false;
+
+    let sound_player = if sounds_enabled {
+        SoundPlayer::load_with_progress(async |i, total| {
+            draw_loading_text_progress("Loading sounds", Some((i, total))).await;
+        })
+        .await
+    } else {
+        SoundPlayer::noop()
+    };
 
     let party = Rc::new(Party {
         money: Cell::new(8),

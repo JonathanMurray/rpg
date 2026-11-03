@@ -24,6 +24,15 @@ struct SoundContainer {
 }
 
 impl SoundPlayer {
+    pub fn noop() -> Self {
+        Self {
+            sounds: Default::default(),
+            enabled: Default::default(),
+            queued: Default::default(),
+            time: 0.0,
+        }
+    }
+
     pub async fn load() -> Self {
         Self::load_with_progress(async |_i, _total| {}).await
     }
@@ -236,8 +245,10 @@ impl SoundPlayer {
     }
 
     pub fn stop(&self, sound_id: SoundId) {
-        let sound = &self.sounds[&sound_id].sounds[0];
-        stop_sound(sound);
+        if self.enabled.get() {
+            let sound = &self.sounds[&sound_id].sounds[0];
+            stop_sound(sound);
+        }
     }
 }
 

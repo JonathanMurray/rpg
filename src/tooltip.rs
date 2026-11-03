@@ -188,6 +188,8 @@ pub fn draw_tooltip(
     header_keyword: Option<Keyword>,
     icon: Option<IconId>,
 ) -> Rect {
+    // TODO: Header should use big_font, size=24
+    // TODO: Enable UI code like this to use arbitrary font - don't force passing around simple_font and big_font throughout the entire codebase
     let header_font_size = if header_keyword.is_some() { 16 } else { 24 };
     let font_size = 16;
     let mut max_line_w = 0.0;

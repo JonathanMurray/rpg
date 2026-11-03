@@ -1,5 +1,7 @@
 use std::{collections::HashMap, rc::Rc, str::FromStr};
 
+use clap::ValueEnum;
+
 use indexmap::IndexMap;
 
 use crate::{
@@ -109,7 +111,7 @@ pub struct GameInitState {
     pub control_points: IndexMap<Position, ControlPoint>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, ValueEnum)]
 pub enum FightId {
     EasyPair,
     Medium,
@@ -124,13 +126,3 @@ pub enum FightId {
     Ogre,
 }
 
-impl FromStr for FightId {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "test" => Ok(FightId::Test),
-            _ => Err(()),
-        }
-    }
-}

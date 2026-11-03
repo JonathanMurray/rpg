@@ -35,17 +35,29 @@ use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::resources::{init_core_game, GameResources};
-use rpg::sounds::SoundPlayer;
+use rpg::sounds::{self, SoundPlayer};
 use rpg::textures::load_and_init_static;
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
 
+use clap::Parser;
+
+/// A Tactical-RPG Game
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Disable sound
+    #[arg(short, long)]
+    mute: bool,
+
+    /// Which fight to play
+    #[arg(value_enum)]
+    fight: Option<FightId>,
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-    let fight_id = args.into_iter().nth(1).map(|f| {
-        dbg!(&f);
-        FightId::from_str(&f).expect("fight_id arg")
-    });
+
+    let args = Args::parse();
 
     // Seed the random numbers
     rand::srand(miniquad::date::now() as u64);
@@ -85,13 +97,19 @@ async fn main() {
     draw_loading_text_progress("Loading resources", Some((1, 2))).await;
     load_and_init_static().await;
 
-    let sound_player = SoundPlayer::load_with_progress(async |i, total| {
-        draw_loading_text_progress("Loading sounds", Some((i, total))).await;
-    })
-    .await;
+    let sounds_enabled = !args.mute;
+
+    let sound_player = if sounds_enabled {
+        SoundPlayer::load_with_progress(async |i, total| {
+            draw_loading_text_progress("Loading sounds", Some((i, total))).await;
+        })
+        .await
+    } else {
+        SoundPlayer::noop()
+    };
 
     draw_loading_text("Starting game").await;
-    run_demo(&resources, sound_player, fight_id).await;
+    run_demo(&resources, sound_player, args.fight).await;
 }
 
 async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id: Option<FightId>) {

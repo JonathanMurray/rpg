@@ -1369,10 +1369,9 @@ impl UserInterface {
         let mut relevant_tooltip = None;
 
         let mut is_reacting = None;
-        let mut is_reacting_to_attack = false;
 
-        self.sound_player.stop(SoundId::FireCrackle);
-        self.sound_player.stop(SoundId::MechanicNoise);
+        //self.sound_player.stop(SoundId::FireCrackle);
+        //self.sound_player.stop(SoundId::MechanicNoise);
 
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
@@ -1442,7 +1441,7 @@ impl UserInterface {
 
             UiState::ReactingToAttack { reactor, .. } => {
                 is_reacting = Some(*reactor);
-                is_reacting_to_attack = true;
+                //is_reacting_to_attack = true;
             }
 
             UiState::ReactingToHit { victim, .. } => {

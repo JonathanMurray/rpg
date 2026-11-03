@@ -1062,23 +1062,10 @@ impl ActionButton {
         };
         let texture_draw_size = (60.0, 48.0);
 
-        let mut style = Style {
+        let style = Style {
             //border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
-        /*
-        match action {
-            ButtonAction::Action(..) => {}
-            ButtonAction::Passive(..) => {
-                style.border_inner_rounding = Some(8.0);
-                style.border_outer_rounding = Some((BLACK, 7.0));
-            }
-            _ => {
-                style.border_inner_rounding = Some(5.0);
-                style.border_outer_rounding = Some((BLACK, 4.0));
-            }
-        }
-         */
 
         let hover_border_color = YELLOW;
 
@@ -1332,11 +1319,17 @@ impl Drawable for ActionButton {
 
         let faded_icon = !self.enabled.get();
 
+        let has_bottom_row = ap_row_size.1 > 0.0 || self.bottom_resource_text.is_some();
+
+        // For actions that have no explicit cost, the cost bar is not drawn at the bottom,
+        // so we offset the y to make the icon more centered
+        let icon_y = if !has_bottom_row { y + 6.0 } else { y };
+
         if let Some(effect_expiration) = self.clicked_effect_until.get() {
             draw_icon(
                 icon,
                 x + 3.3,
-                y + 3.3,
+                icon_y + 3.3,
                 Some((
                     self.texture_draw_size.0 - 2.0,
                     self.texture_draw_size.1 - 2.0,
@@ -1350,7 +1343,7 @@ impl Drawable for ActionButton {
             draw_icon(
                 icon,
                 x + 2.0,
-                y + 2.0,
+                icon_y + 2.0,
                 Some(self.texture_draw_size),
                 faded_icon,
             );
@@ -1360,7 +1353,7 @@ impl Drawable for ActionButton {
         if self.size.0 > 45.0 {
             let bottom_row_h_pad = 2.0;
 
-            if ap_row_size.1 > 0.0 || self.bottom_resource_text.is_some() {
+            if has_bottom_row {
                 let row_h = 13.0;
                 draw_rectangle(
                     x + 1.0,

@@ -853,8 +853,7 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     name: "Knockback",
     description: "|<keyword>Push| the target",
-    // TODO: unique icon
-    icon: IconId::Extend,
+    icon: IconId::Knockback,
     stamina_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
         target_on_hit: &[ApplyEffect::Pushed(3)],
@@ -1900,7 +1899,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 };
 pub const BLESS: Ability = Ability {
     id: AbilityId::Bless,
-    name: "Bless",
+    name: "Nature's blessing",
     description: "|<keyword>Protect| an ally from the next attack \
         and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Bless,
@@ -2560,7 +2559,7 @@ pub const KILL: Ability = Ability {
     name: "Kill",
 
     description: "Kill all enemies",
-    icon: IconId::Fireball,
+    icon: IconId::CarefulAim,
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 0,

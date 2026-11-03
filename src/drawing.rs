@@ -436,7 +436,7 @@ pub async fn draw_loading_text_progress(description: &str, progress: Option<(usi
 
     if let Some((i, total)) = progress {
         let bar_w = 500.0;
-        let bar_h = 30.0;
+        let bar_h = 15.0;
         draw_rectangle(
             xmid - bar_w / 2.0,
             ymid + 50.0,
