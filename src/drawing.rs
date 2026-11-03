@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, BLACK, GREEN, LIGHTGRAY, MAGENTA},
+    color::{Color, BLACK, GRAY, GREEN, LIGHTGRAY, MAGENTA},
     math::Rect,
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_triangle},
     text::{draw_text, measure_text},
@@ -7,7 +7,7 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width},
 };
 
-use crate::game_ui::draw_rectangle_lines2;
+use crate::{game_ui::draw_rectangle_lines2, util::COL_GREEN_0};
 
 pub fn draw_arrow(
     (x, y): (f32, f32),
@@ -416,16 +416,43 @@ pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, 
 }
 
 pub async fn draw_loading_text(description: &str) {
+    draw_loading_text_progress(description, None).await
+}
+
+pub async fn draw_loading_text_progress(description: &str, progress: Option<(usize, usize)>) {
     let text = format!("{description} ...");
     let font_size = 32;
     let dim = measure_text(&text, None, font_size, 1.0);
     clear_background(BLACK);
+    let xmid = screen_width() / 2.0;
+    let ymid = screen_height() / 2.0;
     draw_text(
         &text,
-        screen_width() / 2.0 - dim.width / 2.0,
-        screen_height() / 2.0,
+        xmid - dim.width / 2.0,
+        ymid,
         font_size as f32,
         LIGHTGRAY,
     );
+
+    if let Some((i, total)) = progress {
+        let bar_w = 500.0;
+        let bar_h = 30.0;
+        draw_rectangle(
+            xmid - bar_w / 2.0,
+            ymid + 50.0,
+            bar_w * (i as f32 / total as f32),
+            bar_h,
+            COL_GREEN_0,
+        );
+        draw_rectangle_lines2(
+            xmid - bar_w / 2.0,
+            ymid + 50.0,
+            bar_w,
+            bar_h,
+            3.0,
+            LIGHTGRAY,
+        );
+    }
+
     next_frame().await;
 }

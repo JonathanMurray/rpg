@@ -22,7 +22,7 @@ use rpg::base_ui::{
 };
 use rpg::core::{Character, CharacterId, HandType, Party};
 
-use rpg::drawing::draw_loading_text;
+use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_ui::{draw_rectangle_lines2, UiState};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::{ControlPoint, GameGrid};
@@ -56,17 +56,19 @@ async fn main() {
     set_fullscreen(false);
     request_new_screen_size(monitor_size.0 - 50.0, monitor_size.1 - 100.0);
 
-    draw_loading_text("Loading resources [1]").await;
+    draw_loading_text_progress("Loading resources", Some((0, 2))).await;
     let resources = GameResources::load().await;
 
-    draw_loading_text("Loading resources [2]").await;
+    draw_loading_text_progress("Loading resources", Some((1, 2))).await;
     load_and_init_static().await;
 
     draw_loading_text("Loading map").await;
     let mut map_data = MapData::load_from_file(&filepath);
 
-    draw_loading_text("Loading sounds").await;
-    let sound_player = SoundPlayer::load().await;
+    let sound_player = SoundPlayer::load_with_progress(async |i, total| {
+        draw_loading_text_progress("Loading sounds", Some((i, total))).await;
+    })
+    .await;
 
     let party = Rc::new(Party {
         money: Cell::new(8),

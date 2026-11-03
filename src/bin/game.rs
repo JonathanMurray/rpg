@@ -30,7 +30,7 @@ use rpg::data::{
     HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
     PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
 };
-use rpg::drawing::draw_loading_text;
+use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
@@ -79,14 +79,16 @@ async fn main() {
 
     next_frame().await;
 
-    draw_loading_text("Loading resources [1]").await;
+    draw_loading_text_progress("Loading resources", Some((0, 2))).await;
     let resources = GameResources::load().await;
 
-    draw_loading_text("Loading resources [2]").await;
+    draw_loading_text_progress("Loading resources", Some((1, 2))).await;
     load_and_init_static().await;
 
-    draw_loading_text("Loading sounds").await;
-    let sound_player = SoundPlayer::load().await;
+    let sound_player = SoundPlayer::load_with_progress(async |i, total| {
+        draw_loading_text_progress("Loading sounds", Some((i, total))).await;
+    })
+    .await;
 
     draw_loading_text("Starting game").await;
     run_demo(&resources, sound_player, fight_id).await;

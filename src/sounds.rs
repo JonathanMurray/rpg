@@ -25,9 +25,13 @@ struct SoundContainer {
 
 impl SoundPlayer {
     pub async fn load() -> Self {
+        Self::load_with_progress(async |_i, _total| {}).await
+    }
+
+    pub async fn load_with_progress(on_progress: impl AsyncFn(usize, usize)) -> Self {
         let mut sounds_by_id = HashMap::new();
 
-        for (id, volume, names) in &[
+        let sound_definitions = [
             (SoundId::Execute, 1.6, vec!["fl_execute.ogg"]),
             (SoundId::Coin, 0.05, vec!["coin"]),
             (
@@ -139,7 +143,11 @@ impl SoundPlayer {
             (SoundId::Defeat, 1.0, vec!["fl_defeat.ogg"]),
             (SoundId::Battle, 1.0, vec!["fl_battle.ogg"]),
             (SoundId::Laugh, 0.8, vec!["fl_laugh.ogg"]),
-        ] {
+        ];
+
+        let total = sound_definitions.len();
+        on_progress(0, total).await;
+        for (i, (id, volume, names)) in sound_definitions.iter().enumerate() {
             let mut sounds = vec![];
             for name in names {
                 let name = if name.ends_with(".ogg") {
@@ -157,6 +165,7 @@ impl SoundPlayer {
                     volume: *volume,
                 },
             );
+            on_progress(i + 1, total).await;
         }
 
         Self {
