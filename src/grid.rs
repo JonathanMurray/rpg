@@ -2807,12 +2807,7 @@ impl GameGrid {
                     );
                     let path: Vec<MovementPathNode> = positions
                         .iter()
-                        .map(|pos| MovementPathNode {
-                            pos: *pos,
-                            difficult_terrain: false,
-                            dangerous: false,
-                            ap_cost_breakpoint: false,
-                        })
+                        .map(|pos| MovementPathNode::new(*pos))
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
                 }
@@ -3788,12 +3783,7 @@ impl GameGrid {
                 let target = &self.characters[target];
                 let reactor = &self.characters[reactor];
 
-                let path = movement.into_iter().map(|pos| MovementPathNode {
-                    pos: *pos,
-                    difficult_terrain: false,
-                    dangerous: false,
-                    ap_cost_breakpoint: false,
-                });
+                let path = movement.into_iter().map(|pos| MovementPathNode::new(*pos));
 
                 self.draw_movement_path_with_arrow(path, RED);
                 self.draw_cornered_outline(
@@ -3990,7 +3980,7 @@ impl GameGrid {
                         Surface::Spikes => "|<warning>| spikes",
                         Surface::Fire => "|<warning>| fire",
                     };
-                    front_cursor_text = Some(CursorText::new(text, None, CursorTextColor::Info));
+                    front_cursor_text = Some(CursorText::at_mouse(text, CursorTextColor::Info));
                 }
             }
 
@@ -4011,19 +4001,19 @@ impl GameGrid {
                         if is_mouse_pos_out_of_range {
                             front_cursor_text = Some(CursorText::new(
                                 "Out of reach",
-                                Some(mouse_grid_pos),
+                                self.snapped_cursor_text_pos(mouse_grid_pos),
                                 CursorTextColor::Error,
                             ));
                         } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                             front_cursor_text = Some(CursorText::new(
                                 "Select enemy",
-                                Some(mouse_grid_pos),
+                                self.snapped_cursor_text_pos(mouse_grid_pos),
                                 CursorTextColor::Info,
                             ));
                         } else {
                             front_cursor_text = Some(CursorText::new(
                                 "Select ally",
-                                Some(mouse_grid_pos),
+                                self.snapped_cursor_text_pos(mouse_grid_pos),
                                 CursorTextColor::Info,
                             ));
                         }
@@ -4101,29 +4091,27 @@ impl GameGrid {
                                 if is_mouse_pos_out_of_range {
                                     front_cursor_text = Some(CursorText::new(
                                         "Out of reach",
-                                        Some(mouse_grid_pos),
+                                        self.snapped_cursor_text_pos(mouse_grid_pos),
                                         CursorTextColor::Error,
                                     ));
                                 } else {
                                     //println!("Shape circle");
                                     front_cursor_text = Some(CursorText::new(
                                         "Confirm area",
-                                        Some(mouse_grid_pos),
+                                        self.snapped_cursor_text_pos(mouse_grid_pos),
                                         CursorTextColor::Info,
                                     ));
                                 }
                             }
                             PointTargetKind::Line => {
-                                front_cursor_text = Some(CursorText::new(
+                                front_cursor_text = Some(CursorText::at_mouse(
                                     "Confirm aim",
-                                    None,
                                     CursorTextColor::Info,
                                 ));
                             }
                             PointTargetKind::Projectile { .. } => {
-                                front_cursor_text = Some(CursorText::new(
+                                front_cursor_text = Some(CursorText::at_mouse(
                                     "Confirm aim",
-                                    None,
                                     CursorTextColor::Info,
                                 ));
                             }
@@ -4131,7 +4119,7 @@ impl GameGrid {
                                 if let Some(text) = mouse_pos_target_problem {
                                     front_cursor_text = Some(CursorText::new(
                                         text,
-                                        Some(mouse_grid_pos),
+                                        self.snapped_cursor_text_pos(mouse_grid_pos),
                                         CursorTextColor::Error,
                                     ));
                                 }
@@ -4146,7 +4134,7 @@ impl GameGrid {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                         front_cursor_text = Some(CursorText::new(
                             "Out of reach",
-                            Some(mouse_grid_pos),
+                            self.snapped_cursor_text_pos(mouse_grid_pos),
                             CursorTextColor::Error,
                         ));
                     }
@@ -4165,14 +4153,13 @@ impl GameGrid {
                         self.draw_occupation(OccupationFilter::TallTerrain);
                     }
                     let problem = format!("|<warning>| {}", problem.message());
-                    front_cursor_text =
-                        Some(CursorText::new(problem, None, CursorTextColor::Error));
+                    front_cursor_text = Some(CursorText::at_mouse(problem, CursorTextColor::Error));
                 } else {
                     let committable_action = committable_action.unwrap();
                     //let text = format!("|<confirm>|{}", committable_action.label);
                     let text = committable_action.label;
                     front_cursor_text = Some(
-                        CursorText::new(text, None, CursorTextColor::Info)
+                        CursorText::at_mouse(text, CursorTextColor::Info)
                             .with_icon(committable_action.icon),
                     );
 
@@ -4188,7 +4175,7 @@ impl GameGrid {
                 if let Some(target_str) = target_str {
                     text.push_str(&format!("\n|<target>|{}", target_str));
                 }
-                front_cursor_text = Some(CursorText::new(text, None, CursorTextColor::Info));
+                front_cursor_text = Some(CursorText::at_mouse(text, CursorTextColor::Info));
                 if pressed_left_mouse {
                     outcome.committed_action = true;
                 }
@@ -4264,7 +4251,7 @@ impl GameGrid {
                         self.draw_player_movement_path(&path.nodes, &mut opportunity_attackers);
                     front_cursor_text = Some(CursorText::new(
                         move_text,
-                        Some(dest),
+                        self.snapped_cursor_text_pos(dest),
                         CursorTextColor::Move,
                     ));
 
@@ -5179,6 +5166,14 @@ impl GameGrid {
         }
     }
 
+    fn snapped_cursor_text_pos(&self, pos: Position) -> (f32, f32) {
+        let snapped_mouse_pos = self.grid_pos_to_screen(pos);
+        (
+            snapped_mouse_pos.0 + self.cell_w() / 2.0,
+            snapped_mouse_pos.1 - 10.0,
+        )
+    }
+
     fn draw_cursor_text(&self, cursor_text: CursorText) {
         let font_scale = 1.0; //oscillate(1.0, 0.9, 1.1);
 
@@ -5186,7 +5181,7 @@ impl GameGrid {
         let font = Some(&self.big_font);
 
         let text = &cursor_text.label;
-        let mouse_grid_pos = cursor_text.snapped_mouse_grid_pos;
+        let (x, y) = cursor_text.pos;
         let color = &cursor_text.color;
 
         let lines: Vec<&str> = text.as_ref().split("\n").collect();
@@ -5216,17 +5211,6 @@ impl GameGrid {
         rect_size.1 += pad * 2.0;
         rect_size.1 = rect_size.1.max(icon_size.1);
 
-        let (x, y) = if let Some(pos) = mouse_grid_pos {
-            let snapped_mouse_pos = self.grid_pos_to_screen(pos);
-            (
-                snapped_mouse_pos.0 + self.cell_w() / 2.0,
-                snapped_mouse_pos.1 - 10.0,
-            )
-        } else {
-            let mouse_pos = mouse_position();
-            (mouse_pos.0, mouse_pos.1 - rect_size.1 / 2.0 - 2.0)
-        };
-
         let rect = Rect::new(
             x - (rect_size.0 + icon_size.0) / 2.0,
             y - rect_size.1 / 2.0,
@@ -5236,11 +5220,9 @@ impl GameGrid {
 
         let bg_color = Color::new(0.0, 0.0, 0.0, 0.7);
 
-        if mouse_grid_pos.is_none() || color != &CursorTextColor::Info {
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg_color);
-        }
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg_color);
 
-        let mut y0 = y - rect_size.1 / 2.0 + pad;
+        let mut y0 = rect.y + pad;
 
         for (line, dim) in lines.iter().zip(line_dims) {
             let color = match color {
@@ -5398,12 +5380,9 @@ impl GameGrid {
         if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
             self.draw_movement_path_with_arrow(
-                invalid_path.into_iter().map(|pos| MovementPathNode {
-                    pos,
-                    difficult_terrain: false,
-                    dangerous: false,
-                    ap_cost_breakpoint: false,
-                }),
+                invalid_path
+                    .into_iter()
+                    .map(|pos| MovementPathNode::new(pos)),
                 RED,
             );
         } else {
@@ -5425,12 +5404,9 @@ impl GameGrid {
                 true,
             );
             self.draw_movement_path_with_arrow(
-                movement_to_target.into_iter().map(|pos| MovementPathNode {
-                    pos,
-                    difficult_terrain: false,
-                    dangerous: false,
-                    ap_cost_breakpoint: false,
-                }),
+                movement_to_target
+                    .into_iter()
+                    .map(|pos| MovementPathNode::new(pos)),
                 MOVEMENT_ARROW_COLOR,
             );
         }
@@ -6609,7 +6585,8 @@ impl GameGrid {
         if mover.remaining_movement.get() < path[0].distance_from_start {
             ap_cost += 1;
         }
-        let mut movement_path = vec![(&path[0], false, ap_cost > 0)];
+        let mut movement_path = vec![];
+
         for w in path.windows(2) {
             let mut threatened_cell = false;
             for other_char in self.characters.values() {
@@ -6619,14 +6596,18 @@ impl GameGrid {
                 }
             }
 
-            let mut ap_breakpoint = false;
+            let mut ap_breakpoint = None;
             if mover.cost_to_move(w[1].distance_from_start) > ap_cost {
+                // The "breakpoint" is on the very last cell of the previous AP cost.
+                // It shows the player "This is how far you can move for this AP cost"
+                ap_breakpoint = Some(ap_cost);
                 ap_cost += 1;
-                ap_breakpoint = true;
             }
 
-            movement_path.push((&w[1], threatened_cell, ap_breakpoint));
+            movement_path.push((&w[0], threatened_cell, ap_breakpoint));
         }
+
+        movement_path.push((path.last().unwrap(), false, None));
 
         self.draw_movement_path_with_arrow(
             movement_path
@@ -6675,31 +6656,36 @@ impl GameGrid {
     ) {
         let mut a = path.next().expect("First cell in path");
         let mut b = path.next().expect("Second cell in path");
+        let cell_w = self.cell_w();
 
         loop {
-            let mut r = 3.0;
+            let mut r = (self.cell_w() / 9.0).ceil();
             let mut circle_color = Color::new(1.0, 1.0, 1.0, 0.5);
             if a.dangerous {
-                //circle_color = Color::new(0.8, 0.0, 0.0, 0.8);
                 r = oscillate(0.5, r, r * 2.0);
             }
             if a.difficult_terrain {
                 circle_color = Color::new(1.0, 0.4, 0.4, 0.8);
             }
-            if a.ap_cost_breakpoint {
-                /*
-                if !a.dangerous {
-                    r = 5.0;
-                }
-                 */
+            let snapped_pos = self.grid_pos_to_screen(a.pos);
+
+            let x = snapped_pos.0 + cell_w / 2.0;
+            let y = snapped_pos.1 + cell_w / 2.0;
+
+            if let Some(ap) = a.ap_cost_breakpoint {
                 circle_color = COL_GOLD;
+                self.draw_cursor_text(CursorText::new(
+                    format!("{}|<ap>|", ap),
+                    (x, y),
+                    //(snapped_pos.0 + cell_w / 2.0, snapped_pos.1),
+                    CursorTextColor::Info,
+                ));
+            } else {
+                draw_circle(x, y, r, circle_color);
+
+                let outline_color = BLACK.with_alpha(0.6);
+                draw_circle_lines(x, y, r, 1.0, outline_color);
             }
-
-            let x = self.grid_x_to_screen(a.pos.0) + self.cell_w() / 2.0;
-            let y = self.grid_y_to_screen(a.pos.1) + self.cell_w() / 2.0;
-
-            draw_circle(x, y, r, circle_color);
-            draw_circle_lines(x, y, r, 2.0, BLACK);
 
             if let Some(next) = path.next() {
                 a = b;
@@ -6934,7 +6920,18 @@ struct MovementPathNode {
     pos: Position,
     difficult_terrain: bool,
     dangerous: bool,
-    ap_cost_breakpoint: bool,
+    ap_cost_breakpoint: Option<u32>,
+}
+
+impl MovementPathNode {
+    fn new(pos: Position) -> Self {
+        Self {
+            pos,
+            difficult_terrain: false,
+            dangerous: false,
+            ap_cost_breakpoint: None,
+        }
+    }
 }
 
 enum OccupationFilter {
@@ -6965,23 +6962,24 @@ impl CommittableAction {
 
 struct CursorText {
     label: Cow<'static, str>,
-    snapped_mouse_grid_pos: Option<Position>,
+    pos: (f32, f32),
     color: CursorTextColor,
     icon: Option<IconId>,
 }
 
 impl CursorText {
-    fn new(
-        t: impl Into<Cow<'static, str>>,
-        snapped_mouse_grid_pos: Option<Position>,
-        color: CursorTextColor,
-    ) -> Self {
+    fn new(t: impl Into<Cow<'static, str>>, pos: (f32, f32), color: CursorTextColor) -> Self {
         Self {
             label: t.into(),
-            snapped_mouse_grid_pos,
+            pos,
             color,
             icon: None,
         }
+    }
+
+    fn at_mouse(t: impl Into<Cow<'static, str>>, color: CursorTextColor) -> Self {
+        let mouse_pos = mouse_position();
+        Self::new(t, (mouse_pos.0, mouse_pos.1 - 2.0), color)
     }
 
     fn with_icon(mut self, icon: IconId) -> Self {
