@@ -359,8 +359,8 @@ impl EquipmentSection {
                  */
                 inventory_section,
                 Element::Text(
-                    TextLine::new("Equipped", 22, WHITE, Some(simple_font.clone()))
-                        .with_depth(BLACK, 2.0),
+                    TextLine::new("Equipped", 16, LIGHTGRAY, Some(simple_font.clone()))
+                        .with_depth(BLACK, 1.0),
                 ),
                 equipped_section,
                 Element::Empty(0.0, 2.0),
@@ -369,24 +369,6 @@ impl EquipmentSection {
             ..Default::default()
         });
 
-        /*
-           let stats_column = Element::Container(Container {
-               layout_dir: LayoutDirection::Vertical,
-               margin: 15.0,
-               align: Align::Center,
-               style: Style {
-                   padding: 10.0,
-                   ..Default::default()
-               },
-               children: vec![
-                   Element::Empty(0.0, 15.0),
-                   Element::RcRefCell(equipment_stats_table.clone()),
-               ],
-               ..Default::default()
-           });
-        */
-
-        //let mut children = vec![stats_column, char_eq_column];
         let mut children = vec![char_eq_column];
         if let Some(col) = stash_column {
             children.push(col);
@@ -394,8 +376,6 @@ impl EquipmentSection {
         let element = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
             margin: 5.0,
-            //align: Align::Center,
-            //border_between_children: Some(DARKGRAY),
             children,
             ..Default::default()
         });

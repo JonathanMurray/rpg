@@ -22,7 +22,8 @@ use crate::{
 
 pub async fn run_rest_loop(
     mut player_characters: Vec<Rc<Character>>,
-    font: Font,
+    simple_font: Font,
+    big_font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Vec<Rc<Character>> {
@@ -40,7 +41,8 @@ pub async fn run_rest_loop(
 
         let mut ui = NonCombatPartyUi::new(
             &characters[..],
-            font.clone(),
+            simple_font.clone(),
+            big_font.clone(),
             equipment_icons,
             portrait_textures,
             sound_player,
@@ -57,13 +59,13 @@ pub async fn run_rest_loop(
 
             let text = "You regained 50% health and 100% mana";
             let font_size = 32;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 150.0 + (text_dim.height) / 2.0,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: WHITE,
                     ..Default::default()
@@ -74,7 +76,7 @@ pub async fn run_rest_loop(
             let font_size = 30;
             let margin = 25.0;
             let padding = 15.0;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             let rect = Rect::new(
                 screen_w - margin - text_dim.width - padding * 2.0,
                 screen_h - 270.0 - margin - text_dim.height - padding * 2.0,
@@ -92,7 +94,7 @@ pub async fn run_rest_loop(
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: YELLOW,
                     ..Default::default()

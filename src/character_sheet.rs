@@ -26,7 +26,9 @@ use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection}
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
-use crate::textures::{UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE};
+use crate::textures::{
+    portrait_texture, PORTRAITS_TEXTURE, UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE,
+};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -115,6 +117,7 @@ impl CharacterSheet {
 
         let stats_table = Rc::new(RefCell::new(build_character_stats_table(
             simple_font,
+            big_font,
             Rc::clone(&character),
         )));
 
@@ -142,15 +145,34 @@ impl CharacterSheet {
             sound_player,
         )));
 
+        let portrait = Element::Container(Container {
+            children: vec![Element::Texture {
+                texture: portrait_texture(character.portrait),
+                dest_size: Some((64.0, 80.0)),
+                rotate_quarters: 0,
+            }],
+            style: Style {
+                bg_color: Some(DARKGRAY),
+                border: Some(Border {
+                    color: GRAY,
+                    double: Some((GRAY.with_alpha(0.5), 2.0)),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
         let equipment_column = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
-            margin: 5.0,
+            margin: 2.0,
             align: Align::Center,
             style: Style {
                 padding: 10.0,
                 ..Default::default()
             },
             children: vec![
+                portrait,
                 col_header("Equipment", None),
                 Element::RcRefCell(equipment_section.clone()),
             ],
@@ -525,7 +547,7 @@ impl MoneyText {
     }
 }
 
-const MONEY_FONT_SIZE: u16 = 20;
+const MONEY_FONT_SIZE: u16 = 16;
 
 impl Drawable for MoneyText {
     fn draw(&self, x: f32, y: f32) {
@@ -537,7 +559,7 @@ impl Drawable for MoneyText {
             TextParams {
                 font: Some(&self.font),
                 font_size: MONEY_FONT_SIZE,
-                color: WHITE,
+                color: LIGHTGRAY,
                 ..Default::default()
             },
         );

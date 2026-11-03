@@ -1693,22 +1693,24 @@ impl UserInterface {
                 );
             }
             GameEvent::CharactersDying { characters } => {
+                self.animation_stopwatch.set_to_at_least(0.5);
+            }
+            GameEvent::CharactersDied {
+                characters,
+                new_active,
+            } => {
                 let mut someone_died = false;
-                for char_id in characters {
-                    let char = self.characters.get(char_id);
+                for char_id in &characters {
+                    let char = self.characters.get(*char_id);
                     if !char.has_escaped_from_battle.get() {
-                        self.game_grid.animate_death(char_id);
+                        self.game_grid.animate_death(*char_id, 0.0);
                         someone_died = true;
                     }
                 }
                 if someone_died {
                     self.sound_player.play(SoundId::Death);
                 }
-            }
-            GameEvent::CharactersDied {
-                characters,
-                new_active,
-            } => {
+
                 for char_id in characters {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {

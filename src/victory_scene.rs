@@ -86,7 +86,8 @@ struct RewardSelectionUi {
 impl RewardSelectionUi {
     fn new(
         character: Rc<Character>,
-        font: Font,
+        simple_font: Font,
+        big_font: Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         rewards: Vec<(ButtonAction, Option<&'static str>)>,
@@ -95,7 +96,8 @@ impl RewardSelectionUi {
     ) -> Self {
         let bottom_panel = NonCombatCharacterUi::new(
             character.clone(),
-            &font,
+            &simple_font,
+            &big_font,
             equipment_icons,
             portrait_textures,
             sound_player,
@@ -114,7 +116,7 @@ impl RewardSelectionUi {
                         Some(Rc::clone(&event_queue)),
                         id,
                         Some(Rc::clone(&character)),
-                        &font,
+                        &simple_font,
                     ),
                     context,
                 };
@@ -132,22 +134,27 @@ impl RewardSelectionUi {
 
         let attr_font_size = 24;
         let str_element = Rc::new(RefCell::new(
-            TextLine::new("Strength", attr_font_size, WHITE, Some(font.clone()))
+            TextLine::new("Strength", attr_font_size, WHITE, Some(simple_font.clone()))
                 .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
         let agi_element = Rc::new(RefCell::new(
-            TextLine::new("Agility", attr_font_size, WHITE, Some(font.clone()))
+            TextLine::new("Agility", attr_font_size, WHITE, Some(simple_font.clone()))
                 .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
         let int_element = Rc::new(RefCell::new(
-            TextLine::new("Intellect", attr_font_size, WHITE, Some(font.clone()))
-                .with_padding(15.0, 10.0)
-                .with_hover_color(YELLOW),
+            TextLine::new(
+                "Intellect",
+                attr_font_size,
+                WHITE,
+                Some(simple_font.clone()),
+            )
+            .with_padding(15.0, 10.0)
+            .with_hover_color(YELLOW),
         ));
         let spi_element = Rc::new(RefCell::new(
-            TextLine::new("Spirit", attr_font_size, WHITE, Some(font.clone()))
+            TextLine::new("Spirit", attr_font_size, WHITE, Some(simple_font.clone()))
                 .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
@@ -184,7 +191,7 @@ impl RewardSelectionUi {
             reward_buttons,
             hovered_btn: None,
             selected_btn: None,
-            font,
+            font: simple_font,
             event_queue,
         }
     }
@@ -382,7 +389,8 @@ impl RewardSelectionUi {
 
 pub async fn run_victory_loop(
     player_characters: Vec<Rc<Character>>,
-    font: Font,
+    simple_font: Font,
+    big_font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
@@ -487,7 +495,8 @@ pub async fn run_victory_loop(
             .map(|char| {
                 RewardSelectionUi::new(
                     Rc::clone(char),
-                    font.clone(),
+                    simple_font.clone(),
+                    big_font.clone(),
                     equipment_icons,
                     portrait_textures,
                     rewards.clone(),
@@ -518,13 +527,13 @@ pub async fn run_victory_loop(
 
             let text = "Rewards!";
             let font_size = 32;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 50.0 + (text_dim.height) / 2.0,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: WHITE,
                     ..Default::default()
@@ -538,14 +547,14 @@ pub async fn run_victory_loop(
             draw_rectangle(x_mid - card_w / 2.0, y, card_w, 60.0, card_color);
             let text = &format!("{} gold coins", money_amount);
             let font_size = 28;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             y += 25.0;
             draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 y + (text_dim.height) / 2.0,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: WHITE,
                     ..Default::default()
@@ -563,7 +572,7 @@ pub async fn run_victory_loop(
             let font_size = 30;
             let margin = 25.0;
             let padding = 15.0;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             let rect = Rect::new(
                 screen_w - margin - text_dim.width - padding * 2.0,
                 screen_h - 270.0 - margin - text_dim.height - padding * 2.0,
@@ -581,7 +590,7 @@ pub async fn run_victory_loop(
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: YELLOW,
                     ..Default::default()

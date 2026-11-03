@@ -407,6 +407,28 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        22,
+        16
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        34,
+        7
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

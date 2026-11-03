@@ -90,7 +90,8 @@ pub struct NonCombatPartyUi {
 impl NonCombatPartyUi {
     pub fn new(
         characters: &[Rc<Character>],
-        font: Font,
+        simple_font: Font,
+        big_font: Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         sound_player: SoundPlayer,
@@ -101,7 +102,8 @@ impl NonCombatPartyUi {
             .map(|character| {
                 NonCombatCharacterUi::new(
                     character.clone(),
-                    &font,
+                    &simple_font,
+                    &big_font,
                     equipment_icons,
                     portrait_textures,
                     sound_player.clone(),
@@ -163,7 +165,8 @@ pub struct NonCombatCharacterUi {
 impl NonCombatCharacterUi {
     pub fn new(
         character: Rc<Character>,
-        font: &Font,
+        simple_font: &Font,
+        big_font: &Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         sound_player: SoundPlayer,
@@ -172,7 +175,7 @@ impl NonCombatCharacterUi {
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let resource_bars = Rc::new(RefCell::new(ResourceBars::new(&character, font)));
+        let resource_bars = Rc::new(RefCell::new(ResourceBars::new(&character, simple_font)));
 
         let mut next_button_id = 0;
 
@@ -182,7 +185,7 @@ impl NonCombatCharacterUi {
                 Some(Rc::clone(&event_queue)),
                 next_button_id,
                 character,
-                font,
+                simple_font,
             );
             btn.enabled.set(enabled);
             next_button_id += 1;
@@ -259,7 +262,7 @@ impl NonCombatCharacterUi {
         }
 
         let spell_book = build_spell_book(
-            font,
+            simple_font,
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,
@@ -269,12 +272,13 @@ impl NonCombatCharacterUi {
         );
 
         let stats_table = Rc::new(RefCell::new(build_character_stats_table(
-            font,
+            simple_font,
+            big_font,
             Rc::clone(&character),
         )));
 
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
-            font,
+            simple_font,
             &character,
             true,
             sound_player,
@@ -322,7 +326,7 @@ impl NonCombatCharacterUi {
             event_queue,
             hovered_button: None,
             hoverable_buttons,
-            font: font.clone(),
+            font: simple_font.clone(),
         }
     }
 

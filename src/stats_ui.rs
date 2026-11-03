@@ -13,7 +13,8 @@ use crate::{
 
 pub struct CharacterStatsTable {
     element: Element,
-    font: Font,
+    simple_font: Font,
+    big_font: Font,
     character: Rc<Character>,
 }
 
@@ -33,14 +34,18 @@ impl Drawable for CharacterStatsTable {
 
 impl CharacterStatsTable {
     pub fn rebuild(&mut self) {
-        let font = self.font.clone();
-        let character = self.character.clone();
-        *self = build_character_stats_table(&font, character)
+        *self = build_character_stats_table(
+            &self.simple_font.clone(),
+            &self.big_font,
+            self.character.clone(),
+        )
     }
 }
 
 pub fn build_character_stats_table(
     simple_font: &Font,
+    big_font: &Font,
+
     character: Rc<Character>,
 ) -> CharacterStatsTable {
     let mut main_stat_cells = vec![];
@@ -94,7 +99,7 @@ pub fn build_character_stats_table(
     ] {
         let label_line =
             TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
-        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(simple_font.clone()))
+        let value_line = TextLine::new(format!("{}", value), 12, WHITE, Some(big_font.clone()))
             .with_depth(BLACK, 2.0);
         let cell = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
@@ -263,9 +268,9 @@ pub fn build_character_stats_table(
             TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
         let value_line = TextLine::new(
             format!("|{}| {}", icon, value),
-            24,
+            12,
             WHITE,
-            Some(simple_font.clone()),
+            Some(big_font.clone()),
         )
         .with_depth(BLACK, 2.0);
         let cell = Element::Container(Container {
@@ -326,7 +331,8 @@ pub fn build_character_stats_table(
 
     CharacterStatsTable {
         element,
-        font: simple_font.clone(),
+        simple_font: simple_font.clone(),
+        big_font: big_font.clone(),
         character,
     }
 }

@@ -34,7 +34,8 @@ use crate::{
 
 pub async fn run_shop_loop(
     player_characters: Vec<Rc<Character>>,
-    font: Font,
+    simple_font: Font,
+    big_font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
@@ -50,7 +51,8 @@ pub async fn run_shop_loop(
 
         let mut ui = NonCombatPartyUi::new(
             &characters[..],
-            font.clone(),
+            simple_font.clone(),
+            big_font.clone(),
             equipment_icons,
             portrait_textures,
             sound_player,
@@ -72,13 +74,13 @@ pub async fn run_shop_loop(
 
             let text = "Buy something?";
             let font_size = 32;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 40.0 + (text_dim.height) / 2.0,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: WHITE,
                     ..Default::default()
@@ -89,7 +91,7 @@ pub async fn run_shop_loop(
             let font_size = 30;
             let margin = 25.0;
             let padding = 15.0;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
             let rect = Rect::new(
                 screen_w - margin - text_dim.width - padding * 2.0,
                 screen_h - 270.0 - margin - text_dim.height - padding * 2.0,
@@ -107,7 +109,7 @@ pub async fn run_shop_loop(
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,
                 TextParams {
-                    font: Some(&font),
+                    font: Some(&simple_font),
                     font_size,
                     color: YELLOW,
                     ..Default::default()
@@ -147,19 +149,19 @@ pub async fn run_shop_loop(
                     let cost_color = if can_afford { WHITE } else { RED };
                     let text = format!("{}", entry.cost);
                     let font_size = 24;
-                    let text_dim = measure_text(&text, Some(&font), font_size, 1.0);
+                    let text_dim = measure_text(&text, Some(&simple_font), font_size, 1.0);
                     TextLine::new(
                         format!("{}", entry.cost),
                         font_size,
                         cost_color,
-                        Some(font.clone()),
+                        Some(simple_font.clone()),
                     )
                     .with_depth(DARKGRAY, 1.0)
                     .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
                     let tooltip = equipment_tooltip(&entry.item);
                     let tooltip_rect = draw_regular_tooltip(
-                        &font,
+                        &simple_font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
                             icon_y + 50.0,
@@ -197,7 +199,12 @@ pub async fn run_shop_loop(
 
             if let Some((tooltip, rect)) = hovered {
                 if !tooltip.keywords.is_empty() {
-                    draw_keyword_tooltips(&font, &tooltip.keywords, rect.x, rect.bottom() + 2.0);
+                    draw_keyword_tooltips(
+                        &simple_font,
+                        &tooltip.keywords,
+                        rect.x,
+                        rect.bottom() + 2.0,
+                    );
                 }
             }
 

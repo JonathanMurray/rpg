@@ -3079,6 +3079,12 @@ impl CoreGame {
                 let mut applied_to_self = vec![];
                 let mut visual_effect = None;
 
+                let attack_type = if weapon.is_melee() {
+                    AttackType::Melee
+                } else {
+                    AttackType::Ranged
+                };
+
                 if let Some(game) = game {
                     if !armor_penetrators.is_empty() {
                         detail_lines.push(format!(
@@ -3091,12 +3097,6 @@ impl CoreGame {
                     detail_lines.push(dmg_str);
                     actual_health_lost =
                         game.character_lose_health(defender, damage, Some(DamageType::Regular));
-
-                    let attack_type = if weapon.is_melee() {
-                        AttackType::Melee
-                    } else {
-                        AttackType::Ranged
-                    };
 
                     if weapon.is_melee() {
                         let defender_thorns = defender.thorns();
@@ -3175,16 +3175,6 @@ impl CoreGame {
                             game.do_apply_effect(effect, Some(attacker), None, defender);
                         detail_lines.push(log_line);
                     }
-
-                    applied_to_target.push(AppliedEffect::LostHealth(
-                        damage,
-                        DamageSource::Attack {
-                            attack_type,
-                            hit_type,
-                            attacker_pos: attacker.pos(),
-                        },
-                        DamageType::Regular,
-                    ));
 
                     if damage > 0 {
                         if let Some(effect) = weapon.on_damage {
@@ -3330,6 +3320,16 @@ impl CoreGame {
                         detail_lines.push(format!("|{}| lost Ruthless", attacker.name_tag()));
                     }
                 }
+
+                applied_to_target.push(AppliedEffect::LostHealth(
+                    actual_health_lost,
+                    DamageSource::Attack {
+                        attack_type,
+                        hit_type,
+                        attacker_pos: attacker.pos(),
+                    },
+                    DamageType::Regular,
+                ));
 
                 AttackOutcome {
                     damage,

@@ -686,7 +686,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, BAD_BOW);
+    alice.set_weapon(HandType::MainHand, CHEAT_BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice
         .arrows

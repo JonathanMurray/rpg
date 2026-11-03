@@ -1332,15 +1332,23 @@ impl Drawable for ResourceBar {
                     if i < self.current {
                         draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
                         if i >= self.current.saturating_sub(self.reserved_amount) {
+                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, DARKGRAY);
+                            let alpha = oscillate_plateau(0.1, 0.2, 0.5, 0.3, 0.8);
                             draw_rectangle(
                                 x0,
                                 y0,
                                 cell_size.0,
                                 cell_size.1,
-                                Color::new(1.0, 1.0, 1.0, 0.7),
+                                Color::new(1.0, 1.0, 1.0, alpha),
                             );
                         } else if i >= self.current.saturating_sub(self.hovered_amount) {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, SKYBLUE);
+                            draw_rectangle(
+                                x0,
+                                y0,
+                                cell_size.0,
+                                cell_size.1,
+                                Color::new(1.0, 1.0, 1.0, 0.5),
+                            );
                         }
                     }
 

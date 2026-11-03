@@ -53,6 +53,7 @@ pub struct Sprite {
     pub regular: Texture2D,
     pub white_highlight: Texture2D,
     pub red_highlight: Texture2D,
+    pub bright: Texture2D,
 }
 
 pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
@@ -105,12 +106,17 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
             red.set_filter(FilterMode::Nearest);
             replace_color(&red, highlight_color, [255, 100, 100, 255]);
 
+            let bright = Texture2D::from_image(&texture.get_texture_data());
+            bright.set_filter(FilterMode::Nearest);
+            brighten(&bright, highlight_color);
+
             (
                 id,
                 Sprite {
                     regular: texture,
                     white_highlight: white,
                     red_highlight: red,
+                    bright,
                 },
             )
         })
@@ -1136,6 +1142,20 @@ fn make_grayscale(texture: &Texture2D) {
     for pixel in img.get_image_data_mut() {
         let avg = ((pixel[0] as f32 + pixel[1] as f32 + pixel[2] as f32) / 3.0) as u8;
         *pixel = [avg, avg, avg, pixel[3]];
+    }
+    texture.update(&img);
+}
+
+fn brighten(texture: &Texture2D, highlight_color: [u8; 4]) {
+    let mut img = texture.get_texture_data();
+    for pixel in img.get_image_data_mut() {
+        if pixel == &highlight_color {
+            *pixel = [255, 255, 255, 255];
+        } else {
+            for i in 0..3 {
+                pixel[i] = ((255.0 + pixel[i] as f32 * 2.0) / 3.0) as u8;
+            }
+        }
     }
     texture.update(&img);
 }

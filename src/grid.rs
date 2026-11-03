@@ -1035,7 +1035,7 @@ impl GameGrid {
         self.hovered_character_portrait = character_id;
     }
 
-    pub fn animate_death(&mut self, character_id: CharacterId) {
+    pub fn animate_death(&mut self, character_id: CharacterId, start_time: f32) {
         let character = self.characters.get(&character_id).unwrap();
 
         let standing_on_surface = self.pathfind_grid.surface(character.pos());
@@ -1045,7 +1045,7 @@ impl GameGrid {
             character.pos(),
             character.pos(),
             EffectData {
-                start_time: 0.0,
+                start_time,
                 end_time: 6.0,
                 variant: EffectVariant::Corpse {
                     sprite: character.sprite,
@@ -3061,7 +3061,10 @@ impl GameGrid {
             } else if self.hovered_character.or(self.hovered_character_portrait)
                 == Some(character.id())
             {
-                &sprite.white_highlight
+                // TODO: Use the bright version for something significant - like when hovering a valid target
+                // for a currently configured ability
+                //&sprite.white_highlight
+                &sprite.bright
             } else {
                 &sprite.regular
             };
@@ -6768,7 +6771,7 @@ impl GameGrid {
 
                 if within_outer(x, y) {
                     if !is_within_inner {
-                        self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
+                        self.fill_cell((x, y), Color::new(0.6, 0.6, 0.9, 0.1), 0.0);
                     }
                     // Hack: since high-ground can have low-ground as a direct north neighbor,
                     // if both positions are reachable (via completely different routes), clarify with
