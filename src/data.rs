@@ -1997,7 +1997,7 @@ pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
 
-    description: "|<keyword>Inspire| nearby allies for |<keyword>3| rounds",
+    description: "|<keyword>Inspire| nearby allies for |<value>3| rounds",
     icon: IconId::Inspire,
     action_point_cost: 2,
     mana_cost: 2,
@@ -2042,7 +2042,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
 
-    description: "|<keyword>Inspire| nearby allies for |<keyword>2| rounds",
+    description: "|<keyword>Inspire| nearby allies for |<value>2| rounds",
     icon: IconId::Inspire,
     action_point_cost: 3,
     mana_cost: 0,

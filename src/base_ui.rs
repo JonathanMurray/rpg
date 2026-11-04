@@ -632,9 +632,11 @@ pub fn draw_text_with_font_tags(
         } else {
             let mut params = params.clone();
             let mut strikethrough = false;
+            let mut depth = false;
             if consume_prefix_tag("<value>", &mut part) {
                 if render_tags {
-                    params.color = Color::new(0.9, 0.7, 1.0, 1.0);
+                    params.color = WHITE; // Color::new(0.9, 0.7, 1.0, 1.0);
+                    depth = true;
                     //params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
                 }
             } else if consume_prefix_tag("<keyword>", &mut part) {
@@ -662,7 +664,11 @@ pub fn draw_text_with_font_tags(
                 strikethrough = true;
             }
 
-            let part_dimensions = draw_text_rounded(part, x0, y, params);
+            let part_dimensions = draw_text_rounded(part, x0, y, params.clone());
+
+            if depth {
+                draw_text_rounded(part, x0 + 1.0, y, params);
+            }
 
             if strikethrough && render_tags {
                 let y0 = y - part_dimensions.offset_y + part_dimensions.height / 2.0;

@@ -4843,7 +4843,8 @@ impl GameGrid {
             }
             match &animation.kind {
                 AnimationDetails::SpeechBubble { text } => {
-                    self.draw_speech_bubble(text, animation.character_id, 0.0);
+                    let text_filled_ratio = (animation.elapsed_ratio() * 4.0).min(1.0);
+                    self.draw_speech_bubble(text, animation.character_id, 0.0, text_filled_ratio);
                 }
                 AnimationDetails::AttackCrosshairPreview { target_pos } => {
                     self.draw_target_crosshair(
@@ -5348,10 +5349,16 @@ impl GameGrid {
     }
 
     fn draw_opportunity_attack_warning(&self, opportunity_attacker: CharacterId) {
-        self.draw_speech_bubble("|<warning>|", opportunity_attacker, -3.0);
+        self.draw_speech_bubble("|<warning>|", opportunity_attacker, -3.0, 1.0);
     }
 
-    fn draw_speech_bubble(&self, text: &str, character_id: CharacterId, text_y_offset: f32) {
+    fn draw_speech_bubble(
+        &self,
+        text: &str,
+        character_id: CharacterId,
+        text_y_offset: f32,
+        text_filled_ratio: f32,
+    ) {
         let font_size = 24;
         let text_dim = measure_text_with_font_tags(text, Some(&self.big_font), font_size, 1.0);
         let padding = 5.0;
@@ -5380,7 +5387,7 @@ impl GameGrid {
             None,
         );
         draw_text_with_font_tags(
-            text,
+            &text[0..(text.len() as f32 * text_filled_ratio) as usize],
             (bubble_x + bubble_w / 2.0 - text_dim.width / 2.0).round(),
             v2.1 - padding + text_y_offset,
             TextParams {
@@ -6421,7 +6428,7 @@ impl GameGrid {
     }
 
     fn draw_overhead_question_mark(&self, reactor: &Character) {
-        self.draw_speech_bubble("?", reactor.id(), 0.0);
+        self.draw_speech_bubble("?", reactor.id(), 0.0, 1.0);
     }
 
     fn draw_engagement_line(

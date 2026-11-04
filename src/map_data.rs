@@ -649,7 +649,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(5, 3, 1, 5),
+        Attributes::new(5, 3, 1, 1),
         (2, 10),
     );
     test_fighter.set_weapon(HandType::MainHand, ZERO_SWORD);
