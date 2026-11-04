@@ -22,8 +22,8 @@ use crate::{
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
     resources::{
-        draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
-        PORTRAIT_ENEMY_BG_TEXTURE, UI_RESOURCE_BAR_TEXTURE,
+        draw_portrait, portrait_texture, PortraitId, BIG_FONT, PORTRAITS_TEXTURE,
+        PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE, SIMPLE_FONT, UI_RESOURCE_BAR_TEXTURE,
     },
     sounds::{SoundId, SoundPlayer},
     util::{oscillate, oscillate_loop, oscillate_plateau, oscillate_square},
@@ -1425,7 +1425,6 @@ pub struct LabelledResourceBar {
     pub bar: Rc<RefCell<ResourceBar>>,
     value_text: Rc<RefCell<TextLine>>,
     max_value: u32,
-    symbol: &'static str,
     pub hovered: Cell<bool>,
 }
 
@@ -1473,7 +1472,6 @@ impl LabelledResourceBar {
             bar,
             value_text,
             max_value: max,
-            symbol,
             hovered: Cell::new(false),
         };
 
@@ -1533,4 +1531,114 @@ impl Drawable for LabelledResourceBar {
             (0.0, 0.0)
         }
     }
+}
+
+pub fn portrait_element(character: &Character) -> Element {
+    let bg_texture = if character.player_controlled() {
+        &PORTRAIT_BG_TEXTURE
+    } else {
+        &PORTRAIT_ENEMY_BG_TEXTURE
+    };
+    Element::Container(Container {
+        children: vec![Element::Texture {
+            texture: portrait_texture(character.portrait),
+            dest_size: Some((64.0, 80.0)),
+            rotate_quarters: 0,
+        }],
+        style: Style {
+            bg_color: Some(DARKGRAY),
+            border: Some(Border {
+                color: Color::new(0.7, 0.7, 0.7, 1.0),
+                double: Some((GRAY.with_alpha(0.5), 2.0)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        bg_texture: Some(bg_texture.get().unwrap().clone()),
+        ..Default::default()
+    })
+}
+
+pub fn character_defense_section(character: &Character) -> Element {
+    let simple_font = SIMPLE_FONT.get().unwrap();
+    let big_font = BIG_FONT.get().unwrap();
+
+    let defense_header: Element = Element::Text(TextLine::new(
+        "Defenses:",
+        16,
+        WHITE,
+        Some(simple_font.clone()),
+    ));
+
+    let defense_header_row = Element::Container(Container {
+        layout_dir: LayoutDirection::Vertical,
+        align: Align::Center,
+        style: Style {
+            bg_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
+            padding: 2.0,
+            ..Default::default()
+        },
+        min_width: Some(150.0),
+        children: vec![defense_header],
+        ..Default::default()
+    });
+
+    let mut defense_cells = vec![];
+    for (label, value, icon, tooltip_lines) in [
+        (
+            "Toughness",
+            character.toughness(),
+            "<toughness>",
+            &["Protection against physical harm that can't be dodged."][..],
+        ),
+        (
+            "Evasion",
+            character.evasion(),
+            "<evasion>",
+            &["Protection against melee attacks and projectiles."][..],
+        ),
+        (
+            "Will",
+            character.will(),
+            "<will>",
+            &["Protection against non-physical harm."][..],
+        ),
+    ] {
+        let label_line =
+            TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
+        let value_line = TextLine::new(
+            format!("|{}| {}", icon, value),
+            12,
+            WHITE,
+            Some(big_font.clone()),
+        )
+        .with_depth(BLACK, 2.0);
+        let cell = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            align: Align::Center,
+            margin: 10.0,
+            children: vec![Element::Text(label_line), Element::Text(value_line)],
+            tooltip: Some((
+                format!("{} |{}|", label, icon),
+                tooltip_lines.iter().map(|s| s.to_string()).collect(),
+                vec![],
+            )),
+            ..Default::default()
+        });
+        defense_cells.push(cell);
+    }
+
+    let defense_row = Element::Container(Container {
+        layout_dir: LayoutDirection::Horizontal,
+        margin: 20.0,
+        children: defense_cells,
+        ..Default::default()
+    });
+
+    Element::Container(Container {
+        layout_dir: LayoutDirection::Vertical,
+        children: vec![defense_header_row, Element::Empty(0.0, 11.0), defense_row],
+        align: Align::Center,
+        ..Default::default()
+    })
 }

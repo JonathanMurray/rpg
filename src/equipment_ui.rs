@@ -1013,7 +1013,7 @@ impl Drawable for EquipmentSlot {
             if let Some(content) = &self.content {
                 let tooltip = &content.tooltip;
                 draw_tooltip(
-                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                     &tooltip.header,
                     None,
                     &tooltip.technical_description,
@@ -1023,8 +1023,7 @@ impl Drawable for EquipmentSlot {
                 );
             } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
                 draw_regular_tooltip(
-                    &self.font,
-                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                     tooltip_lines[0].as_ref(),
                     None,
                     &tooltip_lines[1..],

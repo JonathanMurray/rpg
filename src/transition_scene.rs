@@ -2,7 +2,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use macroquad::{
     color::{Color, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
-    input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
+    input::{
+        is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
+    },
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, TextParams},
@@ -63,7 +65,6 @@ impl CharacterGrowth {
 pub async fn run_transition_loop(
     mut player_characters: Vec<(Rc<Character>, CharacterGrowth)>,
     resources: &GameResources,
-    party: &Party,
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let mut restoration_texts = HashMap::<PlayerId, Vec<String>>::default();
@@ -387,7 +388,8 @@ pub async fn run_transition_loop(
                     .unwrap();
                 //let tooltip = button_action_tooltip(&hovered.action);
                 let tooltip = btn.tooltip();
-                draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip, true);
+                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
+                draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip, detailed_tooltip);
             }
 
             let text = "Continue";
@@ -422,7 +424,7 @@ pub async fn run_transition_loop(
             {
                 break;
             }
-            if is_key_pressed(macroquad::input::KeyCode::Space) {
+            if is_key_pressed(KeyCode::Space) {
                 break;
             }
 

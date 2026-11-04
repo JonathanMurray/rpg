@@ -33,7 +33,7 @@ use rpg::data::{
 use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_high_alice, make_low_level_party, make_medium_clara, make_test_fighter};
+use rpg::map_data::{make_low_level_party, make_medium_clara, make_test_archer, make_test_fighter};
 use rpg::resources::load_and_init_static_resources;
 use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::{self, SoundPlayer};
@@ -129,26 +129,25 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
             return;
         }
 
-        // TODO
         /*
-           run_transition_loop(
-               vec![(
-                   player_characters[0].clone(),
-                   CharacterGrowth::of(
-                       vec![
-                           ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                           ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS),
-                           //ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
-                       ],
-                       vec![EquipmentEntry::Weapon(ARCANE_BOW)],
-                   ),
-               )],
-               resources,
-               ui_resources,
-               &party,
-               sound_player.clone(),
-           )
-           .await;
+        player_characters = grow_players(
+            player_characters,
+            vec![(
+                PlayerId::Bob,
+                CharacterGrowth::of(
+                    vec![
+                        ButtonAction::Action(BaseAction::UseAbility(&PIERCING_SHOT)), //ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
+                    ],
+                    vec![],
+                ),
+            )]
+            .into_iter()
+            .collect(),
+            resources,
+            &party,
+            sound_player.clone(),
+        )
+        .await;
         */
 
         let mut demo_sequence = [
@@ -318,7 +317,7 @@ fn build_player_growths(
         assert!(growth.is_new_joiner);
         let new_char = match player_id {
             PlayerId::Bob => make_test_fighter(party),
-            PlayerId::Alice => make_high_alice(party),
+            PlayerId::Alice => make_test_archer(party),
             PlayerId::Clara => make_medium_clara(party),
         };
         result.push((Rc::new(new_char), growth));
@@ -335,7 +334,7 @@ async fn grow_players(
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let player_growths = build_player_growths(player_characters, growths, party);
-    run_transition_loop(player_growths, resources, party, sound_player).await
+    run_transition_loop(player_growths, resources, sound_player).await
 }
 
 async fn run_fight_loop(

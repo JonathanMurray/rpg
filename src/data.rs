@@ -2093,7 +2093,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     stamina_cost: 0,
     requirement: None,
 
-    roll: Some(AbilityRollType::Spell),
+    roll: None,
     possible_enhancements: &[],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
@@ -2877,17 +2877,17 @@ impl PassiveSkill {
         use PassiveSkill::*;
         match self {
             HardenedSkin => "|<value>+1| |<shield>| armor",
-            WeaponProficiency => "Attacks gain |<value>+1| |<shield>| armor penetration",
-            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below |<value>50%| |<mana>| mana",
-            Reaper => "|<trigger>On kill:| gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|",
+            WeaponProficiency => "|<trigger>On strong / critical hit:| Attacks penetrate |<value>+2| |<shield>| armor.",
+            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below |<value>50%| |<mana>| mana.",
+            Reaper => "|<trigger>On kill:| gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|.",
             BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below |<value>50%| |<heart>| health. Immune to |<keyword>Near-death|.",
             ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
-            Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",
-            Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
-            RisingTemper => "|<trigger>End of turn:| gain +1 |<keyword>Ferocity|",
+            Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets.",
+            Vigilant => "Can |<reaction>| opportunity attack an enemy, even while engaging with another enemy.",
+            RisingTemper => "|<trigger>End of turn:| gain +1 |<keyword>Ferocity|.",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
             Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
-            Undead => "Immune to |<keyword>Bleeding|. |<value>-35%| |<boot>| movement speed"
+            Undead => "Immune to |<keyword>Bleeding|. |<value>-35%| |<boot>| movement speed.",
         }
     }
 
@@ -2899,6 +2899,7 @@ impl PassiveSkill {
             SwampDweller => &[Keyword::Cond(Condition::Poisoned, None)],
             Slasher => &[Keyword::Cond(Condition::Bleeding, None)],
             Undead => &[Keyword::Cond(Condition::Bleeding, None)],
+            WeaponProficiency => &[Keyword::StrongWeak, Keyword::Crit],
             _ => &[],
         }
     }

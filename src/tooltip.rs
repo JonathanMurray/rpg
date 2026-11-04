@@ -82,9 +82,9 @@ impl Keyword {
             Keyword::AttackEnhancement(enhancement) => format!("|<enhancement>| |<keyword>Enhancement| |<faded>(attack)|\n\n{}",  enhancement.description),
             Keyword::OnAttackedReaction(reaction) => format!("|<reaction>| |<keyword>Reaction| |<faded>(incoming attack)|\n\n{}", reaction.description),
             Keyword::OpportunityAttack => "|<reaction>| |<keyword>Reaction|\n\nAttack an enemy that drops their guard".to_string(),
-            Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
+            Keyword::Advantage => "Roll extra |<mixed_dice>| dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
-                "Distance: |<value>x| |<faded>(affected by target's |<toughness>||<stat>Toughness|<faded>)|\n|<trigger>On collision:| take |<value>1| damage per remaining distance.".to_string()
+                "|<range>| Distance: |<value>x| |<faded>(resisted by |<toughness>||<stat>Toughness|<faded>)|\n|<trigger>On collision:| take |<value>1| damage per remaining distance.".to_string()
             }
             Keyword::StrongWeak => {
                 "Modified damage or effectiveness, triggered by certain |<mixed_dice>| dice outcomes.\n|<trigger>16 or higher:| |<value>+50%|.\n<trigger>5 or lower:| |<value>-50%|.".to_string()
@@ -165,12 +165,12 @@ pub enum TooltipPositionPreference {
 pub enum Side {
     Top,
     Right,
-    Bottom,
+    BottomRight,
+    BottomLeft,
     Left,
 }
 
 pub fn draw_regular_tooltip(
-    font: &Font,
     pos_preference: TooltipPositionPreference,
     header: &str,
     error: Option<&'static str>,
@@ -317,9 +317,12 @@ pub fn draw_tooltip(
     let (x, y) = match pos_preference {
         TooltipPositionPreference::RelativeToRect(rect, mut pos_preference) => {
             if pos_preference == Side::Top && rect.top() - tooltip_h < 0.0 {
-                pos_preference = Side::Bottom;
+                pos_preference = Side::BottomRight;
             }
-            if pos_preference == Side::Bottom && rect.bottom() + tooltip_h > screen_h {
+
+            if matches!(pos_preference, Side::BottomLeft | Side::BottomRight)
+                && rect.bottom() + tooltip_h > screen_h
+            {
                 pos_preference = Side::Top;
             }
             if pos_preference == Side::Left && rect.left() - tooltip_w < 0.0 {
@@ -337,7 +340,8 @@ pub fn draw_tooltip(
                     rect.top() - space - tooltip_h,
                 ),
                 Side::Right => (rect.right() + space, rect.top().min(screen_h - tooltip_h)),
-                Side::Bottom => (rect.left().min(screen_w - tooltip_w), rect.bottom() + space),
+                Side::BottomRight => (rect.left().min(screen_w - tooltip_w), rect.bottom() + space),
+                Side::BottomLeft => ((rect.right() - tooltip_w).max(0.0), rect.bottom() + space),
                 Side::Left => (
                     rect.left() - space - tooltip_w,
                     rect.top().min(screen_h - tooltip_h),
@@ -454,7 +458,17 @@ pub fn draw_tooltip(
         let shown_for =
             KEYWORD_TOOLTIP_COUNTER.fetch_add(elapsed_ms, std::sync::atomic::Ordering::Relaxed);
         if shown_for > 200 {
-            draw_keyword_tooltips_relative_to_rect(keywords, tooltip_rect);
+            // If the main tooltip is the to the left of something (presumably to avoid covering it),
+            // then any extra keyword tooltips should also be to the left
+            let side = if matches!(
+                pos_preference,
+                TooltipPositionPreference::RelativeToRect(_rect, Side::Left)
+            ) {
+                Side::Left
+            } else {
+                Side::Right
+            };
+            draw_keyword_tooltips_relative_to_rect(keywords, tooltip_rect, side);
         }
     }
 
@@ -481,12 +495,18 @@ pub fn handle_keyword_tooltip_end_of_frame() {
     DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
 }
 
-pub fn draw_keyword_tooltips_relative_to_rect(keywords: &[Keyword], mut rect: Rect) {
+pub fn draw_keyword_tooltips_relative_to_rect(
+    keywords: &[Keyword],
+    mut rect: Rect,
+    side_relative_to_parent_tooltip: Side,
+) {
     for (i, keyword) in keywords.iter().enumerate() {
         let pos_preference = if i == 0 {
-            TooltipPositionPreference::RelativeToRect(rect, Side::Right)
+            TooltipPositionPreference::RelativeToRect(rect, side_relative_to_parent_tooltip)
         } else {
-            TooltipPositionPreference::At((rect.x, rect.y + rect.h))
+            // TODO only left if appropriate
+            TooltipPositionPreference::RelativeToRect(rect, Side::BottomLeft)
+            //TooltipPositionPreference::At((rect.x, rect.y + rect.h))
         };
         let description = keyword.description();
         let content_lines: Vec<&str> = description.split("\n").collect();

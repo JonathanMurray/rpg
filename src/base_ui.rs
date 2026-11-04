@@ -273,7 +273,7 @@ pub struct TextLine {
     depth: Option<(Color, f32)>,
 
     pub has_been_hovered: Cell<Option<(f32, f32)>>,
-    pub tooltip: Option<(Font, String, Vec<String>, Vec<Keyword>)>,
+    pub tooltip: Option<(String, Vec<String>, Vec<Keyword>)>,
 }
 
 impl TextLine {
@@ -356,17 +356,6 @@ impl TextLine {
 
     pub fn with_padding(mut self, hor: f32, vert: f32) -> Self {
         self.set_padding(hor, vert);
-        self
-    }
-
-    pub fn with_tooltip(
-        mut self,
-        font: Font,
-        header: impl Into<String>,
-        lines: Vec<String>,
-        keywords: Vec<Keyword>,
-    ) -> Self {
-        self.tooltip = Some((font, header.into(), lines, keywords));
         self
     }
 
@@ -465,12 +454,12 @@ impl Drawable for TextLine {
     }
 
     fn draw_tooltips(&self, x: f32, y: f32) {
-        if let Some((font, header, lines, keywords)) = self.tooltip.as_ref() {
+        if let Some((header, lines, keywords)) = self.tooltip.as_ref() {
             let (w, h) = self.size();
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
                 draw_tooltip(
-                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                     header,
                     None,
                     lines,
@@ -913,8 +902,9 @@ pub struct Container {
     pub children: Vec<Element>,
     pub border_between_children: Option<Color>,
     pub scroll: Option<ContainerScroll>,
-    pub tooltip: Option<(Font, String, Vec<String>, Vec<Keyword>)>,
+    pub tooltip: Option<(String, Vec<String>, Vec<Keyword>)>,
     pub last_drawn_rectangle: Cell<Rect>,
+    pub bg_texture: Option<Texture2D>,
 }
 
 impl Container {
@@ -1015,12 +1005,12 @@ impl Container {
     pub fn draw_tooltips(&self, x: f32, y: f32) {
         self._draw(x, y, true);
 
-        if let Some((font, header, lines, keywords)) = self.tooltip.as_ref() {
+        if let Some((header, lines, keywords)) = self.tooltip.as_ref() {
             let (w, h) = self.size();
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
                 draw_tooltip(
-                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                     header,
                     None,
                     lines,
@@ -1038,15 +1028,14 @@ impl Container {
             .set(Rect::new(x, y, size.0, size.1));
         if !only_tooltips {
             self.style.draw_background(x, y, size);
+
+            if let Some(t) = self.bg_texture.as_ref() {
+                draw_texture(&t, x, y, WHITE);
+            }
         }
 
         let mut x0 = x + self.style.padding;
         let mut y0 = y + self.style.padding;
-        /*
-        if self.reverse_vertical {
-            y0 = y + size.1 - self.style.padding;
-        }
-         */
 
         let scroll_offset = self
             .scroll
@@ -1323,7 +1312,7 @@ pub fn table(
         );
 
         if let Some((header, lines, keywords)) = cell.tooltip {
-            text.tooltip = Some((font.clone(), header, lines, keywords));
+            text.tooltip = Some((header, lines, keywords));
         }
 
         if let Some(depth) = cell.depth {

@@ -6,7 +6,7 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
-use crate::util::COL_GOLD;
+use crate::{resources::BIG_FONT, util::COL_GOLD};
 
 pub struct Banner {
     inner: Option<_Banner>,
@@ -33,7 +33,8 @@ struct _Banner {
 }
 
 impl Banner {
-    pub fn draw(&mut self, font: &Font) {
+    pub fn draw(&mut self) {
+        let font = BIG_FONT.get().unwrap();
         if let Some(banner) = &mut self.inner {
             let text = banner.text;
             let h = 60.0;

@@ -115,7 +115,7 @@ impl ConditionsList {
                     Rect::new(
                         x,
                         y0 - dimensions.height,
-                        dimensions.width,
+                        dimensions.width + status_w + margin,
                         dimensions.height,
                     ),
                     *info,

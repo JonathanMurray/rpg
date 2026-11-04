@@ -8,6 +8,8 @@ use macroquad::{
 use crate::{
     base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::{Character, HandType},
+    game_ui_components::character_defense_section,
+    resources::{BIG_FONT, SIMPLE_FONT},
     tooltip::Keyword,
     util::COL_TEXT_FADED,
 };
@@ -108,7 +110,6 @@ pub fn build_character_stats_table(
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some((
-                simple_font.clone(),
                 name.to_string(),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
                 vec![],
@@ -208,12 +209,7 @@ pub fn build_character_stats_table(
         };
         Element::Container(Container {
             children: vec![Element::Text(left), Element::Container(right)],
-            tooltip: Some((
-                simple_font.clone(),
-                long_header.to_string(),
-                tooltip,
-                keywords,
-            )),
+            tooltip: Some((long_header.to_string(), tooltip, keywords)),
             margin: 15.0,
             align: Align::Center,
             style: Style {
@@ -223,79 +219,6 @@ pub fn build_character_stats_table(
             ..Default::default()
         })
     };
-
-    let defense_header: Element = Element::Text(TextLine::new(
-        "Defenses:",
-        16,
-        WHITE,
-        Some(simple_font.clone()),
-    ));
-
-    let defense_header_row = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        align: Align::Center,
-        style: Style {
-            bg_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
-            padding: 2.0,
-            ..Default::default()
-        },
-        min_width: Some(150.0),
-        children: vec![defense_header],
-        ..Default::default()
-    });
-
-    let mut defense_cells = vec![];
-    for (label, value, icon, tooltip_lines) in [
-        (
-            "Toughness",
-            character.toughness(),
-            "<toughness>",
-            &["Protection against physical harm that can't be dodged."][..],
-        ),
-        (
-            "Evasion",
-            character.evasion(),
-            "<evasion>",
-            &["Protection against melee attacks and projectiles."][..],
-        ),
-        (
-            "Will",
-            character.will(),
-            "<will>",
-            &["Protection against non-physical harm."][..],
-        ),
-    ] {
-        let label_line =
-            TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
-        let value_line = TextLine::new(
-            format!("|{}| {}", icon, value),
-            12,
-            WHITE,
-            Some(big_font.clone()),
-        )
-        .with_depth(BLACK, 2.0);
-        let cell = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
-            margin: 10.0,
-            children: vec![Element::Text(label_line), Element::Text(value_line)],
-            tooltip: Some((
-                simple_font.clone(),
-                format!("{} |{}|", label, icon),
-                tooltip_lines.iter().map(|s| s.to_string()).collect(),
-                vec![],
-            )),
-            ..Default::default()
-        });
-        defense_cells.push(cell);
-    }
-
-    let defense_row = Element::Container(Container {
-        layout_dir: LayoutDirection::Horizontal,
-        margin: 20.0,
-        children: defense_cells,
-        ..Default::default()
-    });
 
     let mut children = vec![
         Element::Empty(0.0, 4.0),
@@ -307,9 +230,7 @@ pub fn build_character_stats_table(
     }
     children.extend([
         Element::Empty(0.0, 12.0),
-        defense_header_row,
-        Element::Empty(0.0, 11.0),
-        defense_row,
+        character_defense_section(&character),
     ]);
 
     let element = Element::Container(Container {

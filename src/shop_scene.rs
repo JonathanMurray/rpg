@@ -161,7 +161,6 @@ pub async fn run_shop_loop(
 
                     let tooltip = equipment_tooltip(&entry.item);
                     let tooltip_rect = draw_regular_tooltip(
-                        &simple_font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
                             icon_y + 50.0,

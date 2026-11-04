@@ -744,7 +744,7 @@ pub async fn run_skill_tree_scene() {
                         let rect = Rect::new(pos.0, pos.1, cell_w, cell_w);
                         let tooltip = button_action_tooltip(&button_action, None);
                         draw_tooltip(
-                            TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                            TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                             &tooltip.header,
                             tooltip.error,
                             &tooltip.content_lines(true),

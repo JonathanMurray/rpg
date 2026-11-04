@@ -24,6 +24,7 @@ use crate::core::{ActionTarget, EquipmentEntry, EquipmentSlotRole};
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection};
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
+use crate::game_ui_components::portrait_element;
 use crate::resources::{
     portrait_texture, PORTRAITS_TEXTURE, UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE,
 };
@@ -145,24 +146,6 @@ impl CharacterSheet {
             sound_player,
         )));
 
-        let portrait = Element::Container(Container {
-            children: vec![Element::Texture {
-                texture: portrait_texture(character.portrait),
-                dest_size: Some((64.0, 80.0)),
-                rotate_quarters: 0,
-            }],
-            style: Style {
-                bg_color: Some(DARKGRAY),
-                border: Some(Border {
-                    color: GRAY,
-                    double: Some((GRAY.with_alpha(0.5), 2.0)),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-
         let equipment_column = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 2.0,
@@ -172,7 +155,7 @@ impl CharacterSheet {
                 ..Default::default()
             },
             children: vec![
-                portrait,
+                portrait_element(&character),
                 col_header("Equipment", None),
                 Element::RcRefCell(equipment_section.clone()),
             ],

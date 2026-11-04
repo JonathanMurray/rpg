@@ -2861,10 +2861,6 @@ impl CoreGame {
             }
         }
 
-        if attacker.knows_passive(PassiveSkill::WeaponProficiency) {
-            armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
-        }
-
         let mut armor_str = armor_value.to_string();
         for (penetration, label) in &armor_penetrators {
             armor_value = armor_value.saturating_sub(*penetration);
@@ -2963,13 +2959,6 @@ impl CoreGame {
                 dmg_calculation += ferocity as i32;
             }
 
-            if armor_value > 0 {
-                dmg_str.push_str(&format!(
-                    " -{armor_value} |<faded>(|<shield>|<faded>armor)|"
-                ));
-                dmg_calculation -= armor_value as i32;
-            }
-
             //  <=5: weak
             // 6-15: regular
             // >=16: strong
@@ -3006,6 +2995,19 @@ impl CoreGame {
             } else {
                 HitType::Strong
             };
+
+            if matches!(hit_type, HitType::Strong | HitType::Critical)
+                && attacker.knows_passive(PassiveSkill::WeaponProficiency)
+            {
+                armor_penetrators.push((2, PassiveSkill::WeaponProficiency.name()));
+            }
+
+            if armor_value > 0 {
+                dmg_str.push_str(&format!(
+                    " -{armor_value} |<faded>(|<shield>|<faded>armor)|"
+                ));
+                dmg_calculation -= armor_value as i32;
+            }
 
             match hit_type {
                 HitType::Miss => {
@@ -5283,6 +5285,7 @@ impl Condition {
         match self {
             Blinded => &[Keyword::Flanked],
             ArcaneBlessing => &[Keyword::Advantage],
+            Bloodlust => &[Keyword::Crit],
             _ => &[],
         }
     }

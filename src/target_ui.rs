@@ -22,7 +22,9 @@ use crate::{
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
-    game_ui_components::{ActionPointsRow, ResourceBar},
+    game_ui_components::{
+        character_defense_section, portrait_element, ActionPointsRow, ResourceBar,
+    },
     resources::{portrait_texture, PortraitId},
     util::{plus_minus, COL_GOLD, COL_RED},
 };
@@ -92,39 +94,6 @@ impl TargetUi {
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
-            let def_table = table(
-                vec![
-                    TableCell::new("Toughness", Some(LIGHTGRAY), None),
-                    TableCell::new("Evasion", Some(LIGHTGRAY), None),
-                    TableCell::new("Will", Some(LIGHTGRAY), None),
-                    TableCell::new(
-                        format!("|<toughness>| {}", char.toughness()),
-                        Some(WHITE),
-                        Some(BLACK),
-                    ),
-                    TableCell::new(
-                        format!("|<evasion>| {}", char.evasion()),
-                        Some(WHITE),
-                        Some(BLACK),
-                    ),
-                    TableCell::new(
-                        format!("|<will>| {}", char.will()),
-                        Some(WHITE),
-                        Some(BLACK),
-                    ),
-                ],
-                vec![Align::Center, Align::Center, Align::Center],
-                self.simple_font.clone(),
-                TableStyle {
-                    outer_border_color: None,
-                    inner_border_color: None,
-                    all_columns_same_width: true,
-                    row_font_sizes: &[16, 24],
-                    cell_padding: (3.0, 5.0),
-                    ..Default::default()
-                },
-            );
-
             let mut action_points_row = ActionPointsRow::new(
                 (16.0, 16.0),
                 0.25,
@@ -165,39 +134,7 @@ impl TargetUi {
                 ..Default::default()
             };
 
-            let portrait = Element::Container(Container {
-                style: Style {
-                    bg_color: Some(Color::new(0.5, 0.5, 0.5, 0.3)),
-                    border: Some(Border::with_color(LIGHTGRAY)),
-                    ..Default::default()
-                },
-                children: vec![Element::Texture {
-                    texture: portrait_texture(char.portrait),
-                    dest_size: Some((64.0, 80.0)),
-                    rotate_quarters: 0,
-                }],
-                ..Default::default()
-            });
-
-            let defense_header: Element = Element::Text(TextLine::new(
-                "Defenses:",
-                16,
-                WHITE,
-                Some(self.simple_font.clone()),
-            ));
-
-            let defense_header_row = Element::Container(Container {
-                layout_dir: LayoutDirection::Vertical,
-                align: Align::Center,
-                style: Style {
-                    bg_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
-                    padding: 2.0,
-                    ..Default::default()
-                },
-                min_width: Some(150.0),
-                children: vec![defense_header],
-                ..Default::default()
-            });
+            let portrait = portrait_element(&char);
 
             let mut action_rows = vec![];
             let mut passives_row = None;
@@ -297,9 +234,7 @@ impl TargetUi {
                 Element::Empty(1.0, 4.0),
                 Element::Box(Box::new(action_points_row)),
                 Element::Empty(1.0, 12.0),
-                defense_header_row,
-                Element::Empty(1.0, 3.0),
-                Element::Container(def_table),
+                character_defense_section(char),
                 Element::Empty(1.0, 4.0),
             ];
 

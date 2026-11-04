@@ -531,6 +531,9 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 apply_condition.condition,
                 apply_condition.stacks,
             ));
+            for keyword in apply_condition.condition.related_keywords() {
+                t.keywords.push(*keyword);
+            }
         }
 
         ApplyEffect::LoseCondition { condition } => {
@@ -1764,7 +1767,8 @@ pub fn draw_button_tooltip(button_position: (f32, f32), tooltip: &Tooltip, detai
         TooltipPositionPreference::RelativeToRect(
             Rect::new(
                 button_position.0,
-                button_position.1,
+                // Add extra margin upward, to not cover hotkey text
+                button_position.1 - 10.0,
                 button_size.0,
                 button_size.1,
             ),

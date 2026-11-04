@@ -514,11 +514,7 @@ pub struct CharacterUi {
     pub hoverable_buttons: Vec<Rc<ActionButton>>,
     actions_section: Container,
     pub character_sheet: CharacterSheet,
-    health_bar: Rc<RefCell<LabelledResourceBar>>,
-    mana_bar: Rc<RefCell<LabelledResourceBar>>,
-    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
-    pub resource_bars: Container,
-    font: Font,
+    pub resource_bars: ResourceBars,
 }
 
 pub const UI_HEIGHT: f32 = 230.0;
@@ -542,44 +538,14 @@ impl CharacterUi {
         let resource_bars_y = screen_height() - 105.0;
         let resource_bars_x = resources_mid_x - self.resource_bars.size().0 / 2.0;
         self.resource_bars.draw(resource_bars_x, resource_bars_y);
+        self.resource_bars
+            .draw_tooltips(resource_bars_x, resource_bars_y);
 
         let tooltip = if self.action_points_row.hovered.get() {
             Some((
                 "Action Points (AP)",
                 vec!["Used for actions.".to_string(), "".to_string(), "|<trigger>End of turn:| restore |<value>4| |<ap>| AP. This amount can be changed by certain conditions.".to_string()],
                 vec![]
-            ))
-        } else if self.health_bar.borrow().hovered.get() {
-            Some((
-                "Health |<heart>|",
-                vec![
-                    "If this reaches |<value>0|, you die.".to_string(),
-                    "".to_string(),
-                    "|<trigger>End of combat:| restore |<value>25%| of missing |<heart>|."
-                        .to_string(),
-                    "Being |<heart>| < |<value>20%| causes |<keyword>Near-death|.".to_string(),
-                ],
-                vec![Keyword::Cond(Condition::NearDeath, None)],
-            ))
-        } else if self.stamina_bar.borrow().hovered.get() {
-            Some((
-                "Stamina |<stamina>|",
-                vec![
-                    "Used for some physical actions.".to_string(),
-                    "".to_string(),
-                    "|<trigger>End of turn:| restore |<value>25%| |<stamina>|.".to_string(),
-                ],
-                vec![],
-            ))
-        } else if self.mana_bar.borrow().hovered.get() {
-            Some((
-                "Mana |<mana>|",
-                vec![
-                    "Used for casting spells.".to_string(),
-                    "".to_string(),
-                    "|<trigger>End of combat:| restore |<value>25%| |<mana>|.".to_string(),
-                ],
-                vec![],
             ))
         } else {
             None
@@ -614,9 +580,6 @@ pub struct UserInterface {
     animation_stopwatch: StopWatch,
 
     banner: Banner,
-
-    simple_font: Font,
-    big_font: Font,
 
     hovered_button: Option<ButtonHovered>,
     active_character_id: CharacterId,
@@ -743,12 +706,7 @@ impl UserInterface {
             active_character_id,
             remembered_attack_enhancements: Default::default(),
             animation_stopwatch: StopWatch::default(),
-
             banner,
-
-            simple_font: resources.simple_font.clone(),
-            big_font: resources.big_font.clone(),
-
             hovered_button: None,
             log: Log::new(resources.simple_font.clone(), resources.big_font.clone()),
             character_uis,
@@ -1005,7 +963,7 @@ impl UserInterface {
             }
         }
 
-        self.banner.draw(&self.big_font);
+        self.banner.draw();
 
         handle_keyword_tooltip_end_of_frame();
 
@@ -1381,24 +1339,9 @@ impl UserInterface {
 
         let mut is_reacting = None;
 
-        //self.sound_player.stop(SoundId::FireCrackle);
-        //self.sound_player.stop(SoundId::MechanicNoise);
-
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
-
-                // An interesting idea with a "charging up" sound, but needs better (and non-looping) sound effects
-                //
-                /*
-                if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
-                    if ability.id == AbilityId::Fireball {
-                        self.sound_player.play_looping(SoundId::FireCrackle);
-                    } else {
-                        self.sound_player.play_looping(SoundId::MechanicNoise);
-                    }
-                }
-                 */
 
                 let tooltip = if let ConfiguredAction::UseAbility {
                     ability,
@@ -1774,7 +1717,11 @@ impl UserInterface {
                         .action_points_row
                         .animate_gain(gained_ap, duration);
 
-                    character_ui.stamina_bar.borrow_mut().animate_gain(duration);
+                    character_ui
+                        .resource_bars
+                        .stamina_bar
+                        .borrow_mut()
+                        .animate_gain(duration);
 
                     self.animation_stopwatch.set_to_at_least(duration + 0.2);
                 } else {
@@ -2520,7 +2467,11 @@ impl UserInterface {
             character_ui
                 .action_points_row
                 .update(elapsed, &self.sound_player);
-            character_ui.stamina_bar.borrow_mut().update(elapsed);
+            character_ui
+                .resource_bars
+                .stamina_bar
+                .borrow_mut()
+                .update(elapsed);
         }
 
         let selected_char = self.selected_character();
@@ -2650,14 +2601,6 @@ impl UserInterface {
             );
 
             if may_choose_action && self.active_character().can_use_action(base_action) {
-                /*if base_action == BaseAction::ToggleQuickActions {
-                    assert!(player_choice.is_none());
-                    println!("Toggling quick actions");
-                    self.active_character().toggle_quick_actions();
-                    // Movement range/speed is affected by either stamina or AP, depending on 'quick actions'
-                    self.game_grid.update_move_speed(self.active_character_id);
-                } else
-                 */
                 if let Some(s) = ConfiguredAction::from_base_action(base_action) {
                     let already_configuring_it = match &*self.state.borrow() {
                         UiState::ConfiguringAction(configured_action) => configured_action == &s,
@@ -2692,10 +2635,12 @@ impl UserInterface {
             .unwrap();
 
         character_ui
+            .resource_bars
             .mana_bar
             .borrow_mut()
             .reset_hovered_and_reserved_amounts();
         character_ui
+            .resource_bars
             .stamina_bar
             .borrow_mut()
             .reset_hovered_and_reserved_amounts();
@@ -2704,18 +2649,22 @@ impl UserInterface {
         let (reserved_mana, hovered_mana) = self.activity_popup.reserved_and_hovered_mana();
 
         character_ui
+            .resource_bars
             .mana_bar
             .borrow_mut()
             .set_reserved_amount(reserved_mana);
         character_ui
+            .resource_bars
             .mana_bar
             .borrow_mut()
             .set_hovered_amount(hovered_mana);
         character_ui
+            .resource_bars
             .stamina_bar
             .borrow_mut()
             .set_reserved_amount(reserved_sta);
         character_ui
+            .resource_bars
             .stamina_bar
             .borrow_mut()
             .set_hovered_amount(hovered_sta);
@@ -2732,27 +2681,21 @@ impl UserInterface {
         else if let Some(hovered_btn) = &self.hovered_button {
             if hovered_btn.context != Some(ButtonContext::CharacterSheet) {
                 let mut hovered_ap = hovered_btn.action.action_point_cost();
-                /*
-                if !enabled_quick_actions {
-                    hovered_ap += hovered_btn.action.quick_point_cost() as i32;
-                }
-                 */
+
                 character_ui.action_points_row.reserved_and_hovered_ap = (
                     self.activity_popup.reserved_and_hovered_action_points().0,
                     hovered_ap,
                 );
                 character_ui
+                    .resource_bars
                     .mana_bar
                     .borrow_mut()
                     .set_hovered_amount(hovered_btn.action.mana_cost());
 
-                let mut hovered_sta = hovered_btn.action.stamina_cost();
-                /*
-                if enabled_quick_actions {
-                    hovered_sta += hovered_btn.action.quick_point_cost();
-                }
-                 */
+                let hovered_sta = hovered_btn.action.stamina_cost();
+
                 character_ui
+                    .resource_bars
                     .stamina_bar
                     .borrow_mut()
                     .set_hovered_amount(hovered_sta);
@@ -2861,13 +2804,16 @@ impl UserInterface {
         for character in characters.iter() {
             let id = &character.id();
             if let Some(ui) = self.character_uis.get_mut(id) {
-                ui.health_bar
+                ui.resource_bars
+                    .health_bar
                     .borrow_mut()
                     .set_current(character.health.current());
-                ui.mana_bar
+                ui.resource_bars
+                    .mana_bar
                     .borrow_mut()
                     .set_current(character.mana.current());
-                ui.stamina_bar
+                ui.resource_bars
+                    .stamina_bar
                     .borrow_mut()
                     .set_current(character.stamina.current());
 
@@ -3127,11 +3073,7 @@ fn build_character_ui(
         hoverable_buttons,
         actions_section,
         character_sheet,
-        health_bar: resource_bars.health_bar,
-        mana_bar: resource_bars.mana_bar,
-        stamina_bar: resource_bars.stamina_bar,
-        resource_bars: resource_bars.container,
-        font: simple_font.clone(),
+        resource_bars,
     }
 }
 
@@ -3145,6 +3087,59 @@ pub struct ResourceBars {
 impl Drawable for ResourceBars {
     fn draw(&self, x: f32, y: f32) {
         self.container.draw(x, y);
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        let tooltip = if self.health_bar.borrow().hovered.get() {
+            Some((
+                "Health |<heart>|",
+                vec![
+                    "If this reaches |<value>0|, you die.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of combat:| restore |<value>25%| of missing |<heart>|."
+                        .to_string(),
+                    "Being |<heart>| < |<value>20%| causes |<keyword>Near-death|.".to_string(),
+                ],
+                vec![Keyword::Cond(Condition::NearDeath, None)],
+            ))
+        } else if self.stamina_bar.borrow().hovered.get() {
+            Some((
+                "Stamina |<stamina>|",
+                vec![
+                    "Used for some physical actions.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of turn:| restore |<value>25%| |<stamina>|.".to_string(),
+                ],
+                vec![],
+            ))
+        } else if self.mana_bar.borrow().hovered.get() {
+            Some((
+                "Mana |<mana>|",
+                vec![
+                    "Used for casting spells.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of combat:| restore |<value>25%| |<mana>|.".to_string(),
+                ],
+                vec![],
+            ))
+        } else {
+            None
+        };
+
+        if let Some((header, content, keywords)) = tooltip {
+            draw_tooltip(
+                TooltipPositionPreference::RelativeToRect(
+                    Rect::new(x, y, self.container.size().0, self.container.size().1),
+                    Side::Left,
+                ),
+                header,
+                None,
+                &content,
+                &keywords,
+                None,
+                None,
+            );
+        }
     }
 
     fn size(&self) -> (f32, f32) {

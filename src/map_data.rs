@@ -308,7 +308,7 @@ pub fn create_character(
             char
         }
         CharacterType::Alice => {
-            let char = make_high_alice(party.unwrap());
+            let char = make_test_archer(party.unwrap());
             char.position.set(pos);
             char
         }
@@ -675,8 +675,8 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
     test_fighter
 }
 
-pub fn make_high_alice(party: &Rc<Party>) -> Character {
-    let alice = Character::new(
+pub fn make_test_archer(party: &Rc<Party>) -> Character {
+    let test_archer = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Test archer",
         SoundId::DamageFemale,
@@ -685,32 +685,32 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, CHEAT_BOW);
-    alice.armor_piece.set(Some(SHIRT));
-    alice
+    test_archer.set_weapon(HandType::MainHand, CHEAT_BOW);
+    test_archer.armor_piece.set(Some(SHIRT));
+    test_archer
         .arrows
         .set(Some(ArrowStack::new(&EXPLODING_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
+    test_archer.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
         &EXPLODING_ARROWS,
         2,
     )));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(&FIRE_ARROWS, 2)));
+    test_archer.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(&FIRE_ARROWS, 2)));
 
-    alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(TOXIC_GRENADE));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
+    test_archer.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    test_archer.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    test_archer.try_gain_equipment(EquipmentEntry::Consumable(TOXIC_GRENADE));
+    test_archer.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
 
-    //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
-    alice.trinket.set(Some(ASSASSINS_VIAL));
-    alice.learn_ability(natures_blessing());
-    alice.learn_ability_enhancement(&HEAL_ENERGIZE);
-    alice.learn_attack_enhancement(CRIPPLING_SHOT);
-    alice.learn_ability(&PIERCING_SHOT);
-    alice.learn_ability(&KILL);
-    alice.learn_ability(&INFLICT_WOUNDS);
+    test_archer.trinket.set(Some(BATTLEMAGE_SIGIL));
+    test_archer.learn_ability(natures_blessing());
+    test_archer.learn_ability_enhancement(&HEAL_ENERGIZE);
+    test_archer.learn_attack_enhancement(CRIPPLING_SHOT);
+    test_archer.learn_ability(&PIERCING_SHOT);
+    test_archer.learn_ability(&KILL);
+    test_archer.learn_ability(&INFLICT_WOUNDS);
+    test_archer.learn_passive(PassiveSkill::WeaponProficiency);
 
-    alice
+    test_archer
 }
 
 pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
@@ -719,7 +719,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
         stash: Default::default(),
     });
 
-    let alice = make_high_alice(&party);
+    let alice = make_test_archer(&party);
 
     let bob = make_test_fighter(&party);
 
