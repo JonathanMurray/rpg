@@ -14,7 +14,7 @@ use crate::{
         CENTER_MELEE_RANGE_SQUARED, MOVE_COST_FACTOR_IN_LIQUID,
     },
     grid::ControlPoint,
-    textures::{TerrainId, WallOrientation},
+    resources::{TerrainId, WallOrientation},
     util::line_visitor,
 };
 

@@ -53,10 +53,10 @@ use crate::{
     init_fight_map::GameInitState,
     pathfind::{Elevation, Occupation, PathfindGrid, Surface, TerrainType},
     resources::GameResources,
+    resources::{EffectId, StatusId, TerrainId, UI_BG_TEXTURE},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EffectId, StatusId, TerrainId, UI_BG_TEXTURE},
     tooltip::{
         handle_keyword_tooltip_end_of_frame, Keyword, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
@@ -574,7 +574,6 @@ impl CharacterUi {
 
         if let Some((header, content, keywords)) = tooltip {
             draw_tooltip(
-                &self.font,
                 TooltipPositionPreference::RelativeToRect(
                     Rect::new(
                         resource_bars_x,
@@ -986,7 +985,6 @@ impl UserInterface {
             {
                 let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
                 draw_button_tooltip(
-                    &self.simple_font,
                     btn_hovered.hovered_pos.unwrap(),
                     &btn.tooltip(),
                     detailed_tooltip,

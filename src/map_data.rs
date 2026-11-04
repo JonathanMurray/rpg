@@ -18,7 +18,7 @@ use crate::{
         DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
         ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS,
         FIRE_BOLT, HEALING_NOVA, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
-        ICE_BOLT, INSPIRE_RUTHLESS, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
+        ICE_BOLT, INSPIRE_BLOODLUST, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
         LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
         SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH,
         TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW, ZERO_SWORD,
@@ -26,8 +26,8 @@ use crate::{
     grid::{ControlPoint, GameGrid},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
     resources::GameResources,
+    resources::{PortraitId, SpriteId, TerrainId},
     sounds::{SoundId, SoundPlayer},
-    textures::{PortraitId, SpriteId, TerrainId},
 };
 
 use crate::data::{
@@ -304,7 +304,7 @@ pub fn create_character(
 ) -> Rc<Character> {
     let mut char = match char_data.type_ {
         CharacterType::Bob => {
-            let char = make_high_bob(party.unwrap());
+            let char = make_test_fighter(party.unwrap());
             char.position.set(pos);
             char
         }
@@ -642,38 +642,38 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     clara
 }
 
-pub fn make_high_bob(party: &Rc<Party>) -> Character {
-    let bob = Character::new(
+pub fn make_test_fighter(party: &Rc<Party>) -> Character {
+    let test_fighter = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
         "Test fighter",
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(5, 3, 1, 1),
+        Attributes::new(5, 3, 1, 5),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, ZERO_SWORD);
-    bob.set_shield(SPIKE_SHIELD);
-    bob.armor_piece.set(Some(LEATHER_ARMOR));
-    bob.learn_passive(PassiveSkill::Reaper);
-    bob.learn_ability(&LIGHTNING_BOLT);
-    bob.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
+    test_fighter.set_weapon(HandType::MainHand, ZERO_SWORD);
+    test_fighter.set_shield(SPIKE_SHIELD);
+    test_fighter.armor_piece.set(Some(LEATHER_ARMOR));
+    test_fighter.learn_passive(PassiveSkill::Reaper);
+    test_fighter.learn_ability(&LIGHTNING_BOLT);
+    test_fighter.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
     // TODO: lunge attack, not working properly? Weird targetting and resulted in a
     // stackoverflow when trying to commit it
-    bob.learn_ability(&SHIELD_BASH);
-    bob.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(&BRACE);
+    test_fighter.learn_ability(&SHIELD_BASH);
+    test_fighter.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
+    test_fighter.learn_ability(&BRACE);
     // TODO
     //bob.learn_ability(&KILL);
-    bob.learn_ability(&DASH);
-    bob.learn_ability_enhancement(&INSPIRE_RUTHLESS);
+    test_fighter.learn_ability(&INSPIRE);
+    test_fighter.learn_ability_enhancement(&INSPIRE_BLOODLUST);
     //bob.learn_attack_enhancement(EMPOWER);
-    bob.health.lose(10);
-    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Trinket(RUBY));
-    bob.trinket.set(Some(SAPHIRE));
-    bob
+    test_fighter.health.lose(10);
+    test_fighter.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    test_fighter.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
+    test_fighter.try_gain_equipment(EquipmentEntry::Trinket(RUBY));
+    test_fighter.trinket.set(Some(SAPHIRE));
+    test_fighter
 }
 
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
@@ -722,7 +722,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 
     let alice = make_high_alice(&party);
 
-    let bob = make_high_bob(&party);
+    let bob = make_test_fighter(&party);
 
     let clara = make_high_clara(&party);
 

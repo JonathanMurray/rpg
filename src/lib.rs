@@ -29,7 +29,6 @@ pub mod skill_tree;
 pub mod sounds;
 pub mod stats_ui;
 pub mod target_ui;
-pub mod textures;
 mod tooltip;
 pub mod transition_scene;
 mod util;

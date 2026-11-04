@@ -31,8 +31,8 @@ use crate::{
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     game_ui::draw_rectangle_lines2,
+    resources::{draw_eq_icon, EquipmentIconId},
     sounds::{SoundId, SoundPlayer},
-    textures::{draw_eq_icon, EquipmentIconId},
     tooltip::{
         cost_string, draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference,
     },
@@ -196,18 +196,17 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
 
     if let Some(reaction) = weapon.on_attacked_reaction {
-        t.technical_description
-            .push(format!("Skill: |<keyword>{}|", reaction.name));
+        t.technical_description.push(reaction_line(reaction.name));
         t.keywords.push(Keyword::OnAttackedReaction(reaction));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
         t.technical_description
-            .push(format!("Skill: |<keyword>{}|", enhancement.name,));
+            .push(enhancement_line(enhancement.name));
         t.keywords.push(Keyword::AttackEnhancement(enhancement));
     }
     if weapon.is_melee() {
         t.technical_description
-            .push("Skill: |<keyword>Opportunity attack|".to_string());
+            .push(reaction_line("Opportunity attack"));
         t.keywords.push(Keyword::OpportunityAttack);
     }
     t.technical_description.push("".to_string());
@@ -235,17 +234,23 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
     }
 
     if let Some(reaction) = shield.on_attacked_reaction {
-        t.technical_description
-            .push(format!("Skill: |<keyword>{}|", reaction.name));
+        t.technical_description.push(reaction_line(reaction.name));
         t.keywords.push(Keyword::OnAttackedReaction(reaction));
     }
     if let Some(reaction) = shield.on_hit_reaction {
-        t.technical_description
-            .push(format!("Skill: |<keyword>{}|", reaction.name));
+        t.technical_description.push(reaction_line(reaction.name));
     }
     t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(shield.weight));
     t
+}
+
+fn reaction_line(name: &str) -> String {
+    format!("Skill: |<reaction>| |<keyword>{}|", name)
+}
+
+fn enhancement_line(name: &str) -> String {
+    format!("Skill: |<enhancement>| |<keyword>{}|", name)
 }
 
 fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
@@ -1090,7 +1095,6 @@ impl Drawable for EquipmentSlot {
             if let Some(content) = &self.content {
                 let tooltip = &content.tooltip;
                 draw_tooltip(
-                    &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     &tooltip.header,
                     None,

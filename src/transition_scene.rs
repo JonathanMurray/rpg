@@ -23,8 +23,8 @@ use crate::{
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
     resources::GameResources,
+    resources::UI_ARROW_TEXTURE,
     sounds::{SoundId, SoundPlayer},
-    textures::UI_ARROW_TEXTURE,
     tooltip::handle_keyword_tooltip_end_of_frame,
 };
 
@@ -387,7 +387,7 @@ pub async fn run_transition_loop(
                     .unwrap();
                 //let tooltip = button_action_tooltip(&hovered.action);
                 let tooltip = btn.tooltip();
-                draw_button_tooltip(simple_font, hovered.hovered_pos.unwrap(), &tooltip, true);
+                draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip, true);
             }
 
             let text = "Continue";

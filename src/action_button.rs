@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::{Cell, Ref, RefCell},
     collections::HashSet,
     rc::Rc,
@@ -36,9 +37,10 @@ use crate::{
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
     pathfind::Surface,
-    textures::{
-        draw_icon, IconId, UI_ACTION_BUTTON_BG_TEXTURE, UI_ACTION_BUTTON_SMALL_BG_TEXTURE,
-        UI_ACTION_BUTTON_SMALL_TEXTURE, UI_ACTION_BUTTON_TEXTURE,
+    resources::{
+        draw_icon, IconId, ENHANCEMENT_SYMBOL, REACTION_SYMBOL, UI_ACTION_BUTTON_BG_TEXTURE,
+        UI_ACTION_BUTTON_SMALL_BG_TEXTURE, UI_ACTION_BUTTON_SMALL_TEXTURE,
+        UI_ACTION_BUTTON_TEXTURE,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
@@ -50,7 +52,7 @@ use crate::{
 #[derive(Default, Debug)]
 pub struct Tooltip {
     pub header: String,
-    pub description: Option<&'static str>,
+    pub description: Option<Cow<'static, str>>,
     pub error: Option<&'static str>,
     pub technical_description: Vec<String>,
     pub keywords: Vec<Keyword>,
@@ -73,10 +75,12 @@ impl Tooltip {
         let mut lines = vec![];
         let mut has_description = false;
         let show_details = detailed || self.technical_description.len() < 2;
-        if let Some(description) = self.description {
+        if let Some(description) = &self.description {
             if !description.is_empty() {
                 has_description = true;
-                lines.push(description.to_string());
+                for desc_line in description.lines() {
+                    lines.push(desc_line.to_string());
+                }
                 if show_details && !self.technical_description.is_empty() {
                     lines.push("".to_string());
                 }
@@ -137,7 +141,7 @@ pub fn button_action_tooltip(action: &ButtonAction, character: Option<&Character
 fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {
     Tooltip {
         header: skill.name().to_string(),
-        description: Some(skill.description()),
+        description: Some(Cow::Borrowed(skill.description())),
         keywords: skill.keywords().to_vec(),
         ..Default::default()
     }
@@ -184,7 +188,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
 
     Tooltip {
         header,
-        description: Some(reaction.description),
+        description: Some(Cow::Borrowed(reaction.description)),
         technical_description,
         icon: Some(reaction.icon),
         ..Default::default()
@@ -206,7 +210,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
             reaction.name,
             empty_cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
         ),
-        description: Some(reaction.description),
+        description: Some(Cow::Borrowed(reaction.description)),
         technical_description,
         icon: Some(reaction.icon),
         ..Default::default()
@@ -224,7 +228,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
                 enhancement.mana_cost
             )
         ),
-        description: Some(enhancement.description),
+        description: Some(Cow::Owned(enhancement_description(enhancement.description))),
         icon: Some(enhancement.icon),
         ..Default::default()
     };
@@ -238,7 +242,7 @@ fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
     match effect {
         AttackHitEffect::ApplyTarget(apply_effect) => {
             t.technical_description
-                .push("On damage: |<single_target> |<faded>(target)| ".to_string());
+                .push("On damage: |<single_target>| |<faded>(target)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
         AttackHitEffect::ApplySelf(apply_effect) => {
@@ -354,18 +358,26 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 }
 
+fn enhancement_description(description: &str) -> String {
+    format!(
+        "(|<enhancement>| |<keyword>Enhancement|)\n\n{}",
+        description
+    )
+}
+
 fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
+    let header = format!(
+        "{}{}",
+        enhancement.name,
+        empty_cost_string(
+            enhancement.action_point_cost,
+            enhancement.stamina_cost,
+            enhancement.mana_cost
+        )
+    );
     let mut t = Tooltip {
-        header: format!(
-            "{}{}",
-            enhancement.name,
-            empty_cost_string(
-                enhancement.action_point_cost,
-                enhancement.stamina_cost,
-                enhancement.mana_cost
-            )
-        ),
-        description: Some(enhancement.description),
+        header,
+        description: Some(Cow::Owned(enhancement_description(enhancement.description))),
         icon: Some(enhancement.icon),
         ..Default::default()
     };
@@ -448,9 +460,9 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
         BaseAction::UseAbility(ability) => ability_tooltip(ability, character),
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
-            description: Some(
+            description: Some(Cow::Borrowed(
                 "Move a limited distance for free every turn. Spend |<ap>| AP to move further.",
-            ),
+            )),
             technical_description: vec![
                 "Free: |<boot>||<stat>Movement| |<range>|".to_string(),
                 format!(
@@ -462,12 +474,14 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
         },
         BaseAction::ChangeEquipment => Tooltip {
             header: "Equip/unequip".to_string(),
-            description: Some("Change your weapon, shield or armor."),
+            description: Some(Cow::Borrowed("Change your weapon, shield or armor.")),
             ..Default::default()
         },
         BaseAction::UseConsumable => Tooltip {
             header: "Use consumable".to_string(),
-            description: Some("Use a consumable from your inventory (e.g. a potion)."),
+            description: Some(Cow::Borrowed(
+                "Use a consumable from your inventory (e.g. a potion).",
+            )),
             ..Default::default()
         },
         /*
@@ -553,7 +567,7 @@ pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tool
     );
 
     let mut t = Tooltip::new(header);
-    t.description = Some(ability.description);
+    t.description = Some(Cow::Borrowed(ability.description));
     t.icon = Some(ability.icon);
 
     if let Some(ability_roll) = ability.roll {
@@ -738,7 +752,7 @@ fn describe_create_surface(surface: Surface, t: &mut Tooltip) {
     match surface {
         Surface::Water => t.keywords.push(Keyword::Cond(Condition::Wet, None)),
         Surface::Poison => t.keywords.push(Keyword::Cond(Condition::Poisoned, None)),
-        Surface::Spikes => t.keywords.push(Keyword::Spikes),
+        Surface::Spikes => t.keywords.push(Keyword::SpikesSurface),
         Surface::Fire => t.keywords.push(Keyword::Cond(Condition::Burning, None)),
     }
 }
@@ -1037,6 +1051,7 @@ pub struct ActionButton {
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
+pub const PASSIVE_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 52.0);
 pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 0.5);
 pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.6, 0.5, 0.4, 1.0);
 
@@ -1055,9 +1070,7 @@ impl ActionButton {
         let icon: IconId = action.icon(character.as_deref());
 
         let size = match action {
-            ButtonAction::Proceed | ButtonAction::Passive(..) => {
-                (REGULAR_ACTION_BUTTON_SIZE.0, 52.0)
-            }
+            ButtonAction::Proceed | ButtonAction::Passive(..) => PASSIVE_ACTION_BUTTON_SIZE,
             _ => REGULAR_ACTION_BUTTON_SIZE,
         };
         let texture_draw_size = (60.0, 48.0);
@@ -1125,13 +1138,6 @@ impl ActionButton {
             None
         };
 
-        /*
-        let activated = if matches!(action, ButtonAction::Action(BaseAction::ToggleQuickActions)) {
-            Some(character.as_ref().unwrap().enabled_quick_actions.get())
-        } else {
-            None
-        };
-         */
         let activated = None;
 
         Self {
@@ -1276,7 +1282,9 @@ impl Drawable for ActionButton {
             }
         }
 
-        let bg_texture = if matches!(self.action_tooltip.action, ButtonAction::Passive(..)) {
+        let is_passive_skill = matches!(self.action_tooltip.action, ButtonAction::Passive { .. });
+
+        let bg_texture = if is_passive_skill {
             &UI_ACTION_BUTTON_SMALL_BG_TEXTURE
         } else {
             &UI_ACTION_BUTTON_BG_TEXTURE
@@ -1321,9 +1329,12 @@ impl Drawable for ActionButton {
 
         let has_bottom_row = ap_row_size.1 > 0.0 || self.bottom_resource_text.is_some();
 
+        let mut icon_y = y;
         // For actions that have no explicit cost, the cost bar is not drawn at the bottom,
         // so we offset the y to make the icon more centered
-        let icon_y = if !has_bottom_row { y + 6.0 } else { y };
+        if !has_bottom_row && !is_passive_skill {
+            icon_y += 6.0;
+        }
 
         if let Some(effect_expiration) = self.clicked_effect_until.get() {
             draw_icon(
@@ -1371,6 +1382,14 @@ impl Drawable for ActionButton {
             if let Some(text) = &self.bottom_resource_text {
                 text.draw(x + w - text.size().0, y + h - text.size().1);
             }
+        }
+
+        if self.action_tooltip.action.is_reaction() {
+            let texture = REACTION_SYMBOL.get().unwrap();
+            draw_texture(texture, x + 2.0, y + 2.0, WHITE);
+        } else if self.action_tooltip.action.is_enhancement() {
+            let texture = ENHANCEMENT_SYMBOL.get().unwrap();
+            draw_texture(texture, x + 4.0, y + 2.0, WHITE);
         }
 
         self.style.draw_foreground(x, y, self.size);
@@ -1421,7 +1440,7 @@ impl Drawable for ActionButton {
             }
         }
 
-        let border_texture = if matches!(self.action_tooltip.action, ButtonAction::Passive(..)) {
+        let border_texture = if is_passive_skill {
             &UI_ACTION_BUTTON_SMALL_TEXTURE
         } else {
             &UI_ACTION_BUTTON_TEXTURE
@@ -1536,16 +1555,6 @@ impl ButtonAction {
             ButtonAction::OpportunityAttack => "Opportunity attack",
             ButtonAction::Proceed => "Proceed",
             ButtonAction::Passive(skill) => skill.name(),
-        }
-    }
-
-    pub fn context_explanation(&self) -> Option<String> {
-        match self {
-            ButtonAction::AttackEnhancement(_enhancement) => Some("Attack enhancement".to_string()),
-            ButtonAction::AbilityEnhancement(enhancement) => {
-                Some(format!("{} enhancement", enhancement.name))
-            }
-            _ => None,
         }
     }
 
@@ -1679,6 +1688,22 @@ impl ButtonAction {
             other => panic!("Expected on hit reaction, but got: {:?}", other),
         }
     }
+
+    pub fn is_reaction(&self) -> bool {
+        matches!(
+            self,
+            ButtonAction::OnAttackedReaction(..)
+                | ButtonAction::OnHitReaction(..)
+                | ButtonAction::OpportunityAttack
+        )
+    }
+
+    pub fn is_enhancement(&self) -> bool {
+        matches!(
+            self,
+            ButtonAction::AttackEnhancement(..) | ButtonAction::AbilityEnhancement(..)
+        )
+    }
 }
 
 pub struct EventSender {
@@ -1712,16 +1737,10 @@ pub struct ButtonHovered {
     pub context: Option<ButtonContext>,
 }
 
-pub fn draw_button_tooltip(
-    font: &Font,
-    button_position: (f32, f32),
-    tooltip: &Tooltip,
-    detailed: bool,
-) {
+pub fn draw_button_tooltip(button_position: (f32, f32), tooltip: &Tooltip, detailed: bool) {
     let button_size = (64.0, 64.0);
 
     draw_tooltip(
-        font,
         TooltipPositionPreference::RelativeToRect(
             Rect::new(
                 button_position.0,

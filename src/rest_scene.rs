@@ -15,8 +15,8 @@ use crate::{
     base_ui::draw_text_rounded,
     core::Character,
     non_combat_ui::NonCombatPartyUi,
+    resources::{EquipmentIconId, PortraitId},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
     util::screen_size,
 };
 

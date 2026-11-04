@@ -9,7 +9,7 @@ use crate::{
     grid::ControlPoint,
     map_data::{create_character, CharacterType, MapData},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
-    textures::TerrainId,
+    resources::TerrainId,
 };
 
 pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) -> GameInitState {
@@ -24,7 +24,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         FightId::Draug => "draug2.json",
         FightId::Ogre => "ogre_room.json",
         FightId::Test => "test.json",
-        unhandled => todo!("Handle map: {:?}", unhandled),
+        FightId::Graveyard => "graveyard.json",
     };
     let map_data = MapData::load_from_file(&format!("maps/{filename}"));
     let mut characters: Vec<Rc<Character>> = Default::default();
@@ -113,16 +113,11 @@ pub struct GameInitState {
 
 #[derive(Debug, Copy, Clone, PartialEq, ValueEnum)]
 pub enum FightId {
-    EasyPair,
     Medium,
     Easy,
-    EasySurrounded,
-    EasyRiver,
-    EliteOgre,
     Huldra,
     Draug,
     Test,
-    VerticalSlice,
     Ogre,
+    Graveyard,
 }
-

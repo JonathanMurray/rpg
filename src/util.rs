@@ -192,3 +192,7 @@ pub const COL_BRIGHT: Color = rgb(230, 234, 234);
 //pub const COL_GOLD: Color = rgb(219, 157, 40);
 //pub const COL_GOLD: Color = rgb(228, 139, 71);
 pub const COL_GOLD: Color = rgb(245, 207, 138);
+
+//pub const COL_YELLOW_TEXT: Color = rgb(219, 157, 40);
+pub const COL_TEXT_HEADER: Color = rgb(207, 163, 95);
+pub const COL_TEXT_REGULAR: Color = rgb(220, 220, 220);

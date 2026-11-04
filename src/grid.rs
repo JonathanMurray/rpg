@@ -68,13 +68,13 @@ use crate::{
         ChartNode, Elevation, Occupation, PathNode, PathfindGrid, Surface, TerrainType,
         TraversalType, CELLS_PER_ENTITY,
     },
-    sounds::{SoundId, SoundPlayer},
-    textures::{
+    resources::{
         character_sprite_height, draw_icon, draw_status_icon, draw_terrain, draw_tiny_font,
         measure_tiny_font, EffectId, FlipbookAnimation, IconId, LiquidType, Sprite, SpriteId,
         StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE,
         LIGHTNING_BOLT_FX,
     },
+    sounds::{SoundId, SoundPlayer},
     util::{
         are_entities_within_melee, extend_to_range, line_visitor, oscillate, oscillate_loop,
         oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_ERROR, COL_GOLD, COL_GREEN_0,
@@ -3778,6 +3778,7 @@ impl GameGrid {
         }
 
         let mut reaction_choice = None;
+        let mut character_with_overhead_question_mark = None;
 
         match ui_state {
             UiState::ReactingToMovementAttackOpportunity {
@@ -3818,7 +3819,7 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(target.id());
                 detail_labelled_char_ids.insert(reactor.id());
 
-                self.draw_overhead_question_mark(reactor);
+                character_with_overhead_question_mark = reactor_id;
 
                 // The mover should be drawn with label
                 detail_labelled_char_ids.insert(self.active_character_id);
@@ -3869,7 +3870,7 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(attacker.id());
                 detail_labelled_char_ids.insert(reactor.id());
 
-                self.draw_overhead_question_mark(reactor);
+                character_with_overhead_question_mark = reactor_id;
             }
 
             UiState::ReactingToAttack {
@@ -3903,7 +3904,7 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(defender.id());
                 detail_labelled_char_ids.insert(reactor.id());
 
-                self.draw_overhead_question_mark(reactor);
+                character_with_overhead_question_mark = reactor_id;
 
                 reaction_choice = selected
                     .map(|reaction| (reaction.name, None))
@@ -3923,8 +3924,8 @@ impl GameGrid {
                     true,
                 );
 
-                detail_labelled_char_ids.insert(reactor.id());
-                self.draw_overhead_question_mark(reactor);
+                detail_labelled_char_ids.insert(*victim);
+                character_with_overhead_question_mark = reactor_id;
                 reaction_choice = selected
                     .map(|reaction| (reaction.name, None))
                     .or(Some(("No reaction", None)));
@@ -4502,6 +4503,10 @@ impl GameGrid {
             let char = &self.characters[&id];
             detail_labelled_char_ids.insert(char.id());
             //}
+        }
+
+        if let Some(ch) = character_with_overhead_question_mark {
+            self.draw_overhead_question_mark(self.characters.get(&ch).unwrap());
         }
 
         for char in self.characters.values() {

@@ -22,16 +22,16 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     game_ui::draw_rectangle_lines2,
     game_ui_connection::DEBUG,
-    sounds::{SoundId, SoundPlayer},
-    textures::{
+    resources::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, AP_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL,
-        CHECKED_SYMBOL, CONFIRM_SYMBOL, EVASION_SYMBOL, FIRE_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL,
-        INFO_SYMBOL, LIGHTNING_SYMBOL, LOSE_AP_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
-        MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL, RADIUS_SYMBOL, RANGE_SYMBOL, RED_DICE_SYMBOL,
-        SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL,
-        TARGET_SYMBOL, TOUGHNESS_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
-        WILL_SYMBOL,
+        CHECKED_SYMBOL, CONFIRM_SYMBOL, ENHANCEMENT_SYMBOL, EVASION_SYMBOL, FIRE_SYMBOL,
+        HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, LIGHTNING_SYMBOL, LOSE_AP_SYMBOL,
+        MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL, RADIUS_SYMBOL,
+        RANGE_SYMBOL, REACTION_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL,
+        STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, TARGET_SYMBOL, TOUGHNESS_SYMBOL,
+        UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL, WILL_SYMBOL,
     },
+    sounds::{SoundId, SoundPlayer},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
         oscillate, oscillate_loop, COL_ALICE, COL_BOB, COL_BRIGHT, COL_CLARA, COL_ENEMY,
@@ -469,7 +469,6 @@ impl Drawable for TextLine {
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
                 draw_tooltip(
-                    font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     header,
                     None,
@@ -527,6 +526,8 @@ lazy_static! {
             ("<mana_small>", (9.0, &MANA_SMALL_SYMBOL)),
             ("<sword>", (12.0, &SWORD_SYMBOL)),
             ("<target>", (symbol_w, &TARGET_SYMBOL)),
+            ("<reaction>", (8.0, &REACTION_SYMBOL)),
+            ("<enhancement>", (12.0, &ENHANCEMENT_SYMBOL)),
         ])
     };
 }
@@ -1004,7 +1005,6 @@ impl Container {
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
                 draw_tooltip(
-                    font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     header,
                     None,

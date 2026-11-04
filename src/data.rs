@@ -17,8 +17,8 @@ use crate::{
     },
     grid::ParticleShape,
     pathfind::Surface,
+    resources::{EffectId, EquipmentIconId, IconId, SpriteId},
     sounds::SoundId,
-    textures::{EffectId, EquipmentIconId, IconId, SpriteId},
     tooltip::Keyword,
     util::{COL_GREEN_3, COL_RED},
 };
@@ -582,7 +582,7 @@ pub const ARCANE_BOW: Weapon = Weapon {
     on_damage: None,
     on_kill_apply_self: Some(ApplyEffect::GainMana(1)),
     sprite: Some(SpriteId::Bow),
-    icon: EquipmentIconId::Bow,
+    icon: EquipmentIconId::ArcaneBow,
     weight: 2,
 };
 
@@ -745,7 +745,7 @@ pub const RUBY: Trinket = Trinket {
     equip: EquipEffect {
         start_of_turn_maybe_apply_self: Some((
             Circumstance::AdjacentToMultipleEnemies,
-            apply_condition_stacks(Condition::Ruthless, 1),
+            apply_condition_stacks(Condition::Bloodlust, 1),
         )),
         ..EquipEffect::default()
     },
@@ -852,7 +852,7 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 
 pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     name: "Knockback",
-    description: "|<keyword>Push| the target",
+    description: "Attempt to |<keyword>Push| the target.",
     icon: IconId::Knockback,
     stamina_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -1046,12 +1046,11 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "Roll with |<keyword>Advantage| and bypass some of the enemy's armor",
+    description: "Roll with |<keyword>Advantage| and bypass |<value>3| enemy |<shield>| armor.",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
         roll_advantage: 1,
-        //improved_crit: true,
         armor_penetration: 3,
         ..AttackEnhancementEffect::default()
     },
@@ -1663,7 +1662,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
     id: AbilityId::DraugHaunt,
     name: "Haunt",
 
-    description: "Deal |<value>2| damage and inflict |<keyword>Dazed| to targets in an area",
+    description: "Deal |<value>3| damage in a small area",
     icon: IconId::DraugHaunt,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1684,8 +1683,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
             TargetAcquisition::Enemies,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Will),
-                damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
-                on_hit: &[apply_condition_rounds(Condition::Dazed, 1)],
+                damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
                 ..SpellTargetEffect::default()
             }),
             None,
@@ -1900,7 +1898,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const BLESS: Ability = Ability {
     id: AbilityId::Bless,
     name: "Nature's blessing",
-    description: "|<keyword>Protect| an ally from the next attack \
+    description: "|<keyword>Protect| an ally from one attack, \
         and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Bless,
     action_point_cost: 2,
@@ -1983,13 +1981,13 @@ pub const HASTE: Ability = Ability {
     },
 };
 
-pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
-    name: "Ruthless",
-    description: "Also make targets |<keyword>Ruthless| for |<value>2| rounds",
-    icon: IconId::Rage,
+pub const INSPIRE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
+    name: "Bloodlust",
+    description: "Also make targets more likely to score critical hits, for |<value>2| rounds",
+    icon: IconId::Bloodlust,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: &[apply_condition_rounds(Condition::Ruthless, 2)],
+        area_on_hit: &[apply_condition_rounds(Condition::Bloodlust, 2)],
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -2007,7 +2005,7 @@ pub const INSPIRE: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: &[&INSPIRE_RUTHLESS],
+    possible_enhancements: &[&INSPIRE_BLOODLUST],
     target: AbilityTarget::None {
         self_circle: Some(CircleEffect::new(
             Range::f32(12.5),
@@ -2364,7 +2362,7 @@ pub const FIREBALL: Ability = Ability {
 pub const FIRE_BOLT: Ability = Ability {
     id: AbilityId::FireBolt,
     name: "Fire bolt",
-    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| to its surroundings",
+    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| |<fire>|fire damage in a small area",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2464,7 +2462,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     stamina_cost: 0,
     requirement: None,
 
-    roll: Some(AbilityRollType::Spell),
+    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     target: AbilityTarget::Character {acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -2837,7 +2835,7 @@ impl PassiveSkill {
             WeaponProficiency => "Attacks gain |<value>+1| |<shield>| armor penetration",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|",
-            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
+            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|.",
             ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
             Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",

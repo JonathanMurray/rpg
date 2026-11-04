@@ -18,8 +18,8 @@ use crate::{
     drawing::draw_dashed_line,
     game_ui::draw_rectangle_lines2,
     init_fight_map::FightId,
+    resources::{load_and_init_texture, PortraitId},
     shop_scene::{generate_shop_contents, ShopEntry},
-    textures::{load_and_init_texture, PortraitId},
     util::screen_size,
 };
 
@@ -83,16 +83,16 @@ impl MapScene {
         let mut nodes = [
             Node::new((0, 0), None),
             Node::new((1, 0), Some(MapChoice::Fight(FightId::Easy))),
-            Node::new((1, 1), Some(MapChoice::Fight(FightId::EasyPair))),
+            Node::new((1, 1), Some(MapChoice::Fight(FightId::Easy))),
             Node::new((2, 0), Some(MapChoice::Fight(FightId::Medium))),
-            Node::new((2, 1), Some(MapChoice::Fight(FightId::EasyRiver))),
+            Node::new((2, 1), Some(MapChoice::Fight(FightId::Easy))),
             Node::new((2, 2), Some(MapChoice::Shop(generate_shop_contents()))),
             Node::new((3, 0), Some(MapChoice::Shop(generate_shop_contents()))),
             Node::new((3, 1), Some(MapChoice::Chest(generate_chest_content()))),
-            Node::new((3, 2), Some(MapChoice::Fight(FightId::EliteOgre))),
+            Node::new((3, 2), Some(MapChoice::Fight(FightId::Ogre))),
             Node::new((4, 0), Some(MapChoice::Rest)),
             Node::new((4, 1), Some(MapChoice::Chest(generate_chest_content()))),
-            Node::new((5, 0), Some(MapChoice::Fight(FightId::EasySurrounded))),
+            Node::new((5, 0), Some(MapChoice::Fight(FightId::Easy))),
             Node::new((6, 0), Some(MapChoice::Fight(FightId::Huldra))),
         ];
 
@@ -138,7 +138,7 @@ impl MapScene {
                 };
                 node.texture = match choice {
                     MapChoice::Rest => Some(rest_texture.clone()),
-                    MapChoice::Fight(FightId::EliteOgre | FightId::Huldra) => {
+                    MapChoice::Fight(FightId::Ogre | FightId::Huldra) => {
                         Some(fight_elite_texture.clone())
                     }
                     MapChoice::Fight(..) => Some(fight_texture.clone()),

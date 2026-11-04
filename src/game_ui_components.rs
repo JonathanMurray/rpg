@@ -21,11 +21,11 @@ use crate::{
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
-    sounds::{SoundId, SoundPlayer},
-    textures::{
+    resources::{
         draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
         PORTRAIT_ENEMY_BG_TEXTURE, UI_RESOURCE_BAR_TEXTURE,
     },
+    sounds::{SoundId, SoundPlayer},
     util::{oscillate, oscillate_loop, oscillate_plateau, oscillate_square},
 };
 use crate::{
@@ -500,7 +500,6 @@ impl PlayerPortraits {
                 let populated_description = condition_info.populated_description();
                 let content_lines: Vec<&str> = populated_description.split("\n").collect();
                 draw_tooltip(
-                    &self.tooltip_font,
                     TooltipPositionPreference::At((
                         rect.right() + STATUS_ICON_W + 5.0,
                         rect.y + 1.0,

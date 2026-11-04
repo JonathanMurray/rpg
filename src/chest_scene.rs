@@ -22,8 +22,8 @@ use crate::{
     equipment_ui::equipment_tooltip,
     game_ui::draw_rectangle_lines2,
     non_combat_ui::NonCombatPartyUi,
+    resources::{EquipmentIconId, PortraitId},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
     tooltip::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
     util::screen_size,
 };
@@ -122,7 +122,6 @@ pub async fn run_chest_loop(
 
                         if !tooltip.keywords.is_empty() {
                             draw_keyword_tooltips(
-                                &simple_font,
                                 &tooltip.keywords,
                                 tooltip_rect.right() + 2.0,
                                 tooltip_rect.y,

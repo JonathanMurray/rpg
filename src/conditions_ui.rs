@@ -11,7 +11,7 @@ use macroquad::{
 use crate::{
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
-    textures::draw_status_icon,
+    resources::draw_status_icon,
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
 };
 
@@ -46,7 +46,6 @@ impl Drawable for ConditionsList {
             let populated_description = condition_info.populated_description();
             let content_lines: Vec<&str> = populated_description.split("\n").collect();
             draw_tooltip(
-                &self.simple_font,
                 TooltipPositionPreference::RelativeToRect(rect, Side::Right),
                 condition_info.name,
                 None,

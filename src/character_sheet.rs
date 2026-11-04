@@ -24,11 +24,11 @@ use crate::core::{ActionTarget, EquipmentEntry, EquipmentSlotRole};
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection};
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
-use crate::sounds::SoundPlayer;
-use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
-use crate::textures::{
+use crate::resources::{
     portrait_texture, PORTRAITS_TEXTURE, UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE,
 };
+use crate::sounds::SoundPlayer;
+use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},

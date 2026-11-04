@@ -27,21 +27,21 @@ use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, Player
 use rpg::data::{
     PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, BLESS,
     CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, HEALTH_POTION, HEAL_ENERGIZE,
-    HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
+    HUNGERING_BLADE, INSPIRE_BLOODLUST, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
     PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
 };
 use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
+use rpg::map_data::{make_high_alice, make_low_level_party, make_medium_clara, make_test_fighter};
+use rpg::resources::load_and_init_static_resources;
 use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::{self, SoundPlayer};
-use rpg::textures::load_and_init_static;
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
 
 use clap::Parser;
 
-/// A Tactical-RPG Game
+/// Game executable
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -56,7 +56,6 @@ struct Args {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-
     let args = Args::parse();
 
     // Seed the random numbers
@@ -95,7 +94,7 @@ async fn main() {
     let resources = GameResources::load().await;
 
     draw_loading_text_progress("Loading resources", Some((1, 2))).await;
-    load_and_init_static().await;
+    load_and_init_static_resources().await;
 
     let sounds_enabled = !args.mute;
 
@@ -188,7 +187,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![ButtonAction::AbilityEnhancement(&INSPIRE_RUTHLESS)],
+                            vec![ButtonAction::AbilityEnhancement(&INSPIRE_BLOODLUST)],
                             vec![EquipmentEntry::Weapon(ARCANE_BOW)],
                             //vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
                         ),
@@ -318,7 +317,7 @@ fn build_player_growths(
     for (player_id, growth) in growths {
         assert!(growth.is_new_joiner);
         let new_char = match player_id {
-            PlayerId::Bob => make_high_bob(party),
+            PlayerId::Bob => make_test_fighter(party),
             PlayerId::Alice => make_high_alice(party),
             PlayerId::Clara => make_medium_clara(party),
         };

@@ -17,14 +17,14 @@ use crate::{
         Goodness, OnAttackedReaction, OPPORTUNITY_ATTACK_AP_COST, OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     drawing::draw_rounded_rectangle_lines,
-    textures::{draw_icon, draw_status_icon, IconId, StatusId},
-    util::screen_size,
+    resources::{draw_icon, draw_status_icon, IconId, StatusId, BIG_FONT, SIMPLE_FONT},
+    util::{screen_size, COL_TEXT_HEADER, COL_TEXT_REGULAR},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Cond(Condition, Option<u32>),
-    Spikes,
+    SpikesSurface,
     AttackEnhancement(AttackEnhancement),
     OnAttackedReaction(OnAttackedReaction),
     OpportunityAttack,
@@ -66,7 +66,7 @@ impl Keyword {
             Keyword::WeakHit => "Weak hit".to_string(),
             Keyword::Crit => "Crit".to_string(),
             Keyword::Flanked => "Flanked".to_string(),
-            Keyword::Spikes => "spikes (surface)".to_string(),
+            Keyword::SpikesSurface => "spikes (surface)".to_string(),
         }
     }
 
@@ -79,9 +79,9 @@ impl Keyword {
                     condition.description().to_string()
                 }
             },
-            Keyword::AttackEnhancement(enhancement) => format!("|<faded>(attack enhancement)|\n{}",  enhancement.description),
-            Keyword::OnAttackedReaction(reaction) => format!("|<faded>(reaction)|\n{}", reaction.description),
-            Keyword::OpportunityAttack => "|<faded>(reaction)|\nAttack an enemy that drops their guard".to_string(),
+            Keyword::AttackEnhancement(enhancement) => format!("|<enhancement>| |<keyword>Enhancement| |<faded>(attack)|\n\n{}",  enhancement.description),
+            Keyword::OnAttackedReaction(reaction) => format!("|<reaction>| |<keyword>Reaction| |<faded>(incoming attack)|\n\n{}", reaction.description),
+            Keyword::OpportunityAttack => "|<reaction>| |<keyword>Reaction|\n\nAttack an enemy that drops their guard".to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
                 "Distance: |<value>x| |<faded>(affected by target's |<toughness>||<stat>Toughness|<faded>)|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
@@ -92,9 +92,19 @@ impl Keyword {
             Keyword::Crit => {
                 "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers).".to_string()
             }
-            Keyword::Flanked => "Critical hit chance increased to |<value>25%| (from |<value>5%|)".to_string(),
-            Keyword::Spikes => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
+            Keyword::Flanked => "Critical hit chance increased by |<value>20%|".to_string(),
+            Keyword::SpikesSurface => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
         }
+    }
+
+    fn icon(&self) -> Option<IconId> {
+        let icon = match self {
+            Keyword::AttackEnhancement(attack_enhancement) => attack_enhancement.icon,
+            Keyword::OnAttackedReaction(on_attacked_reaction) => on_attacked_reaction.icon,
+            Keyword::OpportunityAttack => IconId::MeleeAttack,
+            _ => return None,
+        };
+        Some(icon)
     }
 
     fn goodness(&self) -> Goodness {
@@ -114,7 +124,7 @@ impl Keyword {
             Keyword::WeakHit => Goodness::Bad,
             Keyword::Crit => Goodness::Good,
             Keyword::Flanked => Goodness::Bad,
-            Keyword::Spikes => Goodness::Bad,
+            Keyword::SpikesSurface => Goodness::Bad,
         }
     }
 }
@@ -123,23 +133,23 @@ pub fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     let mut s = String::new();
 
     if action_points > 0 {
-        s.push_str(&format!("|<faded>{action_points}| |<ap>|"));
+        s.push_str(&format!("|<faded>{action_points}||<ap>|"));
     }
     if stamina > 0 {
         if !s.is_empty() {
             s.push_str(" ");
         }
-        s.push_str(&format!("|<faded>{stamina}| |<stamina>|"));
+        s.push_str(&format!("|<faded>{stamina}||<stamina>|"));
     }
     if mana > 0 {
         if !s.is_empty() {
             s.push_str(" ");
         }
-        s.push_str(&format!("|<faded>{mana}| |<mana>|"));
+        s.push_str(&format!("|<faded>{mana}||<mana>|"));
     }
 
     if !s.is_empty() {
-        s = format!(" |<faded>(|{s}|<faded>)|");
+        s = format!(" {s}");
     }
     s
 }
@@ -167,7 +177,6 @@ pub fn draw_regular_tooltip(
     content_lines: &[String],
 ) -> Rect {
     draw_tooltip(
-        font,
         pos_preference,
         header,
         error,
@@ -179,18 +188,18 @@ pub fn draw_regular_tooltip(
 }
 
 pub fn draw_tooltip(
-    font: &Font,
     pos_preference: TooltipPositionPreference,
     header: &str,
     error: Option<&'static str>,
     content_lines: &[impl AsRef<str>],
-    has_keywords: &[Keyword],
+    keywords: &[Keyword],
     header_keyword: Option<Keyword>,
     icon: Option<IconId>,
 ) -> Rect {
-    // TODO: Header should use big_font, size=24
-    // TODO: Enable UI code like this to use arbitrary font - don't force passing around simple_font and big_font throughout the entire codebase
-    let header_font_size = if header_keyword.is_some() { 16 } else { 24 };
+    let font = SIMPLE_FONT.get().unwrap();
+    let header_font = BIG_FONT.get().unwrap();
+
+    let header_font_size = if header_keyword.is_some() { 12 } else { 24 };
     let font_size = 16;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
@@ -206,23 +215,37 @@ pub fn draw_tooltip(
         _ => None,
     });
 
-    let status_icon_w = 20.0;
-    let status_icon_margin = 8.0;
+    const STATUS_ICON_W: f32 = 20.0;
+    const STATUS_ICON_MARGIN: f32 = 8.0;
 
-    let mut measure_width = |line, size, status_icon: Option<StatusId>| {
+    const ICON_MARGIN: f32 = 5.0;
+    const ICON_SIZE: (f32, f32) = (30.0, 24.0);
+
+    let mut measure_width = |line, font, size, status_icon: bool, icon: bool| {
         let dimensions = measure_text_with_font_tags(line, Some(font), size, 1.0);
         let mut w = dimensions.width;
-        if status_icon.is_some() {
-            w += status_icon_w + status_icon_margin;
+        if status_icon {
+            w += STATUS_ICON_W + STATUS_ICON_MARGIN;
         }
+
+        if icon {
+            w += ICON_MARGIN + ICON_SIZE.0;
+        }
+
         if w > max_line_w {
             max_line_w = w;
         }
     };
 
-    measure_width(header, header_font_size, header_status_icon);
+    measure_width(
+        header,
+        header_font,
+        header_font_size,
+        header_status_icon.is_some(),
+        icon.is_some(),
+    );
     if let Some(error) = error.as_ref() {
-        measure_width(error, font_size, None)
+        measure_width(error, font, font_size, false, false)
     }
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
@@ -265,7 +288,7 @@ pub fn draw_tooltip(
     }
 
     for line in &physical_content_lines {
-        measure_width(line, font_size, None);
+        measure_width(line, font, font_size, false, false);
     }
 
     let tooltip_w = max_line_w + text_margin * 2.0;
@@ -358,7 +381,7 @@ pub fn draw_tooltip(
 
     let mut line_y = tooltip_rect.y + text_margin * 2.0 + 8.0;
 
-    let mut draw_line =
+    let mut draw_text_line =
         |line: &str, color: Option<Color>, is_header: bool, status_icon: Option<StatusId>| {
             let text_x = tooltip_rect.x + text_margin;
             let mut params = text_params.clone();
@@ -366,6 +389,7 @@ pub fn draw_tooltip(
                 params.color = c;
             }
             if is_header {
+                params.font = Some(header_font);
                 params.font_size = header_font_size;
             }
             if line.is_empty() {
@@ -377,9 +401,9 @@ pub fn draw_tooltip(
                 if let Some(status) = status_icon {
                     draw_status_icon(
                         status,
-                        text_x + w + status_icon_margin,
-                        line_y - status_icon_w + 5.0,
-                        Some((status_icon_w, status_icon_w)),
+                        text_x + w + STATUS_ICON_MARGIN,
+                        line_y - STATUS_ICON_W + 5.0,
+                        Some((STATUS_ICON_W, STATUS_ICON_W)),
                     );
                 }
 
@@ -407,19 +431,19 @@ pub fn draw_tooltip(
             Keyword::AttackEnhancement(..)
             | Keyword::OnAttackedReaction(..)
             | Keyword::OpportunityAttack,
-        ) => YELLOW,
+        ) => COL_TEXT_HEADER,
         _ => ORANGE,
     };
 
-    draw_line(header, Some(header_color), true, header_status_icon);
+    draw_text_line(header, Some(header_color), true, header_status_icon);
 
     if let Some(error) = error {
-        draw_line(error, Some(RED), false, None);
+        draw_text_line(error, Some(RED), false, None);
     }
     for line in physical_content_lines {
-        draw_line(line, None, false, None);
+        draw_text_line(line, Some(COL_TEXT_REGULAR), false, None);
     }
-    if !has_keywords.is_empty() {
+    if !keywords.is_empty() {
         DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(true, std::sync::atomic::Ordering::Relaxed);
         if !DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME.load(std::sync::atomic::Ordering::Relaxed) {
             // The keyword tooltip will be shown soon
@@ -430,17 +454,15 @@ pub fn draw_tooltip(
         let shown_for =
             KEYWORD_TOOLTIP_COUNTER.fetch_add(elapsed_ms, std::sync::atomic::Ordering::Relaxed);
         if shown_for > 200 {
-            draw_keyword_tooltips_relative_to_rect(font, has_keywords, tooltip_rect);
+            draw_keyword_tooltips_relative_to_rect(keywords, tooltip_rect);
         }
     }
 
     if let Some(icon) = icon {
-        let margin = 5.0;
-        let icon_size = (30.0, 24.0);
         draw_icon(
             icon,
-            tooltip_rect.right() - icon_size.0 - margin,
-            y + margin,
+            tooltip_rect.right() - ICON_SIZE.0 - ICON_MARGIN,
+            y + ICON_MARGIN,
             None,
             false,
         );
@@ -459,7 +481,7 @@ pub fn handle_keyword_tooltip_end_of_frame() {
     DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
 }
 
-pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword], mut rect: Rect) {
+pub fn draw_keyword_tooltips_relative_to_rect(keywords: &[Keyword], mut rect: Rect) {
     for (i, keyword) in keywords.iter().enumerate() {
         let pos_preference = if i == 0 {
             TooltipPositionPreference::RelativeToRect(rect, Side::Right)
@@ -468,27 +490,26 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
         };
         let description = keyword.description();
         let content_lines: Vec<&str> = description.split("\n").collect();
+
         rect = draw_tooltip(
-            font,
             pos_preference,
             &keyword.name(),
             None,
             &content_lines,
             &[],
             Some(*keyword),
-            None,
+            keyword.icon(),
         );
         rect.y += 2.0;
         //y += rect.h;
     }
 }
 
-pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f32) {
+pub fn draw_keyword_tooltips(keywords: &[Keyword], x: f32, mut y: f32) {
     for keyword in keywords {
         let description = keyword.description();
         let content_lines: Vec<&str> = description.split("\n").collect();
         let rect = draw_tooltip(
-            font,
             TooltipPositionPreference::At((x, y)),
             &keyword.name(),
             None,

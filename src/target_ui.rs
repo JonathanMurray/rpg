@@ -6,7 +6,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, WHITE},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, WHITE},
     math::Rect,
     text::Font,
     texture::Texture2D,
@@ -23,11 +23,11 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{portrait_texture, PortraitId},
-    util::{plus_minus, COL_RED},
+    resources::{portrait_texture, PortraitId},
+    util::{plus_minus, COL_GOLD, COL_RED},
 };
 
-const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.85);
+const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.95);
 
 pub struct TargetUi {
     target: Option<Rc<Character>>,
@@ -366,6 +366,8 @@ impl TargetUi {
                     border: Some(Border {
                         color: LIGHTGRAY,
                         inner_rounding: Some(6.0),
+                        double: Some((DARKGRAY, 2.0)),
+                        corner_ornamentation: Some((DARKGRAY, 4.0, 5.0)),
                         ..Default::default()
                     }),
                     padding: 10.0,
@@ -429,7 +431,7 @@ impl TargetUi {
         if let Some((id, pos)) = self.hovered_btn.borrow().as_ref() {
             let btn = self.buttons.get(id).unwrap();
 
-            draw_button_tooltip(&self.simple_font, *pos, &btn.borrow().tooltip(), true);
+            draw_button_tooltip(*pos, &btn.borrow().tooltip(), true);
         }
     }
 

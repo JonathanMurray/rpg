@@ -33,8 +33,8 @@ use crate::{
         SWEEP_ATTACK,
     },
     non_combat_ui::{NonCombatCharacterUi, PortraitRow},
+    resources::{EquipmentIconId, PortraitId},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
     util::{screen_size, select_n_random},
 };
 
@@ -380,7 +380,7 @@ impl RewardSelectionUi {
                 .find(|btn| btn.action_button.id == btn_id)
                 .map(|reward_btn| &reward_btn.action_button)
                 .unwrap();
-            draw_button_tooltip(&self.font, btn_pos, &reward_btn.tooltip(), true);
+            draw_button_tooltip(btn_pos, &reward_btn.tooltip(), true);
         }
 
         self.bottom_panel.draw_tooltips();

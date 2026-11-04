@@ -23,7 +23,7 @@ use crate::{
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
-    util::{plus_minus, COL_ERROR, COL_GOLD, COL_GREEN_0, COL_RED},
+    util::{plus_minus, COL_ERROR, COL_GOLD, COL_GREEN_0, COL_RED, COL_TEXT_HEADER},
 };
 
 use crate::action_button::ActionButton;
@@ -139,7 +139,7 @@ impl ActivityPopup {
         let header_params = TextParams {
             font: Some(&self.big_font),
             font_size: header_font_size,
-            color: YELLOW,
+            color: COL_TEXT_HEADER,
             ..Default::default()
         };
 
@@ -315,39 +315,6 @@ impl ActivityPopup {
 
         let configuring_action = matches!(&*self.ui_state.borrow(), UiState::ConfiguringAction(..));
 
-        /*
-        if !self.choice_buttons.is_empty() && configuring_action {
-            let buttons_w = self.choice_buttons.len() as f32 * REGULAR_ACTION_BUTTON_SIZE.0
-                + (self.choice_buttons.len() - 1) as f32 * button_margin;
-
-            let label = "Enhance:";
-            let dim = measure_text_with_font_tags(label, Some(&self.font), 16, 1.0);
-            let label_x = btn_x + buttons_w / 2.0 - dim.width / 2.0;
-
-            draw_text_with_font_tags(
-                label,
-                label_x,
-                btn_y - 15.0,
-                TextParams {
-                    font: Some(&self.font),
-                    font_size: 16,
-                    color: YELLOW.with_alpha(0.7),
-                    ..Default::default()
-                },
-                true,
-            );
-            let line_y = btn_y - 7.0;
-            draw_line(
-                btn_x,
-                line_y,
-                btn_x + buttons_w,
-                line_y,
-                1.0,
-                Color::new(1.0, 1.0, 1.0, 0.3),
-            );
-        }
-         */
-
         for btn in self.choice_buttons.values() {
             btn.draw(btn_x, btn_y);
             btn_x += btn.size.0 + button_margin;
@@ -387,7 +354,7 @@ impl ActivityPopup {
         for btn in self.choice_buttons.values() {
             if self.hovered_choice_button_id == Some(btn.id) {
                 let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip(&self.font, (btn_x, btn_y), &btn.tooltip(), detailed_tooltip);
+                draw_button_tooltip((btn_x, btn_y), &btn.tooltip(), detailed_tooltip);
             }
 
             btn_x += btn.size.0 + button_margin;

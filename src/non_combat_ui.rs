@@ -21,9 +21,9 @@ use crate::{
     core::{BaseAction, Character, HandType},
     equipment_ui::{EquipmentDrag, EquipmentSection},
     game_ui::{draw_rectangle_lines2, ResourceBars},
+    resources::{EquipmentIconId, PortraitId},
     sounds::SoundPlayer,
     stats_ui::build_character_stats_table,
-    textures::{EquipmentIconId, PortraitId},
     util::screen_size,
 };
 
@@ -360,7 +360,7 @@ impl NonCombatCharacterUi {
                 .iter()
                 .find(|btn| btn.id == id)
                 .unwrap();
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip(), true);
+            draw_button_tooltip(btn_pos, &btn.tooltip(), true);
         }
     }
 

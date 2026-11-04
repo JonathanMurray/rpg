@@ -26,26 +26,40 @@ use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_ui::{draw_rectangle_lines2, UiState};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::{ControlPoint, GameGrid};
-use rpg::init_fight_map::GameInitState;
+use rpg::init_fight_map::{FightId, GameInitState};
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::{Elevation, Occupation};
 use rpg::resources::{init_core_game, GameResources};
-use rpg::sounds::SoundPlayer;
-use rpg::textures::{
-    load_and_init_static, terrain_atlas_area, LiquidType, Sprite, SpriteId, TerrainId,
+use rpg::resources::{
+    load_and_init_static_resources, terrain_atlas_area, LiquidType, Sprite, SpriteId, TerrainId,
     WallOrientation, WaterOrientation,
 };
+use rpg::sounds::SoundPlayer;
+
+use clap::Parser;
 
 const DEFAULT_FILENAME: &str = "test2.json";
 
+/// Map editor
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Disable sound
+    #[arg(short, long)]
+    mute: bool,
+
+    /// Which map/fight to edit
+    map_file: Option<String>,
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-    let filepath = "maps/".to_string()
-        + &args
-            .into_iter()
-            .nth(1)
-            .unwrap_or(DEFAULT_FILENAME.to_string());
+    let args = Args::parse();
+
+    let filepath = format!(
+        "maps/{}",
+        args.map_file.unwrap_or(DEFAULT_FILENAME.to_string())
+    );
 
     set_fullscreen(true);
     // Give the backend enough time to enter fullscreen, so that we can determine monitor resolution
@@ -60,12 +74,12 @@ async fn main() {
     let resources = GameResources::load().await;
 
     draw_loading_text_progress("Loading resources", Some((1, 2))).await;
-    load_and_init_static().await;
+    load_and_init_static_resources().await;
 
     draw_loading_text("Loading map").await;
     let mut map_data = MapData::load_from_file(&filepath);
 
-    let sounds_enabled = false;
+    let sounds_enabled = !args.mute;
 
     let sound_player = if sounds_enabled {
         SoundPlayer::load_with_progress(async |i, total| {

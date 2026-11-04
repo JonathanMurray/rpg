@@ -17,8 +17,8 @@ use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, Q
 use crate::grid::{ControlPoint, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
+use crate::resources::{EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::sounds::SoundId;
-use crate::textures::{EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
 use crate::util::{are_entities_within_melee, line_visitor, plus_minus, CustomShuffle};
 
@@ -2545,13 +2545,16 @@ impl CoreGame {
         }
 
         for enhancement in enhancements {
+            //dbg!(enhancement);
             let e = enhancement.spell_effect.unwrap();
             let effects = if area_center.is_some() {
                 e.area_on_hit
             } else {
                 e.target_on_hit
             };
+            //dbg!(effects);
             for effect in effects.iter().copied() {
+                //dbg!(&effect);
                 if let Some(game) = real_game {
                     let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                         hit_type,
@@ -2826,13 +2829,6 @@ impl CoreGame {
             detail_lines.push(format!("Rolled: |<value>{}|", unmodified_roll));
         }
 
-        if attacker.has_condition(&Condition::Ruthless) {
-            unmodified_roll = 20;
-            if game.is_some() {
-                detail_lines.push(format!("Changed to {} (|<faded>Ruthless)", unmodified_roll));
-            }
-        }
-
         let attack_roll_bonus = attack_modifier + attack_bonus.flat_amount;
 
         let roll_result = unmodified_roll as i32 + attack_roll_bonus;
@@ -2977,7 +2973,26 @@ impl CoreGame {
             //  <=5: weak
             // 6-15: regular
             // >=16: strong
-            let crit_threshold = if flanking { 16 } else { 20 };
+            let mut crit_threshold = 20;
+            if flanking {
+                crit_threshold -= 4;
+                if game.is_some() {
+                    detail_lines.push(
+                        "Crit threshold lowered by 4 |<faded>(|<keyword>Flanked|<faded>)|"
+                            .to_string(),
+                    );
+                }
+            }
+            if attacker.has_condition(&Condition::Bloodlust) {
+                crit_threshold -= 4;
+                if game.is_some() {
+                    detail_lines.push(
+                        "Crit threshold lowered by 4 |<faded>(|<keyword>Bloodlust|<faded>)|"
+                            .to_string(),
+                    );
+                }
+            }
+
             let blinded_attacker = attacker.has_condition(&Condition::Blinded);
             let miss_threshold = if blinded_attacker { 5 } else { 1 };
             let hit_type = if unmodified_roll <= miss_threshold {
@@ -3031,11 +3046,8 @@ impl CoreGame {
                         dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
                     }
 
-                    let explanation = if flanking {
-                        format!(
-                            "|<faded>(rolled >= {}, |<keyword>Flanked|<faded>)|",
-                            crit_threshold
-                        )
+                    let explanation = if crit_threshold < 20 {
+                        format!("|<faded>(rolled >= {})", crit_threshold)
                     } else {
                         "|<faded>(rolled 20)|".to_string()
                     };
@@ -3310,14 +3322,6 @@ impl CoreGame {
 
                     if defender.lose_condition(Condition::Protected) {
                         detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
-                    }
-
-                    if attacker
-                        .conditions
-                        .borrow_mut()
-                        .remove(&Condition::Ruthless)
-                    {
-                        detail_lines.push(format!("|{}| lost Ruthless", attacker.name_tag()));
                     }
                 }
 
@@ -5084,7 +5088,7 @@ pub enum Condition {
     ArcaneSurge,
     HealthPotionRecovering,
     Ferocity,
-    Ruthless,
+    Bloodlust,
     Wet,
     Poisoned,
     Treasure,
@@ -5125,7 +5129,7 @@ impl Condition {
             ArcaneSurge => "Arcane surge",
             HealthPotionRecovering => "Recovering",
             Ferocity => "Ferocity",
-            Ruthless => "Ruthless",
+            Bloodlust => "Bloodlust",
             Wet => "Wet",
             Poisoned => "Poisoned",
             Treasure => "Treasure",
@@ -5156,7 +5160,7 @@ impl Condition {
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<evasion>| |<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
-            NearDeath => "|<value>-1| |<ap>| AP per turn.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(While below |<value>20%| health |<heart>|)",
+            NearDeath => "|<value>-2| |<ap>| AP per turn",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
             BloodRage => "|<value>+25%| attack damage (passive skill).",
@@ -5166,7 +5170,7 @@ impl Condition {
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
             HealthPotionRecovering => "|<faded>End of turn:| heal |<value>3| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
-            Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
+            Bloodlust => "|<value>20%| more likely to score a critical hit when attacking",
             Wet => "Resistant: |<value>-25%| |<fire>||<faded>fire dmg|\n|Vulnerable: |<value>+50%| |<lightning>||<faded>lightning dmg|",
             Poisoned => "|<faded>End of turn:| lose |<value>10%| of current health |<heart>|",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
@@ -5207,7 +5211,7 @@ impl Condition {
             ArcaneSurge => true,
             HealthPotionRecovering => true,
             Ferocity => true,
-            Ruthless => true,
+            Bloodlust => true,
             Wet => true,
             Poisoned => false,
             Treasure => true,
@@ -5249,7 +5253,7 @@ impl Condition {
             Raging => StatusId::Rage,
             Frosty => StatusId::Frost,
             Ferocity => StatusId::Blade,
-            Ruthless => StatusId::Rage,
+            Bloodlust => StatusId::Bloodlust,
             Wet => StatusId::Wet,
             Poisoned => StatusId::Poisoned,
             Treasure => StatusId::Treasure,
@@ -5270,7 +5274,6 @@ impl Condition {
         use Condition::*;
         match self {
             Blinded => &[Keyword::Flanked],
-            NearDeath => &[Keyword::Advantage],
             ArcaneBlessing => &[Keyword::Advantage],
             _ => &[],
         }
@@ -5285,6 +5288,7 @@ const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 //const INSPIRED_WILL_BONUS: u32 = 3;
 const INSPIRED_MOVE_BONUS: f32 = 3.0;
 const SLOWED_AP_PENALTY: u32 = 2;
+const NEAR_DEATH_AP_PENALTY: u32 = 2;
 const FROSTY_AP_PENALTY: u32 = 1;
 const HASTENED_AP_BONUS: u32 = 1;
 
@@ -6735,7 +6739,7 @@ impl Character {
             gain_ap += 1;
         }
         if self.has_condition(&Condition::NearDeath) {
-            gain_ap = gain_ap.saturating_sub(1);
+            gain_ap = gain_ap.saturating_sub(NEAR_DEATH_AP_PENALTY);
         }
 
         if self.has_condition(&Condition::Slowed) {
@@ -8163,10 +8167,6 @@ impl Character {
             ));
         }
 
-        if conditions.has(&Condition::NearDeath) {
-            bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
-        }
-
         if conditions.has(&Condition::BloodRage) {
             // Increases damage
             bonuses.push(("Blood rage", RollBonusContributor::OtherPositive));
@@ -8250,9 +8250,6 @@ impl Character {
             ));
         }
 
-        if conditions.has(&Condition::NearDeath) {
-            bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
-        }
         if conditions.has(&Condition::Blinded) {
             // Changes miss calculation
             bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
@@ -8279,9 +8276,7 @@ impl Character {
         if conditions.has(&Condition::Distracted) {
             terms.push(("Distracted", RollBonusContributor::OtherPositive));
         }
-        if conditions.has(&Condition::NearDeath) {
-            terms.push(("Near-death", RollBonusContributor::Advantage(1)))
-        }
+
         if conditions.has(&Condition::Exposed) {
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
         }
@@ -8304,9 +8299,7 @@ impl Character {
         if conditions.has(&Condition::Weakened) {
             terms.push(("Weakened", RollBonusContributor::OtherPositive));
         }
-        if conditions.has(&Condition::NearDeath) {
-            terms.push(("Near-death", RollBonusContributor::Advantage(1)))
-        }
+
         if conditions.has(&Condition::Exposed) {
             // Reduced defenses
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
@@ -8391,6 +8384,9 @@ impl Character {
                 }
                 Condition::Slowed => {
                     self.action_points.lose(SLOWED_AP_PENALTY);
+                }
+                Condition::NearDeath => {
+                    self.action_points.lose(NEAR_DEATH_AP_PENALTY);
                 }
                 Condition::Frosty => {
                     self.action_points.lose(FROSTY_AP_PENALTY);

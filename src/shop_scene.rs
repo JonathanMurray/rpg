@@ -27,8 +27,8 @@ use crate::{
     },
     equipment_ui::equipment_tooltip,
     non_combat_ui::NonCombatPartyUi,
+    resources::{EquipmentIconId, PortraitId},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
     util::select_n_random,
 };
 
@@ -199,12 +199,7 @@ pub async fn run_shop_loop(
 
             if let Some((tooltip, rect)) = hovered {
                 if !tooltip.keywords.is_empty() {
-                    draw_keyword_tooltips(
-                        &simple_font,
-                        &tooltip.keywords,
-                        rect.x,
-                        rect.bottom() + 2.0,
-                    );
+                    draw_keyword_tooltips(&tooltip.keywords, rect.x, rect.bottom() + 2.0);
                 }
             }
 

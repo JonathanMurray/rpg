@@ -36,7 +36,7 @@ use crate::data::{
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::game_ui::draw_rectangle_lines2;
-use crate::textures::{draw_icon, draw_portrait, load_and_init_static, PortraitId};
+use crate::resources::{draw_icon, draw_portrait, load_and_init_static_resources, PortraitId};
 use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +66,7 @@ pub async fn run_editor() {
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
 
-    load_and_init_static().await;
+    load_and_init_static_resources().await;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -515,7 +515,7 @@ pub async fn run_editor() {
 
         if let Some((btn_id, pos)) = hovered_btn_id_pos {
             let btn = &skill_buttons.borrow()[&btn_id];
-            draw_button_tooltip(&font, pos, &btn.tooltip(), true);
+            draw_button_tooltip(pos, &btn.tooltip(), true);
         }
 
         for attribute in clicked_attributes.borrow_mut().drain(..) {
@@ -744,7 +744,6 @@ pub async fn run_skill_tree_scene() {
                         let rect = Rect::new(pos.0, pos.1, cell_w, cell_w);
                         let tooltip = button_action_tooltip(&button_action, None);
                         draw_tooltip(
-                            &font,
                             TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                             &tooltip.header,
                             tooltip.error,
@@ -769,7 +768,6 @@ pub async fn run_skill_tree_scene() {
                 NodeContent::Attr(attribute) => {
                     let (header, description) = attribute.tooltip();
                     draw_tooltip(
-                        &font,
                         TooltipPositionPreference::At((mouse_x + 20.0, mouse_y)),
                         header,
                         None,
