@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
+    color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PURPLE, WHITE},
     input::{
         is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
     },
@@ -15,7 +15,7 @@ use std::{
     collections::HashMap,
     f32::consts::PI,
     rc::{Rc, Weak},
-    sync::OnceLock,
+    sync::{LazyLock, OnceLock},
 };
 
 use crate::{
@@ -25,17 +25,18 @@ use crate::{
     resources::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, AP_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL,
         CHECKED_SYMBOL, CONFIRM_SYMBOL, ENHANCEMENT_SYMBOL, EVASION_SYMBOL, FIRE_SYMBOL,
-        HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, LIGHTNING_SYMBOL, LOSE_AP_SYMBOL,
-        MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL, RADIUS_SYMBOL,
-        RANGE_SYMBOL, REACTION_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL,
-        STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, TARGET_SYMBOL, TOUGHNESS_SYMBOL,
-        UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL, WILL_SYMBOL,
+        HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, LEFT_CLICK_SYMBOL, LIGHTNING_SYMBOL,
+        LOSE_AP_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL,
+        RADIUS_SYMBOL, RANGE_SYMBOL, REACTION_SYMBOL, RED_DICE_SYMBOL, RIGHT_CLICK_SYMBOL,
+        SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL,
+        TARGET_SYMBOL, TOUGHNESS_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
+        WILL_SYMBOL,
     },
     sounds::{SoundId, SoundPlayer},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
         oscillate, oscillate_loop, COL_ALICE, COL_BOB, COL_BRIGHT, COL_CLARA, COL_ENEMY,
-        COL_LIGHT_BLUE,
+        COL_LIGHT_BLUE, COL_TEXT_FADED,
     },
 };
 
@@ -486,13 +487,11 @@ impl Drawable for TextLine {
     }
 }
 
-use lazy_static::lazy_static;
-
 const FONT_SYMBOL_H: f32 = 16.0;
 const FONT_STATUS_W: f32 = 10.0;
 
-lazy_static! {
-    static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
+static TAGS: LazyLock<HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)>> =
+    LazyLock::new(|| {
         let symbol_w = 16.0;
         HashMap::from([
             ("<unchecked>", (symbol_w, &UNCHECKED_SYMBOL)),
@@ -528,9 +527,10 @@ lazy_static! {
             ("<target>", (symbol_w, &TARGET_SYMBOL)),
             ("<reaction>", (8.0, &REACTION_SYMBOL)),
             ("<enhancement>", (12.0, &ENHANCEMENT_SYMBOL)),
+            ("<right_click>", (12.0, &RIGHT_CLICK_SYMBOL)),
+            ("<left_click>", (12.0, &LEFT_CLICK_SYMBOL)),
         ])
-    };
-}
+    });
 
 pub fn measure_text_with_font_tags(
     line: &str,
@@ -557,6 +557,7 @@ pub fn measure_text_with_font_tags(
         } else {
             let font_size = font_size;
             let _ = consume_prefix_tag("<value>", &mut part)
+                || consume_prefix_tag("<trigger>", &mut part)
                 || consume_prefix_tag("<keyword>", &mut part)
                 || consume_prefix_tag("<faded>", &mut part)
                 || consume_prefix_tag("<stat>", &mut part)
@@ -596,7 +597,7 @@ pub fn draw_text_with_font_tags(
     render_tags: bool,
 ) -> f32 {
     let mut x0 = x;
-    let parts = line.split("|");
+    let parts = line.split("|").filter(|p| !p.is_empty());
     for mut part in parts {
         if let Some((symbol_w, texture)) = TAGS.get(part) {
             if render_tags {
@@ -639,13 +640,17 @@ pub fn draw_text_with_font_tags(
                     depth = true;
                     //params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
                 }
+            } else if consume_prefix_tag("<trigger>", &mut part) {
+                if render_tags {
+                    params.color = WHITE;
+                }
             } else if consume_prefix_tag("<keyword>", &mut part) {
                 if render_tags {
                     params.color = ORANGE;
                 }
             } else if consume_prefix_tag("<faded>", &mut part) {
                 if render_tags {
-                    params.color = LIGHTGRAY;
+                    params.color = COL_TEXT_FADED;
                 }
             } else if consume_prefix_tag("<stat>", &mut part) {
                 if render_tags {
@@ -662,6 +667,10 @@ pub fn draw_text_with_font_tags(
                 }
             } else if consume_prefix_tag("<strikethrough>", &mut part) {
                 strikethrough = true;
+            }
+
+            if part.is_empty() {
+                eprintln!("WARN: Unexpected empty tag in line: {:?}", line);
             }
 
             let part_dimensions = draw_text_rounded(part, x0, y, params.clone());

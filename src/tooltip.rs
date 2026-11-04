@@ -30,7 +30,7 @@ pub enum Keyword {
     OpportunityAttack,
     Advantage,
     Pushed,
-    WeakHit,
+    StrongWeak,
     Crit,
     Flanked,
 }
@@ -42,7 +42,7 @@ impl Keyword {
             Keyword::AttackEnhancement(enhancement) => format!(
                 "{}{}",
                 enhancement.name,
-                cost_string(
+                keyword_cost_str(
                     enhancement.action_point_cost,
                     enhancement.stamina_cost,
                     enhancement.mana_cost
@@ -51,11 +51,11 @@ impl Keyword {
             Keyword::OnAttackedReaction(reaction) => format!(
                 "{}{}",
                 reaction.name,
-                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+                keyword_cost_str(reaction.action_point_cost, reaction.stamina_cost, 0)
             ),
             Keyword::OpportunityAttack => format!(
                 "Opportunity attack{}",
-                cost_string(
+                keyword_cost_str(
                     OPPORTUNITY_ATTACK_AP_COST,
                     OPPORTUNITY_ATTACK_STAMINA_COST,
                     0
@@ -63,7 +63,7 @@ impl Keyword {
             ),
             Keyword::Advantage => "Advantage / Disadvantage".to_string(),
             Keyword::Pushed => "Pushed".to_string(),
-            Keyword::WeakHit => "Weak hit".to_string(),
+            Keyword::StrongWeak => "Strong / Weak hit".to_string(),
             Keyword::Crit => "Crit".to_string(),
             Keyword::Flanked => "Flanked".to_string(),
             Keyword::SpikesSurface => "spikes (surface)".to_string(),
@@ -84,13 +84,13 @@ impl Keyword {
             Keyword::OpportunityAttack => "|<reaction>| |<keyword>Reaction|\n\nAttack an enemy that drops their guard".to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
-                "Distance: |<value>x| |<faded>(affected by target's |<toughness>||<stat>Toughness|<faded>)|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
+                "Distance: |<value>x| |<faded>(affected by target's |<toughness>||<stat>Toughness|<faded>)|\n|<trigger>On collision:| take |<value>1| damage per remaining distance.".to_string()
             }
-            Keyword::WeakHit => {
-                "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower.".to_string()
+            Keyword::StrongWeak => {
+                "Modified damage or effectiveness, triggered by certain |<mixed_dice>| dice outcomes.\n|<trigger>16 or higher:| |<value>+50%|.\n<trigger>5 or lower:| |<value>-50%|.".to_string()
             }
             Keyword::Crit => {
-                "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers).".to_string()
+                "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| dice roll is |<value>20| (before modifiers).".to_string()
             }
             Keyword::Flanked => "Critical hit chance increased by |<value>20%|".to_string(),
             Keyword::SpikesSurface => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
@@ -121,7 +121,7 @@ impl Keyword {
             Keyword::OpportunityAttack => Goodness::Neutral,
             Keyword::Advantage => Goodness::Neutral,
             Keyword::Pushed => Goodness::Bad,
-            Keyword::WeakHit => Goodness::Bad,
+            Keyword::StrongWeak => Goodness::Neutral,
             Keyword::Crit => Goodness::Good,
             Keyword::Flanked => Goodness::Bad,
             Keyword::SpikesSurface => Goodness::Bad,
@@ -129,7 +129,7 @@ impl Keyword {
     }
 }
 
-pub fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+pub fn keyword_cost_str(action_points: u32, stamina: u32, mana: u32) -> String {
     let mut s = String::new();
 
     if action_points > 0 {

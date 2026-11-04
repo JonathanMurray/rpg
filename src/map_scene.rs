@@ -116,7 +116,7 @@ impl MapScene {
             EquipmentEntry::Armor(CHAIN_MAIL),
             EquipmentEntry::Armor(LEATHER_ARMOR),
             EquipmentEntry::Weapon(DAGGER),
-            EquipmentEntry::Weapon(SWORD),
+            EquipmentEntry::Weapon(*SWORD),
             EquipmentEntry::Weapon(RAPIER),
             EquipmentEntry::Shield(SMALL_SHIELD),
         ];

@@ -470,6 +470,28 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        25,
+        19
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        31,
+        19
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

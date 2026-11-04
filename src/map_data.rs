@@ -1,5 +1,5 @@
 use core::f32;
-use std::{cell::Cell, collections::HashMap, fs, rc::Rc};
+use std::{cell::Cell, collections::HashMap, fs, rc::Rc, sync::LazyLock};
 
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
+        Ability, ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
         EquipmentEntry, EquipmentSlotRole::MainHand, HandType, Party, PlayerId, Position, Shield,
         Weapon,
     },
@@ -25,16 +25,15 @@ use crate::{
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
-    resources::GameResources,
-    resources::{PortraitId, SpriteId, TerrainId},
+    resources::{GameResources, PortraitId, SpriteId, TerrainId},
     sounds::{SoundId, SoundPlayer},
 };
 
 use crate::data::{
-    PassiveSkill, ARCANE_POTION, BLESS, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS,
-    INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MASSIVE_RADIUS, MEDIUM_SHIELD,
-    PIERCING_SHOT, REACH, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
+    inspire, natures_blessing, shield_bash, PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT,
+    DAGGER, EXPLODING_ARROWS, FIREBALL, FIREBALL_INFERNO, HEALTH_POTION, HEAL_ENERGIZE,
+    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, LEATHER_ARMOR, MASSIVE_RADIUS,
+    MEDIUM_SHIELD, PIERCING_SHOT, REACH, SHACKLED_MIND, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
     SWEEP_ATTACK, SWORD,
 };
 
@@ -280,11 +279,11 @@ pub enum ShieldId {
 
 fn create_weapon(id: WeaponId) -> Weapon {
     match id {
-        WeaponId::Sword => SWORD,
-        WeaponId::BadSword => BAD_SWORD,
+        WeaponId::Sword => *SWORD,
+        WeaponId::BadSword => *BAD_SWORD,
         WeaponId::BadDagger => BAD_DAGGER,
         WeaponId::BadRapier => BAD_RAPIER,
-        WeaponId::EnslavedRapier => ENSLAVED_RAPIER,
+        WeaponId::EnslavedRapier => *ENSLAVED_RAPIER,
         WeaponId::BadBow => BAD_BOW,
         WeaponId::WarAxe => WAR_AXE,
     }
@@ -435,7 +434,7 @@ pub fn create_character(
             );
             ghoul.health.change_max_value_to(12);
             ghoul.armor_piece.set(Some(SHIRT));
-            ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+            ghoul.set_weapon(HandType::MainHand, *BAD_SWORD);
             ghoul
         }
         CharacterType::Scoundrel => {
@@ -450,7 +449,7 @@ pub fn create_character(
             );
             scoundrel.health.change_max_value_to(12);
             scoundrel.armor_piece.set(Some(SHIRT));
-            scoundrel.set_weapon(HandType::MainHand, BAD_SWORD);
+            scoundrel.set_weapon(HandType::MainHand, *BAD_SWORD);
             scoundrel
         }
         CharacterType::Ogre => {
@@ -501,7 +500,7 @@ pub fn create_character(
             );
             enslaved.health.change_max_value_to(24);
             enslaved.armor_piece.set(Some(CHAIN_MAIL));
-            enslaved.set_weapon(HandType::MainHand, ENSLAVED_SWORD);
+            enslaved.set_weapon(HandType::MainHand, *ENSLAVED_SWORD);
             enslaved.learn_passive(PassiveSkill::RisingTemper);
             enslaved.learn_passive(PassiveSkill::SwampDweller);
             enslaved
@@ -571,7 +570,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(&DASH);
-    alice.learn_ability(&INSPIRE);
+    alice.learn_ability(inspire());
 
     //TODO
     //alice.learn_ability(&SPIKES);
@@ -595,11 +594,11 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         Attributes::new(5, 3, 3, 1),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_weapon(HandType::MainHand, *SWORD);
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(DRUID_COAT));
     bob.learn_ability(&DASH);
-    bob.learn_ability(&SHIELD_BASH);
+    bob.learn_ability(shield_bash());
     bob.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
 
     bob.learn_ability(&KILL);
@@ -652,7 +651,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 1, 1),
         (2, 10),
     );
-    test_fighter.set_weapon(HandType::MainHand, ZERO_SWORD);
+    test_fighter.set_weapon(HandType::MainHand, *ZERO_SWORD);
     test_fighter.set_shield(SPIKE_SHIELD);
     test_fighter.armor_piece.set(Some(LEATHER_ARMOR));
     test_fighter.learn_passive(PassiveSkill::Reaper);
@@ -660,12 +659,12 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
     test_fighter.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
     // TODO: lunge attack, not working properly? Weird targetting and resulted in a
     // stackoverflow when trying to commit it
-    test_fighter.learn_ability(&SHIELD_BASH);
+    test_fighter.learn_ability(shield_bash());
     test_fighter.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
     test_fighter.learn_ability(&BRACE);
     // TODO
     //bob.learn_ability(&KILL);
-    test_fighter.learn_ability(&INSPIRE);
+    test_fighter.learn_ability(inspire());
     test_fighter.learn_ability_enhancement(&INSPIRE_BLOODLUST);
     //bob.learn_attack_enhancement(EMPOWER);
     test_fighter.health.lose(10);
@@ -704,7 +703,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
 
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
     alice.trinket.set(Some(ASSASSINS_VIAL));
-    alice.learn_ability(&BLESS);
+    alice.learn_ability(natures_blessing());
     alice.learn_ability_enhancement(&HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_ability(&PIERCING_SHOT);

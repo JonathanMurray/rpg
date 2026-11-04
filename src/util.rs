@@ -1,5 +1,5 @@
 use macroquad::{
-    color::Color,
+    color::{Color, LIGHTGRAY},
     rand::gen_range,
     time::get_time,
     window::{screen_height, screen_width},
@@ -196,3 +196,4 @@ pub const COL_GOLD: Color = rgb(245, 207, 138);
 //pub const COL_YELLOW_TEXT: Color = rgb(219, 157, 40);
 pub const COL_TEXT_HEADER: Color = rgb(207, 163, 95);
 pub const COL_TEXT_REGULAR: Color = rgb(220, 220, 220);
+pub const COL_TEXT_FADED: Color = Color::new(0.7, 0.7, 0.7, 1.0);

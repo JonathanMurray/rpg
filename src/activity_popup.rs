@@ -512,11 +512,14 @@ impl ActivityPopup {
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (i32, i32) {
+        /*
         let enabled_quick_actions = self
             .characters
             .get(self.relevant_character_id)
             .enabled_quick_actions
             .get();
+
+             */
 
         if self.current_movement_cost > 0 {
             return (self.current_movement_cost as i32, 0);
@@ -533,12 +536,14 @@ impl ActivityPopup {
             .map(|action| action.base_ap_cost())
             .unwrap_or(0);
 
+        /*
         if !enabled_quick_actions {
             reserved_from_action += base_action
                 .as_ref()
                 .map(|action| action.base_action().quick_point_cost() as i32)
                 .unwrap_or(0);
         }
+         */
 
         let mut reserved_from_choices: i32 = 0;
 
@@ -546,9 +551,11 @@ impl ActivityPopup {
             reserved_from_choices += action.action_point_cost();
             reserved_from_choices -= action.action_point_discount() as i32;
 
+            /*
             if !enabled_quick_actions {
                 reserved_from_choices += action.quick_point_cost() as i32;
             }
+             */
         }
         let mut additional_hovered_from_choices = 0;
         if let Some(id) = self.hovered_choice_button_id {
@@ -614,12 +621,13 @@ impl ActivityPopup {
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
 
+        /*
         if enabled_quick_actions {
             reserved_sta += base_action
                 .as_ref()
                 .map(|action| action.base_action().quick_point_cost())
                 .unwrap_or(0);
-        }
+        } */
 
         for action in self.selected_choices() {
             reserved_sta += action.stamina_cost();

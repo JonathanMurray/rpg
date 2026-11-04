@@ -232,7 +232,7 @@ pub fn generate_shop_contents() -> Vec<ShopEntry> {
     let candidate_items = vec![
         (EquipmentEntry::Weapon(WAR_HAMMER), 3),
         (EquipmentEntry::Weapon(DAGGER), 3),
-        (EquipmentEntry::Weapon(SWORD), 8),
+        (EquipmentEntry::Weapon(*SWORD), 8),
         (EquipmentEntry::Weapon(RAPIER), 8),
         (EquipmentEntry::Weapon(BOW), 11),
         (EquipmentEntry::Armor(LEATHER_ARMOR), 4),

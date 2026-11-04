@@ -25,7 +25,7 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, BLESS,
+    natures_blessing, PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL,
     CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, HEALTH_POTION, HEAL_ENERGIZE,
     HUNGERING_BLADE, INSPIRE_BLOODLUST, LEATHER_ARMOR, MANA_POTION, MASSIVE_RADIUS, NECROTIC_BAND,
     PIERCING_SHOT, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
@@ -167,7 +167,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                         CharacterGrowth::of(
                             vec![
                                 ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                                ButtonAction::Action(BaseAction::UseAbility(&BLESS)),
+                                ButtonAction::Action(BaseAction::UseAbility(natures_blessing())),
                             ],
                             vec![EquipmentEntry::Arrows(ArrowStack::new(
                                 &EXPLODING_ARROWS,

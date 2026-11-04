@@ -34,7 +34,8 @@ use crate::{
     resources::{draw_eq_icon, EquipmentIconId},
     sounds::{SoundId, SoundPlayer},
     tooltip::{
-        cost_string, draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference,
+        draw_regular_tooltip, draw_tooltip, keyword_cost_str, Keyword, Side,
+        TooltipPositionPreference,
     },
 };
 
@@ -85,12 +86,37 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let a = consumable.ability;
     let mut tooltip = ability_tooltip(a, None);
     let line = format!(
-        "|<faded>Right-click to use item|{} :",
-        cost_string(a.action_point_cost, a.stamina_cost, a.mana_cost,)
+        "|<right_click>| |<trigger>Right-click| to use{} :",
+        consumable_cost_str(a.action_point_cost, a.stamina_cost, a.mana_cost,)
     );
     tooltip.technical_description.insert(0, line);
     tooltip.technical_description.insert(1, "".to_string());
     tooltip
+}
+
+pub fn consumable_cost_str(action_points: u32, stamina: u32, mana: u32) -> String {
+    let mut s = String::new();
+
+    if action_points > 0 {
+        s.push_str(&format!("|<faded>{action_points}| |<ap>|"));
+    }
+    if stamina > 0 {
+        if !s.is_empty() {
+            s.push_str(" ");
+        }
+        s.push_str(&format!("|<faded>{stamina}| |<stamina>|"));
+    }
+    if mana > 0 {
+        if !s.is_empty() {
+            s.push_str(" ");
+        }
+        s.push_str(&format!("|<faded>{mana}| |<mana>|"));
+    }
+
+    if !s.is_empty() {
+        s = format!(" ({s})");
+    }
+    s
 }
 
 fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
@@ -102,13 +128,13 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
     }
     if equip.thorns > 0 {
         t.technical_description.push(format!(
-            "Deal |<value>{}| damage back to melee attackers",
+            "Deal |<value>{}| damage back to melee attackers.",
             equip.thorns
         ));
     }
     if equip.heal_on_kill > 0 {
         t.technical_description.push(format!(
-            "|<faded>On kill:| |<heart>| |<value>{}| healing",
+            "|<trigger>On kill:| |<heart>| |<value>{}| healing",
             equip.heal_on_kill
         ));
     }
@@ -126,24 +152,24 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
     }
     if equip.attack_advantage_against_bleeding_target {
         t.technical_description.push(format!(
-            "Gain |<keyword>Advantage| on attacks against |<keyword>Bleeding| targets"
+            "Gain |<keyword>Advantage| on attacks against |<keyword>Bleeding| targets."
         ));
         t.keywords.push(Keyword::Advantage);
         t.keywords.push(Keyword::Cond(Condition::Bleeding, None));
     }
     if let Some(apply_effect) = equip.on_attack_damage_apply_self {
         t.technical_description
-            .push("|<faded>On attack: (self)|".to_string());
+            .push("|<trigger>On attack:| |<faded>(self)|".to_string());
         describe_apply_effect(apply_effect, t);
     }
     if let Some(apply_effect) = equip.on_attack_damage_apply {
         t.technical_description
-            .push("|<faded>On attack:| |<single_target>| |<faded>(target)|".to_string());
+            .push("|<trigger>On attack:| |<single_target>| |<faded>(target)|".to_string());
         describe_apply_effect(apply_effect, t);
     }
     if let Some(apply_effect) = equip.start_of_turn_apply_self {
         t.technical_description
-            .push("|<faded>Start of turn:".to_string());
+            .push("|<trigger>Start of turn:".to_string());
         t.technical_description
             .push("|<single_target>| |<faded>(self):|".to_string());
         describe_apply_effect(apply_effect, t);
@@ -152,7 +178,7 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
         match circumstance {
             Circumstance::AdjacentToMultipleEnemies => {
                 t.technical_description.push(
-                    "|<faded>Start of turn, if adjacent to multiple enemies||<multi_target>|:"
+                    "|<trigger>Start of turn|: |<faded>(if adjacent to multiple enemies)|"
                         .to_string(),
                 );
                 t.technical_description
@@ -175,14 +201,14 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
 
     if weapon.range != WeaponRange::Melee {
         t.technical_description
-            .push(format!("|<range>| {}", weapon.range));
+            .push(format!("|<range>| |<value>{}|", weapon.range));
     }
     if weapon.bonus_melee_evasion > 0 {
         t.technical_description
             .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
     }
     if let Some(effect) = weapon.on_damage {
-        let mut line = "On damage: ".to_string();
+        let mut line = "|<trigger>|On damage:| ".to_string();
         match effect {
             AttackHitEffect::ApplyTarget(..) => line.push_str("|<faded>(target)|"),
             AttackHitEffect::ApplySelf(..) => line.push_str("|<faded>(self)|"),
@@ -191,7 +217,8 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         describe_apply_effect(effect.apply_effect(), &mut t);
     }
     if let Some(effect) = weapon.on_kill_apply_self {
-        t.technical_description.push(format!("On kill: "));
+        t.technical_description
+            .push(format!("|<trigger>On kill:| "));
         describe_apply_effect(effect, &mut t);
     }
 
@@ -218,7 +245,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
 
 fn bonus_melee_evasion_str(value: u32) -> String {
     format!(
-        "|<value>+{}| |<evasion>| |<stat>Evasion| against melee attacks",
+        "|<value>+{}| |<evasion>| |<stat>Evasion| against melee attacks.",
         value
     )
 }
@@ -746,7 +773,8 @@ fn build_inventory_section(
 }
 
 pub fn build_equipped_section(font: &Font) -> (Element, Vec<Rc<RefCell<EquipmentSlot>>>) {
-    let placeholder_text = "Draw something from your inventory to equip it";
+    let placeholder_text =
+        "|<left_click>| |<trigger>Drag| something from your inventory to equip it.";
     let mut slots: Vec<Rc<RefCell<EquipmentSlot>>> = [
         EquipmentSlot::new(
             font.clone(),
@@ -826,117 +854,6 @@ pub fn build_equipped_section(font: &Font) -> (Element, Vec<Rc<RefCell<Equipment
     (slots_container, cloned_slots)
 
     //(container, cloned_slots, stats_table)
-}
-
-pub struct EquipmentStatsTable {
-    element: Element,
-}
-
-impl EquipmentStatsTable {
-    fn new(character: &Character, font: &Font) -> Self {
-        Self {
-            element: Element::Container(Self::build_table(character, font)),
-        }
-    }
-
-    pub fn rebuild(&mut self, character: &Character, font: &Font) {
-        self.element = Element::Container(Self::build_table(character, font));
-    }
-
-    pub fn build_table(character: &Character, font: &Font) -> Container {
-        let mut cells: Vec<TableCell> = vec![];
-        let mut has_weapon = false;
-        for hand in [HandType::MainHand, HandType::OffHand] {
-            if let Some(weapon) = character.weapon(hand) {
-                has_weapon = true;
-                cells.push(TableCell::from("|<sword>|").with_tooltip(
-                    "Attack damage |<sword>|",
-                    vec!["The unmodified base damage of one attack".to_string()],
-                    vec![],
-                ));
-                cells.push(character.weapon_damage_str(hand).unwrap().into());
-
-                cells.push(TableCell::from("|<red_dice>|").with_tooltip(
-                    "Attack modifier",
-                    vec!["Added to your |<red_dice>| |<stat>Attack| rolls.".to_string(), 
-                    "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
-                    vec![Keyword::Crit, Keyword::WeakHit]
-                ));
-                // Use the "base" value; don't include buffs, since we don't take care to rebuild
-                // this when buffs change, so it just gets confusing.
-                cells.push(format!("+{}", character.base_attack_modifier(hand)).into());
-            }
-        }
-        if !has_weapon {
-            cells.push("|<sword>|".into());
-            cells.push("-".into());
-
-            cells.push("|<red_dice>|".into());
-            cells.push("-".into());
-        }
-
-        /*
-        if let Some(shield) = character.shield() {
-            cells.push("Evasion bonus".into());
-            cells.push(format!("{}", shield.evasion).into());
-        }
-         */
-        cells.push(TableCell::from("|<shield>|").with_tooltip(
-            "Armor |<shield>|",
-            vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
-            vec![],
-        ));
-        // Use the "base" value; don't include buffs, since we don't take care to rebuild
-        // this when buffs change, so it just gets confusing.
-        cells.push(format!("{}", character.base_armor()).into());
-
-        cells.push(TableCell::from("|<weight>|").with_tooltip(
-            "Capacity |<weight>|",
-            vec!["Carrying or equipping more than your capacity makes you |<keyword>Encumbered|.".to_string()],
-            vec![]
-        ));
-
-        let text = format!(
-            "{} / {}",
-            character.equipment_weight(),
-            character.capacity.get()
-        );
-        let color_override = if character.equipment_weight() > character.capacity.get() {
-            //Some(Color::new(1.0, 0.0, 0.0, 1.0))
-            Some(RED)
-        } else {
-            None
-        };
-
-        cells.push(TableCell::new(text, color_override, None));
-
-        table(
-            cells,
-            vec![Align::End, Align::Start],
-            font.clone(),
-            TableStyle {
-                background_color: Some(SKYBLUE),
-                default_text_color: BLACK,
-                outer_border_color: Some(LIGHTGRAY),
-                min_width: Some(90.0),
-                ..Default::default()
-            },
-        )
-    }
-}
-
-impl Drawable for EquipmentStatsTable {
-    fn draw(&self, x: f32, y: f32) {
-        self.element.draw(x, y)
-    }
-
-    fn draw_tooltips(&self, x: f32, y: f32) {
-        self.element.draw_tooltips(x, y);
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.element.size()
-    }
 }
 
 #[derive(Debug)]

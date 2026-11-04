@@ -1,3 +1,8 @@
+use std::{
+    cell::OnceCell,
+    sync::{LazyLock, OnceLock},
+};
+
 use macroquad::color::{
     Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, SKYBLUE, WHITE, YELLOW,
 };
@@ -137,9 +142,13 @@ pub const DAGGER: Weapon = Weapon {
     weight: 1,
 };
 
-pub const SLASHING: AttackEnhancement = AttackEnhancement {
+pub const SLASHING: LazyLock<AttackEnhancement> = LazyLock::new(|| AttackEnhancement {
     name: "Slashing",
-    description: "Inflict |<value>4| |<keyword>Bleeding|",
+    description: format!(
+        "Inflict |<value>4| {}.",
+        Condition::Bleeding.name_with_icon()
+    )
+    .leak(),
     icon: IconId::Slashing,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
@@ -151,7 +160,7 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
-};
+});
 
 pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
     name: "Slashing",
@@ -168,14 +177,14 @@ pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
     ..AttackEnhancement::default()
 };
 
-pub const BAD_SWORD: Weapon = Weapon {
+pub const BAD_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(SLASHING),
+    attack_enhancement: Some(*SLASHING),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -183,16 +192,16 @@ pub const BAD_SWORD: Weapon = Weapon {
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
-};
+});
 
-pub const ENSLAVED_SWORD: Weapon = Weapon {
+pub const ENSLAVED_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     name: "Enslaved Sword",
     range: WeaponRange::Melee,
     action_point_cost: 4,
     damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(SLASHING),
+    attack_enhancement: Some(*SLASHING),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -200,16 +209,16 @@ pub const ENSLAVED_SWORD: Weapon = Weapon {
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
-};
+});
 
-pub const ENSLAVED_RAPIER: Weapon = Weapon {
+pub const ENSLAVED_RAPIER: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     name: "Enslaved Rapier",
     range: WeaponRange::Melee,
     action_point_cost: 4,
     damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(SLASHING),
+    attack_enhancement: Some(*SLASHING),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -217,16 +226,16 @@ pub const ENSLAVED_RAPIER: Weapon = Weapon {
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
-};
+});
 
-pub const SWORD: Weapon = Weapon {
+pub const SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 6,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(SLASHING),
+    attack_enhancement: Some(*SLASHING),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -234,7 +243,7 @@ pub const SWORD: Weapon = Weapon {
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
-};
+});
 
 pub const MAGIC_SWORD: Weapon = Weapon {
     name: "Magic sword",
@@ -289,14 +298,14 @@ pub const HUNGERING_BLADE: Weapon = Weapon {
     weight: 2,
 };
 
-pub const ZERO_SWORD: Weapon = Weapon {
+pub const ZERO_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     name: "Useless sword",
     range: WeaponRange::Melee,
     action_point_cost: 0,
     damage: 2,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(SLASHING),
+    attack_enhancement: Some(*SLASHING),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -304,7 +313,7 @@ pub const ZERO_SWORD: Weapon = Weapon {
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
-};
+});
 
 pub const ZERO_BOW: Weapon = Weapon {
     name: "Useless bow",
@@ -325,7 +334,7 @@ pub const ZERO_BOW: Weapon = Weapon {
 
 const FEINT: AttackEnhancement = AttackEnhancement {
     name: "Feint",
-    description: "Reduce the target's defense by 6 against the next attack",
+    description: "Reduce the target's defense by 6 against the next attack.",
     icon: IconId::Feint,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
@@ -394,7 +403,7 @@ pub const RAPIER: Weapon = Weapon {
 
 const BONK: AttackEnhancement = AttackEnhancement {
     name: "Bonk",
-    description: "Target loses |<value>1| |<ap>| AP",
+    description: "Target loses |<value>1| |<ap>| AP.",
     icon: IconId::Bonk,
     stamina_cost: 1,
     effect: AttackEnhancementEffect {
@@ -605,7 +614,7 @@ pub const ELUSIVE_BOW: Weapon = Weapon {
 
 pub const PENETRATING_ARROWS: Arrow = Arrow {
     name: "Penetrating arrows",
-    description: "Bypasses |<value>3| of the target's |<shield>| armor",
+    description: "Bypasses |<value>3| of the target's |<shield>| armor.",
     icon: EquipmentIconId::PenetratingArrow,
     bonus_penetration: 3,
     on_damage_apply: None,
@@ -614,7 +623,7 @@ pub const PENETRATING_ARROWS: Arrow = Arrow {
 
 pub const BARBED_ARROWS: Arrow = Arrow {
     name: "Barbed arrows",
-    description: "Inflicts |<value>3| |<keyword>Bleeding|",
+    description: "Inflicts |<value>3| |<keyword>Bleeding|.",
     icon: EquipmentIconId::BarbedArrow,
     bonus_penetration: 0,
     on_damage_apply: Some(apply_condition_stacks(Condition::Bleeding, 3)),
@@ -623,7 +632,7 @@ pub const BARBED_ARROWS: Arrow = Arrow {
 
 pub const COLD_ARROWS: Arrow = Arrow {
     name: "Cold arrows",
-    description: "Inflicts |<keyword>Hindered|",
+    description: "Inflicts |<keyword>Hindered|.",
     icon: EquipmentIconId::ColdArrow,
     bonus_penetration: 0,
     on_damage_apply: Some(apply_condition_rounds(Condition::Hindered, 1)),
@@ -649,7 +658,7 @@ pub const FIRE_ARROWS: Arrow = Arrow {
 
 pub const EXPLODING_ARROWS: Arrow = Arrow {
     name: "Exploding arrows",
-    description: "Deals |<value>2| |<fire>|fire damage in an area and pushes affected targets",
+    description: "Deals |<value>2| |<fire>|fire damage in an area and pushes affected targets.",
     icon: EquipmentIconId::ExplodingArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
@@ -861,40 +870,52 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     }),
     ..AbilityEnhancement::default()
 };
-pub const SHIELD_BASH: Ability = Ability {
-    id: AbilityId::ShieldBash,
-    name: "Shield bash",
 
-    description: "Deal |<value>3| damage and inflict |<keyword>Dazed| for |<value>1| round",
-    icon: IconId::ShieldBash,
-    action_point_cost: 2,
-    stamina_cost: 1,
-    mana_cost: 0,
-    requirement: Some(EquipmentRequirement::Shield),
-    possible_enhancements: &[&SHIELD_BASH_KNOCKBACK],
+static SHIELD_BASH: OnceLock<Ability> = OnceLock::new();
+pub fn shield_bash() -> &'static Ability {
+    let damage = 3;
+    let condition = Condition::Dazed;
 
-    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
-    target: AbilityTarget::Character {
-        acquisition: TargetAcquisition::Enemies,
-        reach: AbilityReach::Range(Range::Melee),
-        effect: AbilityTargetEffect::Spell(SpellTargetEffect {
-            defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
-            on_hit: &[apply_condition_rounds(Condition::Dazed, 1)],
-            ..SpellTargetEffect::default()
-        }),
-        circle_effect: None,
-        environment_effect: None,
-    },
-    audio_visuals: AudioVisuals {
-        animation_color: GRAY,
-        animation: AbilityAnimation::ShieldAttack,
-        initiate_sound: None,
-        resolve_sound: Some(SoundId::ShieldBash),
-        charge_fx: None,
-        ..AudioVisuals::default()
-    },
-};
+    SHIELD_BASH.get_or_init(|| Ability {
+        id: AbilityId::ShieldBash,
+        name: "Shield bash",
+
+        description: format!(
+            "Deal |<value>{}| damage and inflict {} for |<value>1| round.",
+            damage,
+            condition.name_with_icon()
+        )
+        .leak(),
+        icon: IconId::ShieldBash,
+        action_point_cost: 2,
+        stamina_cost: 1,
+        mana_cost: 0,
+        requirement: Some(EquipmentRequirement::Shield),
+        possible_enhancements: &[&SHIELD_BASH_KNOCKBACK],
+
+        roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
+        target: AbilityTarget::Character {
+            acquisition: TargetAcquisition::Enemies,
+            reach: AbilityReach::Range(Range::Melee),
+            effect: AbilityTargetEffect::Spell(SpellTargetEffect {
+                defense_type: Some(DefenseType::Toughness),
+                damage: Some(AbilityDamage::Dynamic(damage, DamageType::Regular)),
+                on_hit: vec![apply_condition_rounds(condition, 1)].leak(),
+                ..SpellTargetEffect::default()
+            }),
+            circle_effect: None,
+            environment_effect: None,
+        },
+        audio_visuals: AudioVisuals {
+            animation_color: GRAY,
+            animation: AbilityAnimation::ShieldAttack,
+            initiate_sound: None,
+            resolve_sound: Some(SoundId::ShieldBash),
+            charge_fx: None,
+            ..AudioVisuals::default()
+        },
+    })
+}
 
 pub const ENEMY_TACKLE: Ability = Ability {
     id: AbilityId::Tackle,
@@ -1084,7 +1105,7 @@ pub const EMPOWER: AttackEnhancement = AttackEnhancement {
 
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
-    description: "Attempt to |<keyword>Hinder| the target for |<value>1| round",
+    description: "Attempt to |<keyword>Hinder| the target for |<value>1| round.",
     icon: IconId::CripplingShot,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
@@ -1102,7 +1123,7 @@ pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Parry,
     name: "Parry 2",
     granted_from: None,
-    description: "Protect yourself |<faded>(1 melee attack per round)|",
+    description: "Protect yourself |<faded>(1 melee attack per round)|.",
     icon: IconId::Parry,
     action_point_cost: 0,
     stamina_cost: 2,
@@ -1121,7 +1142,7 @@ pub const BLOCK: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Block",
     granted_from: None,
-    description: "Protect yourself or adjacent ally, preventing |<value>2| attack damage |<faded>(once per round)|",
+    description: "Protect yourself or adjacent ally, preventing |<value>2| attack damage |<faded>(once per round)|.",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
@@ -1140,7 +1161,7 @@ pub const BLOCK_2_WITH_THORNS: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Spike block",
     granted_from: None,
-    description: "Protect yourself, preventing |<value>2| damage and dealing |<value>3| damage back to the attacker |<faded>(once per round)|",
+    description: "Protect yourself, preventing |<value>2| damage and dealing |<value>3| damage back to the attacker |<faded>(once per round)|.",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
@@ -1159,7 +1180,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::SideStep,
     name: "Side step",
     granted_from: None,
-    description: "Attempt to dodge an incoming attack",
+    description: "Attempt to dodge an incoming attack.",
     icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 2,
@@ -1197,7 +1218,7 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
 };
 pub const SWEEP_ATTACK_PUSH: AbilityEnhancement = AbilityEnhancement {
     name: "Push",
-    description: "|<keyword>Push| targets away from you",
+    description: "|<keyword>Push| targets away from you.",
     icon: IconId::Extend,
     stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
@@ -1214,7 +1235,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
     name: "Sweeping attack",
 
-    description: "Attack all surrounding enemies",
+    description: "Attack all surrounding enemies. Deals your |<sword>| weapon damage |<value>-1|.",
     icon: IconId::SweepAttack,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1283,7 +1304,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
     name: "Lunge attack",
 
-    description: "Move to target in an unobstructed path, before attacking",
+    description: "Move to target in an unobstructed path, before attacking.",
     icon: IconId::LungeAttack,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1313,7 +1334,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
 
 pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
     name: "Bloodlust",
-    description: "Also gain |<keyword>Ferocity| if it kills",
+    description: "Also gain |<keyword>Ferocity| if it kills.",
     icon: IconId::Rage,
     stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
@@ -1327,7 +1348,7 @@ pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
 
-    description: "Attack with advantage, and regain |<value>2| AP if it kills",
+    description: "Attack with advantage, and regain |<value>2| AP if it kills.",
     icon: IconId::Execute,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1449,7 +1470,7 @@ pub const SCREAM: Ability = Ability {
     id: AbilityId::Scream,
     name: "Scream",
 
-    description: "Daze nearby enemies",
+    description: "Daze nearby enemies.",
     icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
@@ -1489,7 +1510,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
 
-    description: "Attempt to |<keyword>Slow| and |<keyword>Expose| an enemy",
+    description: "Attempt to |<keyword>Slow| and |<keyword>Expose| an enemy.",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
     mana_cost: 2,
@@ -1557,7 +1578,7 @@ pub const MIND_BLAST: Ability = Ability {
     id: AbilityId::MindBlast,
     name: "Mind blast",
 
-    description: "Damage an enemy and make them lose AP",
+    description: "Damage an enemy and make them lose AP.",
     icon: IconId::Mindblast,
     action_point_cost: 3,
     mana_cost: 1,
@@ -1609,7 +1630,7 @@ pub const MIND_BLAST: Ability = Ability {
 
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
     name: "Necrotic influence",
-    description: "Heal and grow stronger for each affected target",
+    description: "Heal and grow stronger for each affected target.",
     icon: IconId::NecroticInfluence,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect::default()),
@@ -1623,7 +1644,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
 
-    description: "Deal damage and cause |<keyword>Bleeding| in an area",
+    description: "Deal damage and cause |<keyword>Bleeding| in an area.",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 0, // TODO: 1,
@@ -1662,7 +1683,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
     id: AbilityId::DraugHaunt,
     name: "Haunt",
 
-    description: "Deal |<value>3| damage in a small area",
+    description: "Deal |<value>3| damage in a small area.",
     icon: IconId::DraugHaunt,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1704,7 +1725,8 @@ pub const DRAUG_CLAW: Ability = Ability {
     id: AbilityId::DraugClaw,
     name: "Claw",
 
-    description: "Deal |<value>4| damage and inflict |<keyword>Blinded|",
+    // TODO icon
+    description: "Deal |<value>4| damage and inflict |<keyword>Blinded|.",
     icon: IconId::DraugClaw,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1886,7 +1908,7 @@ const fn ally_spell_target(range: Range, apply: &'static [ApplyEffect]) -> Abili
 
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     name: "Energize",
-    description: "Also restore |<value>4| |<stamina>| stamina",
+    description: "Also restore |<value>4| |<stamina>| stamina.",
     icon: IconId::Energize,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -1895,49 +1917,59 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     }),
     ..AbilityEnhancement::default()
 };
-pub const BLESS: Ability = Ability {
-    id: AbilityId::Bless,
-    name: "Nature's blessing",
-    description: "|<keyword>Protect| an ally from one attack, \
-        and cure them of |<keyword>Bleeding|, |<keyword>Poisoned|.",
-    icon: IconId::Bless,
-    action_point_cost: 2,
-    mana_cost: 1,
-    stamina_cost: 0,
-    requirement: None,
 
-    roll: Some(AbilityRollType::Spell),
-    target: ally_spell_target(
-        Range::f32(9.5),
-        &[
-            ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Protected,
-                stacks: Some(3),
-                duration_rounds: Some(1),
-            }),
-            ApplyEffect::LoseCondition {
-                condition: Condition::Bleeding,
-            },
-            ApplyEffect::LoseCondition {
-                condition: Condition::Poisoned,
-            },
-        ],
-    ),
-    // TODO add enhancement that heals over time (1 per round for 3 turns?)
-    possible_enhancements: &[&BLESS_REACH, &HEAL_ENERGIZE],
+static NATURES_BLESSING: OnceLock<Ability> = OnceLock::new();
+pub fn natures_blessing() -> &'static Ability {
+    NATURES_BLESSING.get_or_init(|| {
+        Ability {
+            id: AbilityId::Bless,
+            name: "Nature's blessing",
+            description: format!(
+                "|<keyword>Protect| an ally from one attack, and cure them of {}, {}.",
+                Condition::Bleeding.name_with_icon(),
+                Condition::Poisoned.name_with_icon()
+            )
+            .leak(),
+            icon: IconId::Bless,
+            action_point_cost: 2,
+            mana_cost: 1,
+            stamina_cost: 0,
+            requirement: None,
 
-    audio_visuals: AudioVisuals {
-        animation_color: GREEN,
-        animation: AbilityAnimation::CastSpell,
-        initiate_sound: Some(SoundId::ShootSpell),
-        resolve_sound: Some(SoundId::Heal),
-        target_magic_sparks: Some(WHITE),
-        charge_fx: Some(AbilityChargeFx {
-            particle_shape: ParticleShape::Circle,
-        }),
-        ..AudioVisuals::default()
-    },
-};
+            roll: Some(AbilityRollType::Spell),
+            target: ally_spell_target(
+                Range::f32(9.5),
+                &[
+                    ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Protected,
+                        stacks: Some(3),
+                        duration_rounds: Some(1),
+                    }),
+                    ApplyEffect::LoseCondition {
+                        condition: Condition::Bleeding,
+                    },
+                    ApplyEffect::LoseCondition {
+                        condition: Condition::Poisoned,
+                    },
+                ],
+            ),
+            // TODO add enhancement that heals over time (1 per round for 3 turns?)
+            possible_enhancements: &[&BLESS_REACH, &HEAL_ENERGIZE],
+
+            audio_visuals: AudioVisuals {
+                animation_color: GREEN,
+                animation: AbilityAnimation::CastSpell,
+                initiate_sound: Some(SoundId::ShootSpell),
+                resolve_sound: Some(SoundId::Heal),
+                target_magic_sparks: Some(WHITE),
+                charge_fx: Some(AbilityChargeFx {
+                    particle_shape: ParticleShape::Circle,
+                }),
+                ..AudioVisuals::default()
+            },
+        }
+    })
+}
 
 pub const BLESS_REACH: AbilityEnhancement = AbilityEnhancement {
     name: "Reach",
@@ -1955,7 +1987,7 @@ pub const HASTE: Ability = Ability {
     id: AbilityId::Haste,
     name: "Haste",
 
-    description: "Grant an ally bonus AP and movement",
+    description: "Grant an ally bonus AP and movement.",
     icon: IconId::Haste,
     action_point_cost: 2,
     mana_cost: 2,
@@ -1983,7 +2015,7 @@ pub const HASTE: Ability = Ability {
 
 pub const INSPIRE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
     name: "Bloodlust",
-    description: "Also make targets more likely to score critical hits, for |<value>2| rounds",
+    description: "Also make targets more likely to score critical hits, for |<value>2| rounds.",
     icon: IconId::Bloodlust,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -1993,41 +2025,53 @@ pub const INSPIRE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
     ..AbilityEnhancement::default()
 };
 
-pub const INSPIRE: Ability = Ability {
-    id: AbilityId::Inspire,
-    name: "Inspire",
+static INSPIRE: OnceLock<Ability> = OnceLock::new();
 
-    description: "|<keyword>Inspire| nearby allies for |<value>3| rounds",
-    icon: IconId::Inspire,
-    action_point_cost: 2,
-    mana_cost: 2,
-    stamina_cost: 0,
-    requirement: None,
+pub fn inspire() -> &'static Ability {
+    let condition = Condition::Inspired;
+    let duration = 3;
 
-    roll: Some(AbilityRollType::Spell),
-    possible_enhancements: &[&INSPIRE_BLOODLUST],
-    target: AbilityTarget::None {
-        self_circle: Some(CircleEffect::new(
-            Range::f32(12.5),
-            TargetAcquisition::Allies,
-            uncontested_spell_effect(&[apply_condition_rounds(Condition::Inspired, 3)]),
-            None,
-        )),
-        self_effect: None,
-        environment_effect: None,
-    },
-    audio_visuals: AudioVisuals {
-        animation_color: GREEN,
-        animation: AbilityAnimation::CastSpell,
-        initiate_sound: None,
-        resolve_sound: Some(SoundId::Powerup),
-        charge_fx: Some(AbilityChargeFx {
-            particle_shape: ParticleShape::Circle,
-        }),
-        target_magic_sparks: Some(WHITE),
-        ..AudioVisuals::default()
-    },
-};
+    INSPIRE.get_or_init(|| Ability {
+        id: AbilityId::Inspire,
+        name: "Inspire",
+
+        description: format!(
+            "Grant nearby allies {} for |<value>{}| rounds.",
+            condition.name_with_icon(),
+            duration
+        )
+        .leak(),
+        icon: IconId::Inspire,
+        action_point_cost: 2,
+        mana_cost: 2,
+        stamina_cost: 0,
+        requirement: None,
+
+        roll: Some(AbilityRollType::Spell),
+        possible_enhancements: &[&INSPIRE_BLOODLUST],
+        target: AbilityTarget::None {
+            self_circle: Some(CircleEffect::new(
+                Range::f32(12.5),
+                TargetAcquisition::Allies,
+                uncontested_spell_effect(vec![apply_condition_rounds(condition, duration)].leak()),
+                None,
+            )),
+            self_effect: None,
+            environment_effect: None,
+        },
+        audio_visuals: AudioVisuals {
+            animation_color: GREEN,
+            animation: AbilityAnimation::CastSpell,
+            initiate_sound: None,
+            resolve_sound: Some(SoundId::Powerup),
+            charge_fx: Some(AbilityChargeFx {
+                particle_shape: ParticleShape::Circle,
+            }),
+            target_magic_sparks: Some(WHITE),
+            ..AudioVisuals::default()
+        },
+    })
+}
 
 const fn uncontested_spell_effect(apply: &'static [ApplyEffect]) -> AbilityTargetEffect {
     AbilityTargetEffect::Spell(SpellTargetEffect {
@@ -2042,7 +2086,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
 
-    description: "|<keyword>Inspire| nearby allies for |<value>2| rounds",
+    description: "|<keyword>Inspire| nearby allies for |<value>2| rounds.",
     icon: IconId::Inspire,
     action_point_cost: 3,
     mana_cost: 0,
@@ -2076,7 +2120,7 @@ pub const HEALING_NOVA: Ability = Ability {
     id: AbilityId::HealingNova,
     name: "Healing nova",
 
-    description: "Restore health to nearby allies",
+    description: "Restore health to nearby allies.",
     icon: IconId::PlusPlus,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2112,7 +2156,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
 
-    description: "Restore the caster's health and grants protection",
+    description: "Restore the caster's health and grants protection.",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
     mana_cost: 0,
@@ -2147,7 +2191,7 @@ pub const SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
 
-    description: "Restore the caster's health and grants protection",
+    description: "Restore the caster's health and grants protection.",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
     mana_cost: 1,
@@ -2184,7 +2228,7 @@ pub const SELF_HEAL: Ability = Ability {
 pub const SPIKE_TRAP: Ability = Ability {
     id: AbilityId::Spikes,
     name: "Spike trap",
-    description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them",
+    description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them.",
     icon: IconId::SpikeTrap,
     action_point_cost: 2,
     mana_cost: 0,
@@ -2220,7 +2264,7 @@ pub const DASH: Ability = Ability {
     name: "Dash",
 
     description:
-        "Move swiftly in a straight line, without triggering opportunity attacks from enemies.",
+        "Move swiftly in a straight line.\nDoes not trigger |<reaction>| opportunity attacks.",
     icon: IconId::Dash,
     action_point_cost: 1,
     mana_cost: 0,
@@ -2245,7 +2289,8 @@ pub const PIERCING_SHOT: Ability = Ability {
     id: AbilityId::PiercingShot,
     name: "Piercing shot",
 
-    description: "Attack all enemies in a line",
+    description:
+        "Attack all enemies in a line. Deals |<value>1| less damage for each consecutive target.",
     icon: IconId::PiercingShot,
     action_point_cost: 3,
     mana_cost: 0,
@@ -2362,7 +2407,7 @@ pub const FIREBALL: Ability = Ability {
 pub const FIRE_BOLT: Ability = Ability {
     id: AbilityId::FireBolt,
     name: "Fire bolt",
-    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| |<fire>|fire damage in a small area",
+    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| |<fire>|fire damage in a small area.",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2455,7 +2500,7 @@ const fn apply_condition_rounds(condition: Condition, rounds: u32) -> ApplyEffec
 pub const ENEMY_BURNING_ARROW: Ability = Ability {
     id: AbilityId::EnemyBurningArrow,
     name: "Burning arrow",
-    description: "Deal |<value>3| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings",
+    description: "Deal |<value>3| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings.",
     icon: IconId::Fireball,
     action_point_cost: 4,
     mana_cost: 0,
@@ -2514,7 +2559,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
 
-    description: "Deal |<value>7| |<lightning>|lightning damage to all targets in a line",
+    description: "Deal |<value>7| |<lightning>|lightning damage to all targets in a line.",
     icon: IconId::LightningBolt,
     action_point_cost: 3,
     mana_cost: 2,
@@ -2556,7 +2601,7 @@ pub const KILL: Ability = Ability {
     id: AbilityId::Kill,
     name: "Kill",
 
-    description: "Kill all enemies",
+    description: "Kill all enemies.",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     mana_cost: 0,
@@ -2594,7 +2639,7 @@ pub const KILL_SELF: Ability = Ability {
     id: AbilityId::KillSelf,
     name: "Kill self",
 
-    description: "Kill self",
+    description: "Kill self.",
     icon: IconId::Fireball,
     action_point_cost: 4,
     mana_cost: 0,
@@ -2639,7 +2684,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     id: AbilityId::SearingLight,
     name: "Searing light",
 
-    description: "Envelops the target in blinding light",
+    description: "Envelops the target in blinding light.",
     icon: IconId::SearingLight,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2833,13 +2878,13 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "|<value>+1| |<shield>| armor",
             WeaponProficiency => "Attacks gain |<value>+1| |<shield>| armor penetration",
-            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
-            Reaper => "On kill: gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|",
-            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|.",
+            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below |<value>50%| |<mana>| mana",
+            Reaper => "|<trigger>On kill:| gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|",
+            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below |<value>50%| |<heart>| health. Immune to |<keyword>Near-death|.",
             ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
             Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
-            RisingTemper => "End of turn: gain +1 |<keyword>Ferocity|",
+            RisingTemper => "|<trigger>End of turn:| gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
             Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
             Undead => "Immune to |<keyword>Bleeding|. |<value>-35%| |<boot>| movement speed"

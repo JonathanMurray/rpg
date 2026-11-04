@@ -39,7 +39,7 @@ use crate::{
         HitType, IncludeCircleEffects, MovedEvent, MovementType, OnAttackedReaction, OnHitReaction,
         Position, TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
-    data::{INSPIRE, KILL},
+    data::{inspire, KILL},
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -546,27 +546,40 @@ impl CharacterUi {
         let tooltip = if self.action_points_row.hovered.get() {
             Some((
                 "Action Points (AP)",
-                vec!["Used for actions.".to_string(), "".to_string(), "|<value>4| AP is restored after ending your turn, although this amount can be changed by certain conditions.".to_string()],
+                vec!["Used for actions.".to_string(), "".to_string(), "|<trigger>End of turn:| restore |<value>4| |<ap>| AP. This amount can be changed by certain conditions.".to_string()],
                 vec![]
             ))
         } else if self.health_bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>25%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string(),
-                "Being |<heart>| < 20% causes |<keyword>Near-death|.".to_string()],
-                vec![Keyword::Cond(Condition::NearDeath, None)]
+                vec![
+                    "If this reaches |<value>0|, you die.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of combat:| restore |<value>25%| of missing |<heart>|."
+                        .to_string(),
+                    "Being |<heart>| < |<value>20%| causes |<keyword>Near-death|.".to_string(),
+                ],
+                vec![Keyword::Cond(Condition::NearDeath, None)],
             ))
         } else if self.stamina_bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                vec!["Used for movement and certain actions.".to_string(), "".to_string(), "|<value>25%| |<stamina>| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)".to_string()],
-                vec![]
+                vec![
+                    "Used for some physical actions.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of turn:| restore |<value>25%| |<stamina>|.".to_string(),
+                ],
+                vec![],
             ))
         } else if self.mana_bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                vec!["Used for spells.".to_string(), "".to_string(), "|<value>25%| |<mana>| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)".to_string()],
-                vec![]
+                vec![
+                    "Used for casting spells.".to_string(),
+                    "".to_string(),
+                    "|<trigger>End of combat:| restore |<value>25%| |<mana>|.".to_string(),
+                ],
+                vec![],
             ))
         } else {
             None
@@ -1576,7 +1589,7 @@ impl UserInterface {
                     self.activity_popup.additional_line = Some(description);
                 } else {
                     self.activity_popup.additional_line =
-                        Some("Drag something in your inventory to equip/unequip it".to_string());
+                        Some("|<left_click>| |<trigger>Drag| something in your inventory to equip/unequip it.".to_string());
                     self.set_character_sheet_shown(true);
                 }
             }
@@ -2719,9 +2732,11 @@ impl UserInterface {
         else if let Some(hovered_btn) = &self.hovered_button {
             if hovered_btn.context != Some(ButtonContext::CharacterSheet) {
                 let mut hovered_ap = hovered_btn.action.action_point_cost();
+                /*
                 if !enabled_quick_actions {
                     hovered_ap += hovered_btn.action.quick_point_cost() as i32;
                 }
+                 */
                 character_ui.action_points_row.reserved_and_hovered_ap = (
                     self.activity_popup.reserved_and_hovered_action_points().0,
                     hovered_ap,
@@ -2732,9 +2747,11 @@ impl UserInterface {
                     .set_hovered_amount(hovered_btn.action.mana_cost());
 
                 let mut hovered_sta = hovered_btn.action.stamina_cost();
+                /*
                 if enabled_quick_actions {
                     hovered_sta += hovered_btn.action.quick_point_cost();
                 }
+                 */
                 character_ui
                     .stamina_bar
                     .borrow_mut()

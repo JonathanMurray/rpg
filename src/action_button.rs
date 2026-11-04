@@ -30,7 +30,7 @@ use crate::{
         AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction,
         Character, CircleEffect, Condition, DamageType, DefenseType, EnvironmentEffect,
         EquipEffect, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, TargetAcquisition, Weapon, MOVE_DISTANCE_PER_RESOURCE,
+        Shield, TargetAcquisition, Weapon, WeaponType, MOVE_DISTANCE_PER_RESOURCE,
         OPPORTUNITY_ATTACK_STAMINA_COST,
     },
     data::PassiveSkill,
@@ -242,12 +242,12 @@ fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
     match effect {
         AttackHitEffect::ApplyTarget(apply_effect) => {
             t.technical_description
-                .push("On damage: |<single_target>| |<faded>(target)| ".to_string());
+                .push("|<trigger>|On damage:| |<single_target>| |<faded>(target)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
         AttackHitEffect::ApplySelf(apply_effect) => {
             t.technical_description
-                .push("On damage: |<single_target>| |<faded>(self)| ".to_string());
+                .push("|<trigger>|On damage:| |<single_target>| |<faded>(self)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
     }
@@ -300,7 +300,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     if effect.improved_graze {
         t.technical_description
             .push("|<value>-25%| |<keyword>Graze| damage (instead of |<value>-50%|)".to_string());
-        t.keywords.push(Keyword::WeakHit);
+        t.keywords.push(Keyword::StrongWeak);
     }
     if effect.improved_crit {
         t.technical_description
@@ -336,13 +336,13 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if let Some(effect) = effect.on_kill_apply_self {
         t.technical_description
-            .push("|<faded>On kill: (self)|".to_string());
+            .push("|<trigger>On kill:| |<faded>(self)|".to_string());
         describe_apply_effect(effect, t);
     }
 
     if let Some(effect) = effect.on_damage_effect {
         t.technical_description
-            .push("|<faded>On damage:|".to_string());
+            .push("|<trigger>On damage:|".to_string());
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
                 t.technical_description.push("Regain AP".to_string())
@@ -474,7 +474,9 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
         },
         BaseAction::ChangeEquipment => Tooltip {
             header: "Equip/unequip".to_string(),
-            description: Some(Cow::Borrowed("Change your weapon, shield or armor.")),
+            description: Some(Cow::Borrowed(
+                "Equip something from your inventory, or unequip something you're wearing.",
+            )),
             ..Default::default()
         },
         BaseAction::UseConsumable => Tooltip {
@@ -515,11 +517,8 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             .technical_description
             .push(format!("  |<value>{}| |<heart>| healing", n)),
         ApplyEffect::Condition(apply_condition) => {
-            let mut line = format!(
-                "  |<status>{:?}| |<keyword>{}|",
-                apply_condition.condition.status_id(),
-                apply_condition.condition.name()
-            );
+            let mut line = format!("  {}", apply_condition.condition.name_with_icon());
+
             if let Some(stacks) = apply_condition.stacks {
                 line.push_str(&format!(" |<value>x{}|", stacks));
             }
@@ -849,7 +848,7 @@ fn describe_ability_target_effect(effect: &AbilityTargetEffect, t: &mut Tooltip)
             }
             if let Some(apply_effect) = ability_attack_effect.on_kill_apply_self {
                 t.technical_description
-                    .push("|<faded>On kill: (self)|".to_string());
+                    .push("|<trigger>On kill:| |<faded>(self)|".to_string());
                 describe_apply_effect(apply_effect, t);
             }
         }
@@ -953,7 +952,24 @@ impl ActionTooltip {
 
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
-                    let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
+                    let attack_type;
+                    let description;
+                    match weapon.weapon_type() {
+                        WeaponType::Melee => {
+                            attack_type = "Melee";
+                            description = format!(
+                                "Attack a single target within melee range, for |<value>{}| damage.",
+                                weapon.damage
+                            );
+                        }
+                        WeaponType::Ranged => {
+                            attack_type = "Ranged";
+                            description = format!(
+                                "Attack a single target, for |<value>{}| damage.",
+                                weapon.damage
+                            );
+                        }
+                    }
                     let mut technical_description = vec!["|<red_dice>| |<stat>Attack|".to_string()];
                     let range = weapon.range.into_range().range_with_icon();
 
@@ -970,7 +986,7 @@ impl ActionTooltip {
 
                     let mut t = Tooltip {
                         header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
-                        //description: "Deal |"
+                        description: Some(Cow::Owned(description)),
                         technical_description,
                         ..Default::default()
                     };
@@ -980,7 +996,7 @@ impl ActionTooltip {
                     }
                     if let Some(effect) = weapon.on_kill_apply_self {
                         t.technical_description
-                            .push("|<faded>On kill: (self)| ".to_string());
+                            .push("|<trigger>On kill:| |<faded>(self)| ".to_string());
                         describe_apply_effect(effect, &mut t);
                     }
 
@@ -1066,7 +1082,7 @@ impl ActionButton {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
-        let quick_points = action.quick_point_cost();
+        //let quick_points = action.quick_point_cost();
         let icon: IconId = action.icon(character.as_deref());
 
         let size = match action {
@@ -1094,12 +1110,14 @@ impl ActionButton {
             }))
         }
 
+        /*
         for _ in 0..quick_points {
             ap_circles.push(Element::Circle(Circle {
                 r,
                 color: Rc::new(Cell::new(COL_GREEN_2)),
             }))
         }
+         */
 
         let mut bottom_resource_text = "".to_string();
 
@@ -1597,6 +1615,7 @@ impl ButtonAction {
         }
     }
 
+    /*
     pub fn quick_point_cost(&self) -> u32 {
         match self {
             ButtonAction::Action(base_action) => base_action.quick_point_cost(),
@@ -1609,6 +1628,7 @@ impl ButtonAction {
             ButtonAction::Passive(..) => 0,
         }
     }
+     */
 
     pub fn costs_arrow(&self) -> bool {
         match self {

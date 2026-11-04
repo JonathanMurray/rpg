@@ -5140,44 +5140,52 @@ impl Condition {
         }
     }
 
+    pub fn name_with_icon(&self) -> String {
+        format!(
+            "|<status>{:?}| |<keyword>{}|",
+            self.status_id(),
+            self.name(),
+        )
+    }
+
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
+            Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|.",
             Blinded => "The miss chance of attacks and certain abilities is increased to |<value>25%| (from |<value>5%|).\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
-            Slowed => "|<value>-2| |<ap>| AP per turn",
-            Hastened => "|<value>+1| |<ap>| AP per turn",
+            Slowed => "|<value>-2| |<ap>| AP per turn.",
+            Hastened => "|<value>+1| |<ap>| AP per turn.",
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Receives |<value>x| less |<sword>| damage from the next attack.",
-            Bleeding => "|<faded>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
-            Burning => "|<faded>End of turn:| deals |<value>x| |<fire>|fire damage.\n|<value>50%| spreads to adjacent.",
+            Bleeding => "|<trigger>End of turn:| lose |<value>x| health |<heart>|.\nHalved every turn.",
+            Burning => "|<trigger>End of turn:| deals |<value>x| |<fire>|fire damage.\n|<value>50%| spreads to adjacent.",
             Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<evasion>| |<stat>Evasion| against the next attack.",
             Weakened => "|<value>-x| to all defenses and dice rolls.",
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<evasion>| |<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
-            NearDeath => "|<value>-2| |<ap>| AP per turn",
+            NearDeath => "|<value>-2| |<ap>| AP per turn.",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
             BloodRage => "|<value>+25%| attack damage (passive skill).",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
-            Adrenalin => "|<value>+1| |<ap>| AP per turn",
-            ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
-            HealthPotionRecovering => "|<faded>End of turn:| heal |<value>3| |<heart>|",
-            Ferocity => "|<value>+x| attack damage",
-            Bloodlust => "|<value>20%| more likely to score a critical hit when attacking",
-            Wet => "Resistant: |<value>-25%| |<fire>||<faded>fire dmg|\n|Vulnerable: |<value>+50%| |<lightning>||<faded>lightning dmg|",
-            Poisoned => "|<faded>End of turn:| lose |<value>10%| of current health |<heart>|",
+            Adrenalin => "|<value>+1| |<ap>| AP per turn.",
+            ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn.",
+            HealthPotionRecovering => "|<trigger>End of turn:| heal |<value>3| |<heart>|.",
+            Ferocity => "|<value>+x| attack damage.",
+            Bloodlust => "|<value>20%| more likely to score a critical hit when attacking.",
+            Wet => "Resistant: |<value>-25%| |<fire>||<faded>fire dmg|.\n|Vulnerable: |<value>+50%| |<lightning>||<faded>lightning dmg|.",
+            Poisoned => "|<trigger>End of turn:| lose |<value>10%| of current health |<heart>|.",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
-            HungeringBladeSouls => "Can be unleashed to empower an attack",
-            ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
-            SpellFinesse => "After spending mana on a spell enhancement, regain |<value>1| |<mana>| mana",
-            Frosty =>  "|<value>-1| |<ap>| AP per turn\nResistant: |<value>-25%| |<fire>||<faded>fire dmg|",
+            HungeringBladeSouls => "Can be unleashed to empower an attack.",
+            ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll.",
+            SpellFinesse => "After spending mana on a spell enhancement, regain |<value>1| |<mana>| mana.",
+            Frosty =>  "|<value>-1| |<ap>| AP per turn.\nResistant: |<value>-25%| |<fire>||<faded>fire dmg|.",
         }
     }
 
@@ -5600,22 +5608,24 @@ impl BaseAction {
             BaseAction::Attack(attack) => attack.action_point_cost as i32,
             BaseAction::UseAbility(ability) => ability.action_point_cost as i32,
             BaseAction::Move => 0,
-            BaseAction::ChangeEquipment => 0,
+            BaseAction::ChangeEquipment => 1,
             BaseAction::UseConsumable => 0,
             //BaseAction::ToggleQuickActions => 0,
         }
     }
 
+    /*
     pub fn quick_point_cost(&self) -> u32 {
         match self {
             BaseAction::Attack(..) => 0,
             BaseAction::UseAbility(..) => 0,
             BaseAction::Move => 0,
-            BaseAction::ChangeEquipment => 1,
+            BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
             //  BaseAction::ToggleQuickActions => 0,
         }
     }
+     */
 
     pub fn mana_cost(&self) -> u32 {
         match self {
@@ -7525,10 +7535,11 @@ impl Character {
     }
 
     pub fn can_change_equipment(&self) -> bool {
-        let sta = self.stamina.current() as i32;
+        //let sta = self.stamina.current() as i32;
         let ap = self.action_points.current() as i32;
-        let cost = BaseAction::ChangeEquipment.quick_point_cost() as i32;
-        self.enabled_quick_actions.get() && sta >= cost || ap >= cost
+        let cost = BaseAction::ChangeEquipment.action_point_cost() as i32;
+        ap >= cost
+        //self.enabled_quick_actions.get() && sta >= cost || ap >= cost
     }
 
     pub fn can_use_ability(&self, ability: &Ability) -> bool {
@@ -8789,16 +8800,6 @@ pub enum AttackAttribute {
     Strength,
     Agility,
     Finesse,
-}
-
-impl Display for AttackAttribute {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AttackAttribute::Strength => f.write_str("str"),
-            AttackAttribute::Agility => f.write_str("agi"),
-            AttackAttribute::Finesse => f.write_str("str | agi"),
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -28,9 +28,9 @@ use crate::{
         OnHitReaction, Party, WeaponType,
     },
     data::{
-        PassiveSkill, BLESS, BRACE, CRIPPLING_SHOT, FIREBALL, HEALING_NOVA, LUNGE_ATTACK,
-        MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE,
-        SWEEP_ATTACK,
+        natures_blessing, PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEALING_NOVA,
+        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
+        SMITE, SWEEP_ATTACK,
     },
     non_combat_ui::{NonCombatCharacterUi, PortraitRow},
     resources::{EquipmentIconId, PortraitId},
@@ -428,7 +428,7 @@ pub async fn run_victory_loop(
             &SCREAM,
             &SHACKLED_MIND,
             &MIND_BLAST,
-            &BLESS,
+            natures_blessing(),
             &HEALING_NOVA,
         ] {
             candidate_rewards.push((ButtonAction::Action(BaseAction::UseAbility(ability)), None));

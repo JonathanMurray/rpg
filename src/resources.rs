@@ -1677,6 +1677,8 @@ async fn load_and_init_font_symbols() {
     TARGET_SYMBOL.get_or_init(|| symbol(6, 4));
     REACTION_SYMBOL.get_or_init(|| symbol(0, 4));
     ENHANCEMENT_SYMBOL.get_or_init(|| symbol(0, 5));
+    RIGHT_CLICK_SYMBOL.get_or_init(|| symbol(1, 5));
+    LEFT_CLICK_SYMBOL.get_or_init(|| symbol(2, 5));
 }
 
 async fn load_and_init_texture_into(path: &str, dst: &OnceLock<Texture2D>) {
@@ -1717,6 +1719,8 @@ pub static CONFIRM_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static REACTION_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static ENHANCEMENT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static RIGHT_CLICK_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static LEFT_CLICK_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

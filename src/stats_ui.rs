@@ -9,6 +9,7 @@ use crate::{
     base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::{Character, HandType},
     tooltip::Keyword,
+    util::COL_TEXT_FADED,
 };
 
 pub struct CharacterStatsTable {
@@ -56,11 +57,11 @@ pub fn build_character_stats_table(
             "Strength",
             &[
                 "Each point grants:",
-                "|<heart>| 2",
-                "|<stamina>| 1",
-                "|<red_dice>| +1 |<faded>(melee attack)|",
-                "|<toughness>| |<stat>Toughness| 2",
-                "|<weight>| 2 |<faded>(capacity)|",
+                "|<heart>| |<value>2|",
+                "|<stamina>| |<value>1|",
+                "|<red_dice>| |<value>+1| |<faded>(melee attack)|",
+                "|<toughness>| |<stat>Toughness| |<value>2|",
+                "|<weight>| |<value>2| |<faded>(capacity)|",
             ][..],
         ),
         (
@@ -69,10 +70,10 @@ pub fn build_character_stats_table(
             "Agility",
             &[
                 "Each point grants:",
-                "|<stamina>| 1",
-                "|<boot>| 0.5",
-                "|<red_dice>| +1 |<faded>(ranged attack)|",
-                "|<evasion>| |<stat>Evasion| 1",
+                "|<stamina>| |<value>1|",
+                "|<boot>| |<value>0.5|",
+                "|<red_dice>| |<value>+1| |<faded>(ranged attack)|",
+                "|<evasion>| |<stat>Evasion| |<value>1|",
             ],
         ),
         (
@@ -81,9 +82,9 @@ pub fn build_character_stats_table(
             "Intellect",
             &[
                 "Each point grants:",
-                "|<mixed_dice>| +1 |<faded>(spell & attack)|",
-                "|<will>| |<stat>Will| 2",
-                "|<evasion>| |<stat>Evasion| 0.5",
+                "|<mixed_dice>| |<value>+1| |<faded>(spell & attack)|",
+                "|<will>| |<stat>Will| |<value>2|",
+                "|<evasion>| |<stat>Evasion| |<value>0.5|",
             ],
         ),
         (
@@ -92,8 +93,8 @@ pub fn build_character_stats_table(
             "Spirit",
             &[
                 "Each point grants:",
-                "|<mana>| 2",
-                "|<blue_dice>| +1 |<faded>(spell)|",
+                "|<mana>| |<value>2|",
+                "|<blue_dice>| |<value>+1| |<faded>(spell)|",
             ],
         ),
     ] {
@@ -129,7 +130,7 @@ pub fn build_character_stats_table(
             "Move |<boot>|",
             "Movement |<boot>|",
             format!("{}", character.base_free_movement.get()),
-            vec!["You can move this far every turn without spending AP.".to_string()],
+            vec!["You can move this far every turn without spending |<ap>| AP.".to_string()],
             vec![],
         ),
         (
@@ -140,7 +141,7 @@ pub fn build_character_stats_table(
                 "Added to your |<blue_dice>| |<stat>Spell| rolls.".to_string(),
                 "Higher rolls mean more favourable outcomes.".to_string(),
             ],
-            vec![Keyword::Crit, Keyword::WeakHit],
+            vec![Keyword::Crit, Keyword::StrongWeak],
         ),
         (
             "Atk mod |<red_dice>|",
@@ -150,7 +151,7 @@ pub fn build_character_stats_table(
                 "Added to your |<red_dice>| |<stat>Attack| rolls.".to_string(),
                 "Higher rolls mean more favourable outcomes.".to_string(),
             ],
-            vec![Keyword::Crit, Keyword::WeakHit],
+            vec![Keyword::Crit, Keyword::StrongWeak],
         ),
         (
             "Atk dmg |<sword>|",
@@ -158,7 +159,7 @@ pub fn build_character_stats_table(
             character
                 .weapon_damage_str(HandType::MainHand)
                 .unwrap_or("-".to_string()),
-            vec!["The unmodified base damage of one attack".to_string()],
+            vec!["The unmodified base damage of one attack.".to_string()],
             vec![],
         ),
         (
@@ -191,13 +192,13 @@ pub fn build_character_stats_table(
         Vec<String>,
         Vec<Keyword>,
     )| {
-        let mut left = TextLine::new(short_header, 16, LIGHTGRAY, Some(simple_font.clone()));
+        let mut left = TextLine::new(short_header, 16, COL_TEXT_FADED, Some(simple_font.clone()));
         left.set_min_width(100.0, true);
         let right = Container {
             children: vec![Element::Text(TextLine::new(
                 value,
                 16,
-                LIGHTGRAY,
+                WHITE,
                 Some(simple_font.clone()),
             ))],
             align: Align::Center,
@@ -249,19 +250,19 @@ pub fn build_character_stats_table(
             "Toughness",
             character.toughness(),
             "<toughness>",
-            &["Protection against physical harm that can't be dodged"][..],
+            &["Protection against physical harm that can't be dodged."][..],
         ),
         (
             "Evasion",
             character.evasion(),
             "<evasion>",
-            &["Protection against melee attacks and projectiles"][..],
+            &["Protection against melee attacks and projectiles."][..],
         ),
         (
             "Will",
             character.will(),
             "<will>",
-            &["Protection against non-physical harm"][..],
+            &["Protection against non-physical harm."][..],
         ),
     ] {
         let label_line =
