@@ -439,21 +439,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "SkeletonLeader",
+      "type_": "Enslaved",
       "pos": [
-        28,
+        22,
         16
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Alice",
-      "pos": [
-        25,
-        19
       ],
       "health": null,
       "main_hand": null,
@@ -463,63 +452,8 @@
     {
       "type_": "Clara",
       "pos": [
-        25,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        31,
-        16
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Huldra",
-      "pos": [
-        34,
+        28,
         19
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "SkeletonBoss",
-      "pos": [
-        31,
-        22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Draug",
-      "pos": [
-        37,
-        22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Enslaved",
-      "pos": [
-        22,
-        16
       ],
       "health": null,
       "main_hand": null,

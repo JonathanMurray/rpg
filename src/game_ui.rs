@@ -29,15 +29,16 @@ use crate::{
     character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
-        distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
-        AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AppliedEffect, ApplyCondition,
-        ApplyEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
-        AttackOutcome, AttackType, AttackedEvent, BaseAction, Character, CharacterFacing,
-        CharacterId, Characters, CircleEffect, ConcreteCircle, Condition, CoreGame, DamageInterval,
-        DamageSource, DamageType, DecoratedTargetOutcome, GameEvent, GameOverType, HandType,
-        HitType, IncludeCircleEffects, MovedEvent, MovementType, OnAttackedReaction, OnHitReaction,
-        Position, TargetAcquisition, TargetPoint, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        distance_between, predict_ability, predict_attack, Ability, AbilityAnimation,
+        AbilityAreaOutcome, AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType,
+        AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget, AppliedEffect,
+        ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
+        AttackEnhancementEffect, AttackOutcome, AttackType, AttackedEvent, BaseAction, Character,
+        CharacterFacing, CharacterId, Characters, CircleEffect, ConcreteCircle, Condition,
+        CoreGame, DamageInterval, DamageSource, DamageType, DecoratedTargetOutcome, GameEvent,
+        GameOverType, HandType, HitType, IncludeCircleEffects, MovedEvent, MovementType,
+        OnAttackedReaction, OnHitReaction, Position, TargetAcquisition, TargetPoint,
+        TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::{inspire, KILL},
     drawing::draw_dashed_line_ex,
@@ -1337,18 +1338,33 @@ impl UserInterface {
             UiState::ConfiguringAction(ref mut configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
 
-                let tooltip = if let ConfiguredAction::UseAbility {
-                    ability,
-                    equipment_idx_to_consume: Some(..),
-                    ..
-                } = configured_action
-                {
+                if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
+                    self.game_grid
+                        .animate_started_configuring_ability(self.active_character_id, ability);
+                    if matches!(
+                        ability.audio_visuals.animation,
+                        AbilityAnimation::CastSpell { .. }
+                    ) {
+                        self.sound_player.play(SoundId::StartChannelingAbility);
+                    }
+                }
+
+                let consumable_ability = match configured_action {
+                    ConfiguredAction::UseAbility {
+                        ability,
+                        equipment_idx_to_consume: Some(..),
+                        ..
+                    } => Some(ability),
+                    _ => None,
+                };
+
+                let tooltip = if let Some(a) = consumable_ability {
                     // When the configured ability comes from the "use consumable" base action (that button in the UI)
                     // we have to build a new tooltip here on-the-fly instead of relying on the one tracked by the button.
                     // The "use consumable" button's UI doesn't have any knowledge of the ability, so using that one would
                     // give a useless tooltip
                     Rc::new(ActionTooltip::new(
-                        ButtonAction::Action(BaseAction::UseAbility(*ability)),
+                        ButtonAction::Action(BaseAction::UseAbility(*a)),
                         None,
                     ))
                 } else {

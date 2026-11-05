@@ -50,6 +50,10 @@ struct Args {
 
     /// Which map/fight to edit
     map_file: Option<String>,
+
+    /// Disable ability costs
+    #[arg(short, long)]
+    cheat: bool,
 }
 
 #[macroquad::main(window_conf)]
@@ -568,6 +572,14 @@ async fn main() {
                 .unwrap()
                 .id();
 
+            if args.cheat {
+                for ch in game_grid.characters.values() {
+                    if ch.player_controlled() {
+                        ch.cheat_ignore_costs.set(true);
+                    }
+                }
+            }
+
             let init_state = GameInitState {
                 characters: game_grid.characters.values().cloned().collect(),
                 active_character_id,
@@ -578,7 +590,9 @@ async fn main() {
                 surfaces: game_grid.surfaces.clone(),
                 control_points: game_grid.control_points.clone(),
             };
+
             let core_game = init_core_game(resources.clone(), sound_player.clone(), init_state);
+
             match core_game.run().await {
                 Ok(_chars) => println!("Game ended naturally"),
                 Err(QuitEvent) => println!("User quit from game"),

@@ -706,7 +706,8 @@ pub fn make_test_archer(party: &Rc<Party>) -> Character {
     test_archer.learn_ability_enhancement(&HEAL_ENERGIZE);
     test_archer.learn_attack_enhancement(CRIPPLING_SHOT);
     test_archer.learn_ability(&PIERCING_SHOT);
-    test_archer.learn_ability(&KILL);
+    test_archer.learn_ability(inspire());
+    test_archer.learn_ability_enhancement(&INSPIRE_BLOODLUST);
     test_archer.learn_ability(&INFLICT_WOUNDS);
     test_archer.learn_passive(PassiveSkill::WeaponProficiency);
 

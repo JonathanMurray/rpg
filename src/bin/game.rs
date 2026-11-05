@@ -52,6 +52,10 @@ struct Args {
     /// Which fight to play
     #[arg(value_enum)]
     fight: Option<FightId>,
+
+    /// Start with smaller window size
+    #[arg(short, long)]
+    small: bool,
 }
 
 #[macroquad::main(window_conf)]
@@ -79,7 +83,13 @@ async fn main() {
     }
     let monitor_size = screen_size();
     set_fullscreen(false);
-    request_new_screen_size(monitor_size.0 - 50.0, monitor_size.1 - 100.0);
+
+    let desired_screen_size = if args.small {
+        (monitor_size.0 * 0.7, monitor_size.1 - 100.0)
+    } else {
+        (monitor_size.0 - 50.0, monitor_size.1 - 100.0)
+    };
+    request_new_screen_size(desired_screen_size.0, desired_screen_size.1);
 
     dbg!(
         window::screen_size(),

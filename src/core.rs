@@ -4,9 +4,11 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
+use std::sync::OnceLock;
 
 use indexmap::IndexMap;
 use macroquad::color::{Color, BLACK};
+use macroquad::texture::Texture2D;
 
 use crate::bot::BotBehaviour;
 use crate::core::AppliedEffect::GainedActionPoints;
@@ -17,7 +19,9 @@ use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, Q
 use crate::grid::{ControlPoint, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
-use crate::resources::{EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
+use crate::resources::{
+    BeamFxId, EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId,
+};
 use crate::sounds::SoundId;
 use crate::tooltip::Keyword;
 use crate::util::{are_entities_within_melee, line_visitor, plus_minus, CustomShuffle};
@@ -705,8 +709,8 @@ impl CoreGame {
                 for enhancement in &enhancements {
                     action_point_cost += enhancement.action_point_cost as i32;
                     action_point_cost -= enhancement.effect.action_point_discount as i32;
-                    attacker.stamina.spend(enhancement.stamina_cost);
-                    attacker.mana.spend(enhancement.mana_cost);
+                    attacker.spend_stamina(enhancement.stamina_cost);
+                    attacker.spend_mana(enhancement.mana_cost);
                     attacker.on_mana_changed();
                 }
 
@@ -810,7 +814,7 @@ impl CoreGame {
 
                         self.perform_spend_ap(reactor, reaction.action_point_cost)
                             .await;
-                        reactor.stamina.spend(reaction.stamina_cost);
+                        reactor.spend_stamina(reaction.stamina_cost);
                         reactor.on_use_on_attacked_reaction(reaction);
 
                         Some((reactor.id(), with_shield))
@@ -864,7 +868,7 @@ impl CoreGame {
                 let mut ap_cost = ability.action_point_cost;
 
                 actor.spend_mana(ability.mana_cost);
-                actor.stamina.spend(ability.stamina_cost);
+                actor.spend_stamina(ability.stamina_cost);
                 let mut spent_mana_on_enhancements = false;
                 for enhancement in &enhancements {
                     ap_cost += enhancement.action_point_cost;
@@ -872,7 +876,7 @@ impl CoreGame {
                         actor.spend_mana(enhancement.mana_cost);
                         spent_mana_on_enhancements = true;
                     }
-                    actor.stamina.spend(enhancement.stamina_cost);
+                    actor.spend_stamina(enhancement.stamina_cost);
                 }
 
                 self.perform_spend_ap(actor, ap_cost).await;
@@ -965,7 +969,7 @@ impl CoreGame {
             Action::ChangeEquipment { from, to } => {
                 let character = self.active_character();
                 if character.enabled_quick_actions.get() {
-                    character.stamina.spend(1);
+                    character.spend_stamina(1);
                 } else {
                     self.perform_spend_ap(character, 1).await;
                 }
@@ -978,7 +982,7 @@ impl CoreGame {
     }
 
     async fn perform_spend_ap(&self, character: &Character, amount: u32) {
-        character.action_points.spend(amount);
+        character.spend_ap(amount);
 
         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
@@ -1166,9 +1170,7 @@ impl CoreGame {
         self.perform_spend_ap(reactor, OPPORTUNITY_ATTACK_AP_COST)
             .await;
         if reactor.player_controlled() {
-            reactor
-                .stamina
-                .spend(reactor.opportunity_attack_stamina_cost());
+            reactor.spend_stamina(reactor.opportunity_attack_stamina_cost());
         }
 
         self.ui_handle_event(GameEvent::AttackWasInitiated {
@@ -3406,7 +3408,7 @@ impl CoreGame {
         let reactor = self.characters.get(reactor_id);
         self.perform_spend_ap(reactor, reaction.action_point_cost)
             .await;
-        reactor.stamina.spend(reaction.stamina_cost);
+        reactor.spend_stamina(reaction.stamina_cost);
         let reactor_name_tag = reactor.name_tag();
 
         match reaction.effect {
@@ -5649,11 +5651,21 @@ pub enum HandType {
 pub enum AbilityAnimation {
     MeleeWeaponAttack,
     ShieldAttack,
-    RangedWeaponAttack,
+    RangedWeaponAttackLine,
     SpinAttack,
-    CastSpell,
+    CastSpell(SpellTravelAnimation),
     Dash,
     Throw(Color),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellTravelAnimation {
+    StraightProjectile,
+    GravitationalProjectile,
+
+    Line { impact_time_ratio: f32 },
+    Beam(BeamFxId),
+    None,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5669,8 +5681,15 @@ pub struct AudioVisuals {
     pub resolve_sound: Option<SoundId>,
     pub charge_fx: Option<AbilityChargeFx>,
     pub speech: &'static str,
-    pub target_effect_id: Option<(EffectId, f32)>,
+    pub target_effect: Option<(EffectId, f32)>,
     pub target_magic_sparks: Option<Color>,
+    pub reaction: AbilityVisualReaction,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AbilityVisualReaction {
+    ReelBack,
+    Enjoy,
 }
 
 impl AudioVisuals {
@@ -5682,8 +5701,9 @@ impl AudioVisuals {
             resolve_sound: None,
             charge_fx: None,
             speech: "",
-            target_effect_id: None,
+            target_effect: None,
             target_magic_sparks: None,
+            reaction: AbilityVisualReaction::ReelBack,
         }
     }
 }
@@ -6611,6 +6631,8 @@ pub struct Character {
     pub facing: Cell<CharacterFacing>,
     push_vector: Cell<Option<PushVector>>,
     pub has_escaped_from_battle: Cell<bool>,
+
+    pub cheat_ignore_costs: Cell<bool>,
 }
 
 impl core::fmt::Debug for Character {
@@ -6699,6 +6721,7 @@ impl Character {
             facing: Cell::new(CharacterFacing::West),
             push_vector: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
+            cheat_ignore_costs: Cell::new(false),
         }
     }
 
@@ -6848,8 +6871,22 @@ impl Character {
         }
     }
 
+    fn spend_ap(&self, amount: u32) {
+        if !self.cheat_ignore_costs.get() {
+            self.action_points.spend(amount);
+        }
+    }
+
+    fn spend_stamina(&self, amount: u32) {
+        if !self.cheat_ignore_costs.get() {
+            self.stamina.spend(amount);
+        }
+    }
+
     fn spend_mana(&self, amount: u32) {
-        self.mana.spend(amount);
+        if !self.cheat_ignore_costs.get() {
+            self.mana.spend(amount);
+        }
         self.on_mana_changed();
     }
 

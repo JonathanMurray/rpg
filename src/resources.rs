@@ -1,9 +1,10 @@
 use std::{collections::HashMap, f32::consts::PI, hash::Hash, sync::OnceLock};
 
 use macroquad::{
-    color::WHITE,
-    math::Rect,
+    color::{BLACK, WHITE},
+    math::{Rect, Vec2},
     miniquad::StencilFaceState,
+    shapes::draw_circle,
     text::{load_ttf_font, Font},
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Image, Texture2D},
     time::get_time,
@@ -1330,7 +1331,7 @@ pub async fn load_and_init_static_resources() {
     load_and_init_texture_into("equipment_icons.png", &EQUIPMENT_ICONS_TEXTURE).await;
     load_and_init_texture_into("effects.png", &EFFECTS_TEXTURE).await;
     load_and_init_texture_into("portraits.png", &PORTRAITS_TEXTURE).await;
-    load_and_init_texture_into("fx_lightning_bolt.png", &LIGHTNING_BOLT_FX).await;
+    load_and_init_texture_into("fx_beam.png", &BEAM_FX).await;
 
     load_static_fonts().await;
 }
@@ -1516,6 +1517,7 @@ pub struct FlipbookAnimation {
     pub source_pos: (f32, f32),
     pub source_size: (f32, f32),
     pub num_frames: u32,
+    pub draw_size_cell_w: f32,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -1525,6 +1527,9 @@ pub enum EffectId {
     Blood,
     ArmorClank,
     Poof,
+    Magic,
+    MagicSpinUp,
+    PurpleMagic,
 }
 
 impl FlipbookAnimation {
@@ -1535,14 +1540,23 @@ impl FlipbookAnimation {
             EffectId::Blood => 2,
             EffectId::ArmorClank => 3,
             EffectId::Poof => 4,
+            EffectId::Magic => 5,
+            EffectId::MagicSpinUp => 6,
+            EffectId::PurpleMagic => 7,
         };
         let source_size = (32.0, 32.0);
+
+        let draw_size_cell_w = match effect {
+            EffectId::PurpleMagic => 3.0,
+            _ => 2.0,
+        };
 
         Self {
             texture: EFFECTS_TEXTURE.get().unwrap().clone(),
             source_pos: (0.0, row as f32 * source_size.1),
             source_size,
-            num_frames: 3,
+            num_frames: 5,
+            draw_size_cell_w,
         }
     }
 
@@ -1555,10 +1569,10 @@ impl FlipbookAnimation {
         )
     }
 
-    pub fn draw(&self, screen_pos: (f32, f32), animation_idx: u32) {
+    pub fn draw(&self, screen_pos: (f32, f32), animation_idx: u32, dest_size: f32) {
         let source = self.source_rect(animation_idx);
-
-        let dest_size = (self.source_size.0 * 2.0, self.source_size.1 * 2.0);
+        let dest_size = (dest_size, dest_size);
+        //let dest_size = (self.source_size.0 * 2.0, self.source_size.1 * 2.0);
         draw_texture_ex(
             &self.texture,
             screen_pos.0 - dest_size.0 / 2.0,
@@ -1765,7 +1779,83 @@ async fn load_and_init_ui_textures() {
     load_and_init_texture_into("portrait_enemy_bg.png", &PORTRAIT_ENEMY_BG_TEXTURE).await;
 }
 
-pub static LIGHTNING_BOLT_FX: OnceLock<Texture2D> = OnceLock::new();
+pub static BEAM_FX: OnceLock<Texture2D> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BeamFxId {
+    Purple,
+    Lightning,
+    Chains,
+}
+
+pub fn draw_beam_fx(from: (f32, f32), to: (f32, f32), id: BeamFxId, texture_draw_size: (f32, f32)) {
+    let texture = BEAM_FX.get().unwrap();
+    let texture_size = (32.0, 32.0);
+
+    let dist = Vec2::from(from).distance(Vec2::from(to));
+    let num_textures = dist / texture_draw_size.0; // + 0.5;
+
+    let num_full_textures = (num_textures).floor() as usize;
+    let last_texture_fraction = num_textures.fract();
+
+    let rotation = -(to.0 - from.0).atan2(to.1 - from.1) + 0.5 * PI;
+
+    let params = DrawTextureParams {
+        dest_size: Some(texture_draw_size.into()),
+        rotation,
+        ..Default::default()
+    };
+
+    let row_idx = match id {
+        BeamFxId::Purple => 0,
+        BeamFxId::Lightning => 1,
+        BeamFxId::Chains => 2,
+    };
+
+    for i in 0..=num_full_textures {
+        let mut params = params.clone();
+        let center_pos;
+        if i < num_full_textures {
+            params.source = Some(Rect::new(
+                0.0,
+                row_idx as f32 * texture_size.1,
+                texture_size.0,
+                texture_size.1,
+            ));
+            center_pos = Vec2::from(from)
+                .move_towards(Vec2::from(to), texture_draw_size.0 * ((i as f32) + 0.5));
+        } else {
+            params.source = Some(Rect::new(
+                0.0,
+                row_idx as f32 * texture_size.1,
+                texture_size.0 * last_texture_fraction,
+                texture_size.1,
+            ));
+
+            params.dest_size = Some(Vec2::new(
+                texture_draw_size.0 * last_texture_fraction,
+                texture_draw_size.1,
+            ));
+
+            //texture_draw_size.0 *= last_partial_texture_w;
+
+            center_pos = Vec2::from(from).move_towards(
+                Vec2::from(to),
+                texture_draw_size.0 * ((i as f32) + 0.5 * last_texture_fraction),
+            );
+        }
+
+        let dest_size = params.dest_size.unwrap();
+
+        draw_texture_ex(
+            texture,
+            center_pos.x - dest_size.x / 2.0,
+            center_pos.y - dest_size.y / 2.0,
+            WHITE,
+            params,
+        );
+    }
+}
 
 async fn load_static_fonts() {
     let simple_font = load_font("delicatus/Delicatus.ttf").await;

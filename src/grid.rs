@@ -50,11 +50,12 @@ use crate::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
         is_target_within_shape, is_valid_area_target, pushed_vector,
         target_char_within_range_squared, within_range_squared, Ability, AbilityAnimation,
-        AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, ActionReach, ActionTarget,
-        AppliedEffect, ApplyCondition, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
-        AttackEnhancementOnHitEffect, AudioVisuals, BaseAction, Character, CharacterFacing,
-        CircleEffect, Condition, Goodness, HitType, MovementType, Position, PushVector,
-        TargetAcquisition, TargetLine, TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, AbilityVisualReaction,
+        ActionReach, ActionTarget, AppliedEffect, ApplyCondition, ApplyEffect, AreaShape,
+        AttackAction, AttackEnhancement, AttackEnhancementOnHitEffect, AudioVisuals, BaseAction,
+        Character, CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType,
+        Position, PushVector, SpellTravelAnimation, TargetAcquisition, TargetLine, TargetPoint,
+        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -63,16 +64,15 @@ use crate::{
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
     game_ui_connection::DEBUG,
-    grid::SpriteProperty::{ReplaceHandHeldWithProjectile, WeaponXOffsetCellW},
     pathfind::{
         ChartNode, Elevation, Occupation, PathNode, PathfindGrid, Surface, TerrainType,
         TraversalType, CELLS_PER_ENTITY,
     },
     resources::{
-        character_sprite_height, draw_icon, draw_status_icon, draw_terrain, draw_tiny_font,
-        measure_tiny_font, EffectId, FlipbookAnimation, IconId, LiquidType, Sprite, SpriteId,
-        StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation, EFFECTS_TEXTURE,
-        LIGHTNING_BOLT_FX,
+        character_sprite_height, draw_beam_fx, draw_icon, draw_status_icon, draw_terrain,
+        draw_tiny_font, measure_tiny_font, BeamFxId, EffectId, FlipbookAnimation, IconId,
+        LiquidType, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WallOrientation,
+        WaterOrientation,
     },
     sounds::{SoundId, SoundPlayer},
     util::{
@@ -233,7 +233,7 @@ enum AnimationDetails {
     AttackCrosshairPreview {
         target_pos: Position,
     },
-    CastingSpell {
+    GatheringMagicFromAir {
         color: Color,
     },
 
@@ -337,13 +337,19 @@ enum InterpolateShape {
 enum SpriteProperty {
     CharacterRotateForward,
     CharacterXOffsetCellW,
-    CharacterYOffsetCellW { jump: bool },
+    CharacterYOffsetCellW {
+        jump: bool,
+    },
     FlipX,
     WeaponRotation,
     WeaponXOffsetCellW,
     ShieldXOffsetCellW,
     ShieldYOffsetCellW,
-    ReplaceHandHeldWithProjectile(Color),
+    ReplaceHandHeldWithSphere {
+        color: Color,
+        radius_cell_w: f32,
+        outline: bool,
+    },
     HideHandHeld,
     Hide,
     SinkIntoGroundRatio,
@@ -1078,6 +1084,35 @@ impl GameGrid {
         ));
     }
 
+    pub fn animate_started_configuring_ability(
+        &mut self,
+        actor_id: CharacterId,
+        ability: &Ability,
+    ) {
+        println!("ANIMATE ABILITY: {:?} - {}", actor_id, ability.name);
+
+        match ability.audio_visuals.animation {
+            AbilityAnimation::CastSpell { .. } => {
+                let duration = 0.25;
+                let animation = CharacterAnimation::new(
+                    actor_id,
+                    0.0,
+                    duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![(
+                            SpriteProperty::HideHandHeld {},
+                            PropertyTimeline(vec![PropertyUpdate::linear(1.0, 0.5)]),
+                        )],
+                    },
+                );
+                self.character_animations.push(animation);
+
+                self.animate_effect(actor_id, duration + 0.1, EffectId::MagicSpinUp);
+            }
+            _ => {}
+        }
+    }
+
     pub fn animate_initiating_ability(
         &mut self,
         actor_id: CharacterId,
@@ -1085,15 +1120,6 @@ impl GameGrid {
         destination: Option<Position>,
     ) -> (f32, f32) {
         let actor = self.characters.get(&actor_id).unwrap();
-
-        let shape = match &ability.target {
-            AbilityTarget::PositionCircle { circle_effect, .. } => {
-                Some(AreaShape::Circle(circle_effect.radius))
-            }
-            //AbilityTarget::Projectile { .. } => Some(AreaShape::Line),
-            AbilityTarget::Line { .. } => Some(AreaShape::Line),
-            _ => None,
-        };
 
         let mut delay = 0.0;
 
@@ -1146,24 +1172,20 @@ impl GameGrid {
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 0.1
             }
-            AbilityAnimation::RangedWeaponAttack => {
+            AbilityAnimation::RangedWeaponAttackLine => {
                 aim_duration = self.animate_initiating_ranged_weapon_attack(
                     actor.id(),
                     delay,
                     destination.unwrap(),
                 );
-                let mut effect_duration = 0.0;
-                if let Some(shape) = shape {
-                    effect_duration = self.animate_ability_area_effect(
-                        actor_pos,
-                        destination.unwrap(),
-                        shape,
-                        ability,
-                        delay + aim_duration,
-                    );
-                }
+                let effect_duration = self.animate_ability_initiation_line(
+                    actor_pos,
+                    destination.unwrap(),
+                    ability.audio_visuals.animation_color,
+                    delay + aim_duration,
+                );
 
-                aim_duration + effect_duration
+                aim_duration + effect_duration / 2.0
             }
             AbilityAnimation::Throw(color) => {
                 let target_pos = destination.unwrap();
@@ -1171,25 +1193,11 @@ impl GameGrid {
                 let attacker_pos = self.active_char().pos();
                 aim_duration = self.animate_throw_projectile(actor.id(), target_pos, delay, color);
 
-                let projectile_duration = 0.8;
-
-                self.add_effect(
-                    attacker_pos,
+                let projectile_duration = self.animate_gravitational_projectile(
+                    delay + aim_duration,
+                    color,
                     target_pos,
-                    EffectData {
-                        start_time: delay + aim_duration,
-                        end_time: delay + aim_duration + projectile_duration,
-                        variant: EffectVariant::At(
-                            EffectPosition::GravitationalProjectile { upward_speed: 20.0 },
-                            EffectGraphics::Circle {
-                                radius: 6.0,
-                                end_radius: None,
-                                fill: Some(color),
-                                stroke: Some((BLACK, 3.0)),
-                                fade: false,
-                            },
-                        ),
-                    },
+                    attacker_pos,
                 );
 
                 self.add_effect(
@@ -1257,169 +1265,211 @@ impl GameGrid {
                 duration / 2.0
             }
 
-            AbilityAnimation::CastSpell => {
-                let casting_duration = 0.4;
-                let animation_color = ability.audio_visuals.animation_color;
+            AbilityAnimation::CastSpell(kind) => {
+                let casting_duration =
+                    self.animate_character_casting_spell(actor_id, ability, delay);
 
-                self.character_animations.push(CharacterAnimation::new(
-                    actor.id(),
-                    delay,
-                    casting_duration,
-                    AnimationDetails::CastingSpell {
-                        color: animation_color,
-                    },
-                ));
+                let duration_until_impact = match kind {
+                    SpellTravelAnimation::StraightProjectile => {
+                        let duration = 0.04 * distance_between(actor_pos, destination.unwrap());
+                        self.animate_circle_projectile(
+                            delay + casting_duration,
+                            duration,
+                            ability.audio_visuals.animation_color,
+                            actor_pos,
+                            destination.unwrap(),
+                        );
+                        duration
+                    }
+                    SpellTravelAnimation::GravitationalProjectile => self
+                        .animate_gravitational_projectile(
+                            delay + casting_duration,
+                            ability.audio_visuals.animation_color,
+                            destination.unwrap(),
+                            actor_pos,
+                        ),
+                    SpellTravelAnimation::Line { impact_time_ratio } => {
+                        let visual_duration = self.animate_ability_initiation_line(
+                            actor_pos,
+                            destination.unwrap(),
+                            ability.audio_visuals.animation_color,
+                            delay + casting_duration,
+                        );
 
-                // Wiggle back and forth
-                let mut x_offsets = vec![];
-                for i in 0..10 {
-                    let d = 0.05;
-                    let val = if i % 2 == 0 { -d } else { d };
-                    x_offsets.push(PropertyUpdate::linear(i as f32 / 10.0, val));
-                }
+                        visual_duration * impact_time_ratio
+                    }
+                    SpellTravelAnimation::Beam(id) => {
+                        let visual_duration =
+                            0.03 * distance_between(actor_pos, destination.unwrap());
+                        self.add_effect(
+                            actor_pos,
+                            destination.unwrap(),
+                            EffectData {
+                                start_time: delay + casting_duration,
+                                end_time: delay + casting_duration + visual_duration,
+                                variant: EffectVariant::TextureLine { id },
+                            },
+                        );
 
-                let weapon_rotation = if actor.has_equipped_melee_weapon() {
-                    PI * 0.3
-                } else {
-                    -PI * 0.3
+                        if ability.targets_single_character() {
+                            visual_duration
+                        } else {
+                            // Targets should be affected before the line has travelled from start to end
+                            visual_duration / 2.0
+                        }
+                    }
+                    SpellTravelAnimation::None => 0.0,
                 };
 
-                self.character_animations.push(CharacterAnimation::new(
-                    actor.id(),
-                    delay,
-                    casting_duration,
-                    AnimationDetails::TransformSprite {
-                        timelines: vec![
-                            (
-                                SpriteProperty::WeaponRotation,
-                                PropertyTimeline(vec![
-                                    PropertyUpdate::fixed(0.2),
-                                    PropertyUpdate::linear(0.7, weapon_rotation),
-                                    PropertyUpdate::linear(1.0, 0.0),
-                                ]),
-                            ),
-                            (
-                                SpriteProperty::CharacterYOffsetCellW { jump: true },
-                                PropertyTimeline(vec![PropertyUpdate::linear(1.0, -0.2)]),
-                            ),
-                            (
-                                SpriteProperty::CharacterXOffsetCellW,
-                                PropertyTimeline(x_offsets),
-                            ),
-                            (
-                                SpriteProperty::CharacterRotateForward,
-                                PropertyTimeline(vec![
-                                    PropertyUpdate::linear(0.2, -0.03 * PI),
-                                    PropertyUpdate::linear(0.5, 0.1 * PI),
-                                    PropertyUpdate::linear(1.0, 0.0),
-                                ]),
-                            ),
-                        ],
-                    },
-                ));
-
-                if let Some(shape) = shape {
-                    let duration = self.animate_ability_area_effect(
-                        actor_pos,
-                        destination.unwrap(),
-                        shape,
-                        ability,
-                        delay + casting_duration,
-                    );
-                    casting_duration + duration
-                } else if let Some(target_pos) = destination {
-                    let duration = 0.04 * distance_between(actor_pos, target_pos);
-
-                    self.add_circle_projectile_effect(
-                        delay + casting_duration,
-                        duration,
-                        animation_color,
-                        actor_pos,
-                        target_pos,
-                    );
-
-                    casting_duration + duration
-                } else {
-                    casting_duration
-                }
+                casting_duration + duration_until_impact
             }
         };
 
         (delay + aim_duration, delay + duration)
     }
 
-    fn animate_ability_area_effect(
+    fn animate_gravitational_projectile(
         &mut self,
-        caster_pos: Position,
-        area_pos: Position,
-        shape: AreaShape,
+        delay: f32,
+        color: Color,
+        target_pos: Position,
+        source_pos: Position,
+    ) -> f32 {
+        let projectile_duration = 0.8;
+        self.add_effect(
+            source_pos,
+            target_pos,
+            EffectData {
+                start_time: delay,
+                end_time: delay + projectile_duration,
+                variant: EffectVariant::At(
+                    EffectPosition::GravitationalProjectile { upward_speed: 20.0 },
+                    EffectGraphics::Circle {
+                        radius: 6.0,
+                        end_radius: None,
+                        fill: Some(color),
+                        stroke: Some((BLACK, 3.0)),
+                        fade: false,
+                    },
+                ),
+            },
+        );
+        projectile_duration
+    }
+
+    fn animate_character_casting_spell(
+        &mut self,
+        actor_id: CharacterId,
         ability: &Ability,
         delay: f32,
     ) -> f32 {
-        let distance = distance_between(caster_pos, area_pos);
-        let duration;
-        match shape {
-            AreaShape::Circle(..) => {
-                duration = 0.05 * distance;
-                self.add_circle_projectile_effect(
-                    delay,
-                    duration,
-                    ability.audio_visuals.animation_color,
-                    caster_pos,
-                    area_pos,
-                );
-            }
-            AreaShape::Line => {
-                let visual_duration;
-                if ability.id == AbilityId::LightningBolt {
-                    let texture = LIGHTNING_BOLT_FX.get().unwrap();
-                    visual_duration = 0.03 * distance;
-                    self.add_effect(
-                        caster_pos,
-                        area_pos,
-                        EffectData {
-                            start_time: delay,
-                            end_time: delay + visual_duration,
-                            variant: EffectVariant::Fx { texture },
-                        },
-                    );
-                } else {
-                    visual_duration = 0.03 * distance;
-                    self.add_effect(
-                        caster_pos,
-                        area_pos,
-                        EffectData {
-                            start_time: delay,
-                            end_time: delay + visual_duration,
-                            variant: EffectVariant::Line {
-                                color: ability.audio_visuals.animation_color,
-                                thickness: 10.0,
-                                end_thickness: None,
-                                extend_gradually: true,
-                            },
-                        },
-                    );
-                }
-                // Targets should be affected before the line has travelled from start to end
-                duration = visual_duration / 2.0;
-            }
+        let actor = self.characters.get(&actor_id).unwrap();
+        let gathering_duration = 0.5;
+        let casting_duration = 0.6;
+        let animation_color = ability.audio_visuals.animation_color;
+
+        self.character_animations.push(CharacterAnimation::new(
+            actor_id,
+            delay,
+            gathering_duration,
+            AnimationDetails::GatheringMagicFromAir {
+                color: animation_color,
+            },
+        ));
+
+        // Wiggle back and forth
+        let mut x_offsets = vec![];
+        for i in 0..10 {
+            let d = 0.05;
+            let val = if i % 2 == 0 { -d } else { d };
+            x_offsets.push(PropertyUpdate::linear(i as f32 / 10.0, val));
         }
 
+        let weapon_rotation = if actor.has_equipped_melee_weapon() {
+            PI * 0.3
+        } else {
+            -PI * 0.3
+        };
+
+        self.character_animations.push(CharacterAnimation::new(
+            actor.id(),
+            delay,
+            casting_duration,
+            AnimationDetails::TransformSprite {
+                timelines: vec![
+                    (
+                        SpriteProperty::WeaponRotation,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::fixed(0.2),
+                            PropertyUpdate::linear(0.7, weapon_rotation),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::CharacterYOffsetCellW { jump: true },
+                        PropertyTimeline(vec![PropertyUpdate::linear(1.0, -0.2)]),
+                    ),
+                    (
+                        SpriteProperty::CharacterXOffsetCellW,
+                        PropertyTimeline(x_offsets),
+                    ),
+                    (
+                        SpriteProperty::CharacterRotateForward,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.2, -0.03 * PI),
+                            PropertyUpdate::linear(0.5, 0.1 * PI),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                ],
+            },
+        ));
+
+        //
+        casting_duration - 0.2
+    }
+
+    fn animate_ability_initiation_line(
+        &mut self,
+        caster_pos: Position,
+        area_pos: Position,
+        color: Color,
+        delay: f32,
+    ) -> f32 {
+        let distance = distance_between(caster_pos, area_pos);
+        let duration = 0.03 * distance;
+        self.add_effect(
+            caster_pos,
+            area_pos,
+            EffectData {
+                start_time: delay,
+                end_time: delay + duration,
+                variant: EffectVariant::Line {
+                    color,
+                    thickness: 10.0,
+                    end_thickness: Some(20.0),
+                    extend_gradually: false,
+                },
+            },
+        );
         duration
     }
 
-    fn add_circle_projectile_effect(
+    fn animate_circle_projectile(
         &mut self,
         start_time: f32,
         duration: f32,
         animation_color: Color,
-        caster_pos: (i32, i32),
-        target_pos: (i32, i32),
+        caster_pos: Position,
+        target_pos: Position,
     ) {
+        // Chest height - not feed
+        let source = (caster_pos.0, caster_pos.1 - 1);
+        let destination = (target_pos.0, target_pos.1 - 1);
         for i in 0..4 {
             self.add_effect(
-                caster_pos,
-                target_pos,
+                source,
+                destination,
                 EffectData {
                     start_time: start_time + i as f32 * 0.025,
                     end_time: start_time + duration + i as f32 * 0.025,
@@ -1668,7 +1718,11 @@ impl GameGrid {
                         ]),
                     ),
                     (
-                        SpriteProperty::ReplaceHandHeldWithProjectile(projectile_color),
+                        SpriteProperty::ReplaceHandHeldWithSphere {
+                            color: projectile_color,
+                            radius_cell_w: 0.25,
+                            outline: true,
+                        },
                         PropertyTimeline(vec![
                             PropertyUpdate::linear(0.0, 1.0),
                             // Hold it until it's been thrown
@@ -2028,7 +2082,7 @@ impl GameGrid {
         audio_visuals: &AudioVisuals,
         start_time: f32,
     ) {
-        if let Some((effect_id, duration)) = audio_visuals.target_effect_id {
+        if let Some((effect_id, duration)) = audio_visuals.target_effect {
             self.animate_effect(target_id, duration, effect_id);
         }
 
@@ -2036,10 +2090,17 @@ impl GameGrid {
             self.animate_magic_sparks(target_id, color);
         }
 
-        if !self.characters.get(&target_id).unwrap().is_being_pushed() {
-            self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
-        } else {
+        if self.characters.get(&target_id).unwrap().is_being_pushed() {
             self.animate_effect(target_id, 0.5, EffectId::Poof);
+        } else {
+            match audio_visuals.reaction {
+                AbilityVisualReaction::ReelBack => {
+                    self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
+                }
+                AbilityVisualReaction::Enjoy => {
+                    self.animate_character_shaking(target_id, start_time);
+                }
+            }
         }
     }
 
@@ -2059,7 +2120,9 @@ impl GameGrid {
                 end_time: duration,
                 variant: EffectVariant::At(
                     EffectPosition::Source,
-                    EffectGraphics::FlipBook(FlipbookAnimation::from_effect(effect)),
+                    EffectGraphics::FlipBook {
+                        animation: FlipbookAnimation::from_effect(effect),
+                    },
                 ),
             },
         });
@@ -2772,13 +2835,6 @@ impl GameGrid {
 
         let (mut shadow_x, mut shadow_y) = (x, y);
 
-        struct HeldSphere {
-            color: Color,
-            radius: f32,
-            outline: bool,
-            offset: (f32, f32),
-        }
-
         let mut held_sphere = None;
         let mut show_regular_hald_hend = true;
 
@@ -2828,7 +2884,7 @@ impl GameGrid {
                 AnimationDetails::AttackCrosshairPreview { .. } => {
                     // This is drawn separately, after all the characters
                 }
-                AnimationDetails::CastingSpell { .. } => {
+                AnimationDetails::GatheringMagicFromAir { .. } => {
                     // This is drawn separately, after all the characters
                 }
                 AnimationDetails::Motion { .. } => {
@@ -2854,12 +2910,17 @@ impl GameGrid {
                                 character_crop_factor = (1.0, 1.0 - value);
                                 character_offset = (0.0, value * self.rect_w as f32);
                             }
-                            SpriteProperty::ReplaceHandHeldWithProjectile(color) => {
-                                if value == 1.0 {
+                            SpriteProperty::ReplaceHandHeldWithSphere {
+                                color,
+                                radius_cell_w,
+                                outline,
+                            } => {
+                                if value > 0.0 {
+                                    let outline = if *outline { Some((BLACK, 3.0)) } else { None };
                                     held_sphere = Some(HeldSphere {
-                                        color: *color,
-                                        outline: true,
-                                        radius: cell_w / 4.0,
+                                        color: color.with_alpha(value),
+                                        outline,
+                                        radius: cell_w * radius_cell_w,
                                         offset: (0.0, 0.0),
                                     });
                                 }
@@ -2954,17 +3015,18 @@ impl GameGrid {
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_h = Some(oscillate(0.5, 0.97, 1.0));
-                    let angle = oscillate_loop(0.7, 0.0, PI * 2.0);
-                    let (sin, cos) = angle.sin_cos();
-                    let dist = cell_w * 0.3;
-                    let offset = (cos * dist, sin * dist * 0.5);
-                    held_sphere = Some(HeldSphere {
-                        color: color.with_alpha(0.7),
-                        outline: false,
-                        radius: cell_w / 3.0,
-                        offset,
-                    });
                     dx = oscillate(0.5, -1.0, 1.0);
+
+                    // If we've just started configuring an ability, that may animate a sphere - we
+                    // should wait it out before we override it with this sphere
+                    if held_sphere.is_none() && show_regular_hald_hend {
+                        let angle = oscillate_loop(0.7, 0.0, PI * 2.0);
+                        let (sin, cos) = angle.sin_cos();
+                        let dist = cell_w * 0.3;
+                        let mut sphere = self.spell_sphere(color);
+                        sphere.offset = (cos * dist, sin * dist * 0.5);
+                        held_sphere = Some(sphere);
+                    }
                 }
                 AnticipationKind::Throw { color } => {
                     let rotation = PI * 0.01;
@@ -2973,7 +3035,7 @@ impl GameGrid {
                     dx = 0.0;
                     held_sphere = Some(HeldSphere {
                         color,
-                        outline: true,
+                        outline: Some((BLACK, 3.0)),
                         radius: cell_w / 4.0,
                         offset: (0.0, 0.0),
                     });
@@ -3107,12 +3169,7 @@ impl GameGrid {
             );
 
             if let Some(sphere) = held_sphere {
-                let x0 = x + cell_w * 1.5 + sphere.offset.0;
-                let y0 = y + 2.0 * cell_w + sphere.offset.1;
-                draw_circle(x0, y0, sphere.radius, sphere.color);
-                if sphere.outline {
-                    draw_circle_lines(x0, y0, sphere.radius, 3.0, BLACK);
-                }
+                self.draw_held_sphere((x, y), sphere);
             } else if show_regular_hald_hend {
                 if !params.flip_x {
                     weapon_rotation_modifier *= -1.0;
@@ -3144,6 +3201,27 @@ impl GameGrid {
                     }
                 }
             }
+        }
+    }
+
+    fn spell_sphere(&self, spell_animation_color: Color) -> HeldSphere {
+        let cell_w = self.cell_w();
+        HeldSphere {
+            color: spell_animation_color.with_alpha(0.7),
+            outline: Some((BLACK.with_alpha(0.3), 2.0)),
+            radius: cell_w / 3.0,
+            offset: (0.0, 0.0),
+        }
+    }
+
+    fn draw_held_sphere(&self, pos: (f32, f32), sphere: HeldSphere) {
+        let cell_w = self.cell_w();
+        let (x, y) = pos;
+        let x0 = x + cell_w * 1.5 + sphere.offset.0;
+        let y0 = y + 2.0 * cell_w + sphere.offset.1;
+        draw_circle(x0, y0, sphere.radius, sphere.color);
+        if let Some((color, thickness)) = sphere.outline {
+            draw_circle_lines(x0, y0, sphere.radius, thickness, color);
         }
     }
 
@@ -4755,11 +4833,11 @@ impl GameGrid {
                     let kind = match ability.audio_visuals.animation {
                         AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
                         AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
-                        AbilityAnimation::RangedWeaponAttack => {
+                        AbilityAnimation::RangedWeaponAttackLine => {
                             AnticipationKind::RangedAttack { aiming }
                         }
                         AbilityAnimation::MeleeWeaponAttack => AnticipationKind::MeleeAttack,
-                        AbilityAnimation::CastSpell => AnticipationKind::CastSpell {
+                        AbilityAnimation::CastSpell { .. } => AnticipationKind::CastSpell {
                             color: ability.audio_visuals.animation_color,
                         },
                         AbilityAnimation::Dash => AnticipationKind::Dash,
@@ -4885,7 +4963,7 @@ impl GameGrid {
                 AnimationDetails::ParticleGroup(group) => {
                     self.draw_particle_group(group);
                 }
-                AnimationDetails::CastingSpell { color } => {
+                AnimationDetails::GatheringMagicFromAir { color } => {
                     let pos = self.character_screen_pos(&self.characters[&animation.character_id]);
                     let pos = (pos.0 + cell_w / 2.0, pos.1 - cell_w);
                     let t = 1.0 - animation.remaining_duration_ratio();
@@ -4900,7 +4978,7 @@ impl GameGrid {
                         draw_circle_lines(pos.0, pos.1, r, 5.0, *color);
                         draw_circle_lines(pos.0, pos.1, r * 1.2, 4.0, *color);
                         draw_circle_lines(pos.0, pos.1, r * 1.4, 3.0, *color);
-                        draw_circle(pos.0, pos.1, r * 1.4, color.with_alpha(0.3));
+                        draw_circle(pos.0, pos.1, r * 1.4, color.with_alpha(0.6));
                     };
                 }
                 AnimationDetails::Text(text_graphics) => {
@@ -6244,16 +6322,15 @@ impl GameGrid {
                     };
                     draw_dashed_line(from, to, thickness, *color, 5.0, None, true);
                 }
-                EffectVariant::Fx { texture } => {
+                EffectVariant::TextureLine { id } => {
                     let from = (
                         self.grid_x_f32_to_screen(effect.source_grid_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.source_grid_pos.1 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_grid_pos.1 - 0.5),
                     );
                     let final_to = (
                         self.grid_x_f32_to_screen(effect.destination_grid_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.destination_grid_pos.1 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_grid_pos.1 - 0.5),
                     );
-                    let texture_size = texture.size();
                     let texture_draw_size = self.default_entity_draw_size();
 
                     let to = (
@@ -6261,53 +6338,7 @@ impl GameGrid {
                         from.1 + (final_to.1 - from.1) * t,
                     );
 
-                    let dist = Vec2::from(to).distance(Vec2::from(from)); //  + texture_draw_size.0 ;
-                    let num_textures = dist / texture_draw_size.0 + 0.5;
-                    let num_textures_trunc = (num_textures).floor() as usize;
-                    let last_partial_texture_w = num_textures.fract();
-
-                    let rotation = -(to.0 - from.0).atan2(to.1 - from.1) + 0.5 * PI;
-
-                    let params = DrawTextureParams {
-                        dest_size: Some(texture_draw_size.into()),
-                        rotation,
-                        ..Default::default()
-                    };
-
-                    let osc_offset = oscillate_square(0.1, 0.0, self.cell_w() * 1.5);
-                    for i in 1..=num_textures_trunc {
-                        let mut pos = Vec2::from(from).move_towards(
-                            Vec2::from(final_to),
-                            texture_draw_size.0 * i as f32 + osc_offset,
-                        );
-                        let mut params = params.clone();
-                        if i == num_textures_trunc {
-                            params.source = Some(Rect::new(
-                                0.0,
-                                0.0,
-                                texture_size.x * last_partial_texture_w,
-                                texture_size.y,
-                            ));
-
-                            params.dest_size = Some(Vec2::new(
-                                texture_draw_size.0 * last_partial_texture_w,
-                                texture_draw_size.1,
-                            ));
-                            pos = pos.move_towards(
-                                Vec2::from(from),
-                                texture_draw_size.0 / 2.0
-                                    - (texture_draw_size.0 * last_partial_texture_w) / 2.0,
-                            );
-                        }
-                        let dest_size = params.dest_size.unwrap();
-                        draw_texture_ex(
-                            texture,
-                            pos.x - dest_size.x / 2.0,
-                            pos.y - dest_size.y / 2.0,
-                            WHITE,
-                            params,
-                        );
-                    }
+                    draw_beam_fx(from, to, *id, texture_draw_size);
                 }
 
                 EffectVariant::Corpse {
@@ -7038,6 +7069,13 @@ pub enum NewState {
     ChoosingAction,
 }
 
+struct HeldSphere {
+    color: Color,
+    radius: f32,
+    outline: Option<(Color, f32)>,
+    offset: (f32, f32),
+}
+
 #[derive(Debug)]
 struct ConcreteEffect {
     age: f32,
@@ -7062,8 +7100,8 @@ pub enum EffectVariant {
         end_thickness: Option<f32>,
         extend_gradually: bool,
     },
-    Fx {
-        texture: &'static Texture2D,
+    TextureLine {
+        id: BeamFxId,
     },
     Corpse {
         sprite: SpriteId,
@@ -7098,7 +7136,9 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    FlipBook(FlipbookAnimation),
+    FlipBook {
+        animation: FlipbookAnimation,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -7199,10 +7239,11 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::FlipBook(flipbook) => {
-                let num_frames = flipbook.num_frames as f32;
+            EffectGraphics::FlipBook { animation } => {
+                let num_frames = animation.num_frames as f32;
                 let i = (t * num_frames).floor().min(num_frames - 1.0) as u32;
-                flipbook.draw((x, y), i);
+                let dest_size = cell_w * animation.draw_size_cell_w;
+                animation.draw((x, y), i, dest_size);
             }
         }
     }
