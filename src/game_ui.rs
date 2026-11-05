@@ -3004,8 +3004,6 @@ fn build_character_ui(
     }
 
     let character_sheet = CharacterSheet::new(
-        simple_font,
-        big_font,
         Rc::clone(character),
         attack_button_for_character_sheet,
         reaction_buttons_for_character_sheet,

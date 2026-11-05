@@ -26,7 +26,8 @@ use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection}
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::game_ui_components::portrait_element;
 use crate::resources::{
-    portrait_texture, PORTRAITS_TEXTURE, UI_ARROW_TEXTURE, UI_SPELLBOOK_TEXTURE,
+    portrait_texture, BIG_FONT, PORTRAITS_TEXTURE, SIMPLE_FONT, UI_ARROW_TEXTURE,
+    UI_SPELLBOOK_TEXTURE,
 };
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
@@ -61,8 +62,6 @@ impl CharacterSheet {
     }
 
     pub fn new(
-        simple_font: &Font,
-        big_font: &Font,
         character: Rc<Character>,
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
@@ -73,8 +72,10 @@ impl CharacterSheet {
         screen_position: Rc<RefCell<(f32, f32)>>,
         sound_player: SoundPlayer,
     ) -> Self {
+        let simple_font = SIMPLE_FONT.get().unwrap();
+        let big_font = BIG_FONT.get().unwrap();
+
         let spell_book = build_spell_book(
-            simple_font,
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,
@@ -191,8 +192,8 @@ impl CharacterSheet {
             },
             children: vec![
                 Element::Text(
-                    TextLine::new(&character.name, 32, SKYBLUE, Some(simple_font.clone()))
-                        .with_depth(DARKBLUE, 1.0)
+                    TextLine::new(&character.name, 24, SKYBLUE, Some(big_font.clone()))
+                        .with_depth(GRAY, 1.0)
                         .with_padding(10.0, 10.0),
                 ),
                 contents,
@@ -405,7 +406,6 @@ impl CharacterSheet {
 }
 
 pub fn build_spell_book(
-    font: &Font,
     attack_button: Option<Rc<ActionButton>>,
     reaction_buttons: Vec<Rc<ActionButton>>,
     attack_enhancement_buttons: Vec<Rc<ActionButton>>,
@@ -413,6 +413,7 @@ pub fn build_spell_book(
     passive_skill_buttons: Vec<Rc<ActionButton>>,
     max_height: f32,
 ) -> Container {
+    let simple_font = SIMPLE_FONT.get().unwrap();
     let mut spell_book = Container {
         layout_dir: LayoutDirection::Vertical,
         margin: 8.0,
@@ -454,7 +455,7 @@ pub fn build_spell_book(
             "Reactions",
             16,
             WHITE,
-            Some(font.clone()),
+            Some(simple_font.clone()),
         )));
         spell_book.children.push(row);
     }
@@ -464,7 +465,7 @@ pub fn build_spell_book(
             "Attack",
             16,
             WHITE,
-            Some(font.clone()),
+            Some(simple_font.clone()),
         )));
 
         let mut row_elements = vec![Element::Rc(attack_button)];
@@ -485,7 +486,7 @@ pub fn build_spell_book(
             ability.name,
             16,
             WHITE,
-            Some(font.clone()),
+            Some(simple_font.clone()),
         )));
 
         let mut row_elements = vec![Element::Rc(ability_btn.clone())];
@@ -511,7 +512,7 @@ pub fn build_spell_book(
             "Passives",
             16,
             WHITE,
-            Some(font.clone()),
+            Some(simple_font.clone()),
         )));
         spell_book.children.push(row);
     }

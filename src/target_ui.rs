@@ -6,7 +6,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, WHITE},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, SKYBLUE, WHITE},
     math::Rect,
     text::Font,
     texture::Texture2D,
@@ -18,8 +18,8 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{
-        table, Align, Border, Container, Drawable, Element, LayoutDirection, SimpleTooltip, Style,
-        TableCell, TableStyle, TextLine,
+        character_name_color, table, Align, Border, Container, Drawable, Element, LayoutDirection,
+        SimpleTooltip, Style, TableCell, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
@@ -27,7 +27,7 @@ use crate::{
         character_defense_section, gui_ap_row, portrait_element, ActionPointsRow, ResourceBar,
     },
     resources::{portrait_texture, PortraitId},
-    util::{plus_minus, COL_GOLD, COL_RED, COL_TEXT_REGULAR},
+    util::{plus_minus, COL_ENEMY, COL_GOLD, COL_RED, COL_TEXT_REGULAR},
 };
 
 const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.95);
@@ -90,9 +90,10 @@ impl TargetUi {
     pub fn set_character(&mut self, character: Option<&Rc<Character>>) {
         if let Some(char) = character {
             self.target = Some(Rc::clone(char));
+            let name_color = character_name_color(&char.name);
             let mut name_text_line =
-                TextLine::new(char.name.clone(), 18, WHITE, Some(self.big_font.clone()));
-            name_text_line.set_depth(BLACK, 2.0);
+                TextLine::new(&char.name, 24, name_color, Some(self.big_font.clone()));
+            name_text_line.set_depth(GRAY, 1.0);
             name_text_line.set_min_height(20.0);
 
             let mut action_points_row = gui_ap_row(16.0);
@@ -238,7 +239,9 @@ impl TargetUi {
             }
 
             let mut centered_items = vec![
+                Element::Empty(1.0, 4.0),
                 Element::Text(name_text_line),
+                Element::Empty(1.0, 8.0),
                 portrait,
                 Element::Empty(1.0, 8.0),
                 Element::Container(resource_row),

@@ -30,7 +30,7 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     util::{
         oscillate, oscillate_loop, oscillate_plateau, oscillate_square, COL_RED, COL_RED_BRIGHT,
-        COL_RED_BRIGHTER,
+        COL_RED_BRIGHTER, COL_TEXT_FADED, COL_TEXT_REGULAR,
     },
 };
 use crate::{
@@ -1586,9 +1586,9 @@ pub fn character_defense_section(character: &Character) -> Element {
     let big_font = BIG_FONT.get().unwrap();
 
     let defense_header: Element = Element::Text(TextLine::new(
-        "Defenses:",
+        "Defenses",
         16,
-        WHITE,
+        COL_TEXT_FADED,
         Some(simple_font.clone()),
     ));
 
@@ -1646,7 +1646,7 @@ pub fn character_defense_section(character: &Character) -> Element {
         let cell = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
-            margin: 10.0,
+            margin: 13.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some(SimpleTooltip::new(
                 format!("{} |{}|", label, icon),

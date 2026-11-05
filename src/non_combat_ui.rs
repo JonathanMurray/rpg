@@ -262,7 +262,6 @@ impl NonCombatCharacterUi {
         }
 
         let spell_book = build_spell_book(
-            simple_font,
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,

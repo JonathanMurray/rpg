@@ -650,12 +650,7 @@ pub fn draw_text_with_font_tags(
                 }
             } else if consume_prefix_tag("<name>", &mut part) {
                 if render_tags {
-                    params.color = match part {
-                        "Bob" | "Gorm" => COL_BOB,
-                        "Alice" | "Ylva" | "Test archer" => COL_ALICE,
-                        "Clara" | "Idun" | "Test mage" => COL_CLARA,
-                        _ => COL_ENEMY,
-                    };
+                    params.color = character_name_color(part);
                 }
             } else if consume_prefix_tag("<strikethrough>", &mut part) {
                 strikethrough = true;
@@ -683,6 +678,15 @@ pub fn draw_text_with_font_tags(
     }
     let w = x0 - x;
     (w, h)
+}
+
+pub fn character_name_color(name: &str) -> Color {
+    match name {
+        "Bob" | "Gorm" | "Test fighter" => COL_BOB,
+        "Alice" | "Ylva" | "Test archer" => COL_ALICE,
+        "Clara" | "Idun" | "Test mage" => COL_CLARA,
+        _ => COL_ENEMY,
+    }
 }
 
 fn consume_prefix_tag(tag: &str, part: &mut &str) -> bool {
