@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::OnceCell,
     sync::{LazyLock, OnceLock},
 };
@@ -2873,21 +2874,21 @@ impl PassiveSkill {
         }
     }
 
-    pub fn description(&self) -> &'static str {
+    pub fn description(&self) -> Cow<'static, str> {
         use PassiveSkill::*;
         match self {
-            HardenedSkin => "|<value>+1| |<shield>| armor",
-            WeaponProficiency => "|<trigger>On strong / critical hit:| Attacks penetrate |<value>+2| |<shield>| armor.",
-            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below |<value>50%| |<mana>| mana.",
-            Reaper => "|<trigger>On kill:| gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|.",
-            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below |<value>50%| |<heart>| health. Immune to |<keyword>Near-death|.",
-            ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
-            Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets.",
-            Vigilant => "Can |<reaction>| opportunity attack an enemy, even while engaging with another enemy.",
-            RisingTemper => "|<trigger>End of turn:| gain +1 |<keyword>Ferocity|.",
-            SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
-            Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
-            Undead => "Immune to |<keyword>Bleeding|. |<value>-35%| |<boot>| movement speed.",
+            HardenedSkin => "|<value>+1| |<shield>| armor".into(),
+            WeaponProficiency => "|<trigger>On strong / critical hit:| Attacks penetrate |<value>2| |<shield>| armor.".into(),
+            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below |<value>50%| |<mana>| mana.".into(),
+            Reaper => "|<trigger>On kill:| gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|.".into(),
+            BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below |<value>50%| |<heart>| health. Immune to |<keyword>Near-death|.".into(),
+            ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.".into(),
+            Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets.".into(),
+            Vigilant => "Can |<reaction>| opportunity attack an enemy, even while engaging with another enemy.".into(),
+            RisingTemper => format!("|<trigger>End of turn:| gain |<value>1| {}", Condition::Ferocity.name_with_icon()).into(),
+            SwampDweller => format!("Immune to {}. While standing in water, the water is |<keyword>Poisonous|.", Condition::Poisoned.name_with_icon()).into(),
+            Slasher => format!("Inflicts {} when dealing attack damage.", Condition::Bleeding.name_with_icon()).into(),
+            Undead => format!("Immune to {}. |<value>-35%| |<boot>| movement speed.", Condition::Bleeding.name_with_icon()).into(),
         }
     }
 

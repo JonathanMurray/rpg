@@ -6,7 +6,10 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Align, Border, Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    base_ui::{
+        Align, Border, Container, Drawable, Element, LayoutDirection, SimpleTooltip, Style,
+        TextLine,
+    },
     core::{Character, HandType},
     game_ui_components::character_defense_section,
     resources::{BIG_FONT, SIMPLE_FONT},
@@ -104,16 +107,17 @@ pub fn build_character_stats_table(
             TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
         let value_line = TextLine::new(format!("{}", value), 12, WHITE, Some(big_font.clone()))
             .with_depth(BLACK, 2.0);
+        let tooltip = SimpleTooltip::new(
+            name,
+            tooltip_lines.iter().map(|s| s.to_string()).collect(),
+            vec![],
+        );
         let cell = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
-            tooltip: Some((
-                name.to_string(),
-                tooltip_lines.iter().map(|s| s.to_string()).collect(),
-                vec![],
-            )),
+            tooltip: Some(tooltip),
             ..Default::default()
         });
         main_stat_cells.push(cell);
@@ -209,7 +213,12 @@ pub fn build_character_stats_table(
         };
         Element::Container(Container {
             children: vec![Element::Text(left), Element::Container(right)],
-            tooltip: Some((long_header.to_string(), tooltip, keywords)),
+
+            tooltip: Some(SimpleTooltip::new(
+                long_header.to_string(),
+                tooltip,
+                keywords,
+            )),
             margin: 15.0,
             align: Align::Center,
             style: Style {

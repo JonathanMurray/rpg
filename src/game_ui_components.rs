@@ -16,7 +16,7 @@ use macroquad::{
 use crate::{
     base_ui::{
         draw_text_rounded, Align, Border, Container, ContainerScroll, Drawable, Element,
-        LayoutDirection, Rectangle, Style, TextLine,
+        LayoutDirection, Rectangle, SimpleTooltip, Style, TextLine,
     },
     core::{
         Character, CharacterId, Characters, ConditionInfo, CoreGame, Goodness, MAX_ACTION_POINTS,
@@ -1648,7 +1648,7 @@ pub fn character_defense_section(character: &Character) -> Element {
             align: Align::Center,
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
-            tooltip: Some((
+            tooltip: Some(SimpleTooltip::new(
                 format!("{} |{}|", label, icon),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
                 vec![],

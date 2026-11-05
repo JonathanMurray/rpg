@@ -9,7 +9,10 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_rounded, draw_text_with_font_tags, Drawable},
+    base_ui::{
+        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags,
+        Drawable,
+    },
     core::ConditionInfo,
     resources::{draw_status_icon, SIMPLE_FONT},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
@@ -25,7 +28,10 @@ pub struct ConditionsList {
 impl ConditionsList {
     pub fn new(infos: Vec<ConditionInfo>) -> Self {
         // We need to start out with an accurate height, to prevent the parent container from "flickering" the first time it renders
-        let approx_size = (1.0, infos.len() as f32 * CONDITIONS_LIST_LINE_H);
+        let approx_size = (
+            1.0,
+            infos.len() as f32 * CONDITIONS_LIST_LINE_H + BOTTOM_PAD,
+        );
         Self {
             infos,
             size: Cell::new(approx_size),
@@ -64,6 +70,7 @@ impl Drawable for ConditionsList {
     }
 }
 
+const BOTTOM_PAD: f32 = 10.0;
 const CONDITIONS_LIST_LINE_H: f32 = 22.0;
 
 impl ConditionsList {
@@ -87,7 +94,7 @@ impl ConditionsList {
         for info in condition_infos {
             y_offset += CONDITIONS_LIST_LINE_H;
             let y0 = y + y_offset;
-            let margin = 6.0;
+            let icon_text_margin = 6.0;
 
             let status_y = y0 + 5.0 - status_w;
             draw_rectangle(x, status_y, status_w, status_w, BLACK);
@@ -98,31 +105,34 @@ impl ConditionsList {
                 Some((status_w, status_w)),
             );
 
-            let x0 = x + status_w + margin;
+            let x0 = x + status_w + icon_text_margin;
 
-            let (text_w, text_h) = draw_text_with_font_tags(
-                &condition_info_str(info),
-                x0,
-                y0,
-                text_params.clone(),
-                true,
-            );
+            let text = &condition_info_str(info);
 
+            let dim =
+                measure_text_with_font_tags(text, text_params.font, text_params.font_size, 1.0);
+            let text_w = dim.width;
+            let text_h = dim.height;
+            let w = text_w + status_w + icon_text_margin;
             if (x..x0 + text_w).contains(&mouse_x) && (y0 - text_h..y0).contains(&mouse_y) {
-                self.hovered_tooltip.set(Some((
-                    Rect::new(x, y0 - text_h, text_w + status_w + margin, text_h),
-                    *info,
-                )));
+                let rect = Rect::new(x, y0 - text_h, w, text_h);
+                draw_rectangle(rect.x, rect.y, rect.w, rect.h, WHITE.with_alpha(0.2));
+                self.hovered_tooltip.set(Some((rect, *info)));
             }
 
-            let w = text_w + status_w + 2.0;
+            let (text_w, text_h) =
+                draw_text_with_font_tags(text, x0, y0, text_params.clone(), true);
 
             if w > max_w {
                 max_w = w;
             }
         }
 
-        (max_w, y_offset)
+        let (w, h) = (max_w, y_offset + BOTTOM_PAD);
+
+        draw_debug(x, y, w, h);
+
+        (w, h)
     }
 }
 

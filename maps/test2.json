@@ -481,6 +481,50 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Huldra",
+      "pos": [
+        34,
+        19
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "SkeletonBoss",
+      "pos": [
+        31,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        37,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        22,
+        16
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

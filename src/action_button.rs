@@ -22,7 +22,7 @@ use macroquad::{
 use crate::{
     base_ui::{
         draw_debug, draw_text_rounded, Align, Circle, Container, Drawable, Element,
-        LayoutDirection, Style, TextLine,
+        LayoutDirection, SimpleTooltip, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEnhancement, AbilityReach, AbilityRollType, AbilityTarget,
@@ -96,6 +96,13 @@ impl Tooltip {
         }
         lines
     }
+
+    pub fn to_simple_tooltip(self) -> SimpleTooltip {
+        let lines = self.content_lines(true);
+        let mut t = SimpleTooltip::new(self.header, lines, self.keywords);
+        t.icon = self.icon;
+        t
+    }
 }
 
 pub fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -> Tooltip {
@@ -138,11 +145,12 @@ pub fn button_action_tooltip(action: &ButtonAction, character: Option<&Character
     tooltip
 }
 
-fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {
+pub fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {
     Tooltip {
         header: skill.name().to_string(),
-        description: Some(Cow::Borrowed(skill.description())),
+        description: Some(skill.description()),
         keywords: skill.keywords().to_vec(),
+        icon: Some(skill.icon()),
         ..Default::default()
     }
 }
@@ -1142,7 +1150,7 @@ impl ActionButton {
             align: Align::Center,
             style: Style {
                 padding,
-                bg_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
+                //bg_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
                 ..Default::default()
             },
             ..Default::default()
@@ -1392,7 +1400,7 @@ impl Drawable for ActionButton {
                     y + h - bottom_row_h_pad - row_h,
                     w - 2.0,
                     row_h,
-                    Color::new(0.1, 0.1, 0.1, 0.8),
+                    Color::new(0.1, 0.1, 0.1, 0.6),
                 );
             }
 

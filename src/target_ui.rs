@@ -14,11 +14,12 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
+        draw_button_tooltip, passive_skill_tooltip, ActionButton, ButtonAction, ButtonHovered,
+        InternalUiEvent,
     },
     base_ui::{
-        table, Align, Border, Container, Drawable, Element, LayoutDirection, Style, TableCell,
-        TableStyle, TextLine,
+        table, Align, Border, Container, Drawable, Element, LayoutDirection, SimpleTooltip, Style,
+        TableCell, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
@@ -26,7 +27,7 @@ use crate::{
         character_defense_section, gui_ap_row, portrait_element, ActionPointsRow, ResourceBar,
     },
     resources::{portrait_texture, PortraitId},
-    util::{plus_minus, COL_GOLD, COL_RED},
+    util::{plus_minus, COL_GOLD, COL_RED, COL_TEXT_REGULAR},
 };
 
 const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.95);
@@ -130,7 +131,7 @@ impl TargetUi {
             let portrait = portrait_element(&char);
 
             let mut action_rows = vec![];
-            let mut passives_row = None;
+            let mut passives_section = None;
             let mut bot_using_spells = false;
 
             self.buttons.clear();
@@ -187,7 +188,20 @@ impl TargetUi {
                     let btn = new_btn(ButtonAction::Passive(*skill));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
-                    passive_children.push(Element::RcRefCell(btn.clone()));
+                    //passive_children.push(Element::RcRefCell(btn.clone()));
+
+                    let mut text_line = TextLine::new(
+                        skill.name(),
+                        12,
+                        COL_TEXT_REGULAR,
+                        Some(self.big_font.clone()),
+                    );
+                    text_line.set_padding(3.0, 7.0);
+                    let t = passive_skill_tooltip(skill);
+                    text_line.tooltip = Some(t.to_simple_tooltip());
+                    text_line.hover_bg_color = Some(WHITE.with_alpha(0.1));
+                    passive_children.push(Element::Text(text_line));
+
                     self.buttons.insert(id, btn);
                 }
 
@@ -210,10 +224,14 @@ impl TargetUi {
                 }
 
                 if !passive_children.is_empty() {
-                    passives_row = Some(Element::Container(Container {
-                        layout_dir: LayoutDirection::Horizontal,
-                        margin: btn_margin,
+                    passives_section = Some(Element::Container(Container {
+                        layout_dir: LayoutDirection::Vertical,
+                        margin: 3.0,
                         children: passive_children,
+                        style: Style {
+                            padding: 2.0,
+                            ..Default::default()
+                        },
                         ..Default::default()
                     }));
                 }
@@ -268,25 +286,25 @@ impl TargetUi {
                 ..Default::default()
             };
 
-            let mut rows = vec![Element::Container(centered_section)];
+            let mut sections = vec![Element::Container(centered_section)];
 
             for row in action_rows {
-                rows.push(row);
+                sections.push(row);
             }
-            if let Some(row) = passives_row {
-                rows.push(row);
+            if let Some(section) = passives_section {
+                sections.push(section);
             }
 
             if !char.condition_infos().is_empty() {
                 let conditions_list = ConditionsList::new(char.condition_infos());
 
-                rows.push(Element::Box(Box::new(conditions_list)));
+                sections.push(Element::Box(Box::new(conditions_list)));
             }
 
             self.container = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Start,
-                children: rows,
+                children: sections,
                 margin: 15.0,
                 style: Style {
                     bg_color: Some(BG_COLOR),
@@ -300,7 +318,7 @@ impl TargetUi {
                     padding: 10.0,
                     ..Default::default()
                 },
-                border_between_children: Some(GRAY),
+                border_between_children: Some(GRAY.with_alpha(0.5)),
 
                 ..Default::default()
             }
