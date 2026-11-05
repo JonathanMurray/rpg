@@ -175,7 +175,7 @@ impl NonCombatCharacterUi {
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let resource_bars = Rc::new(RefCell::new(ResourceBars::new(&character, simple_font)));
+        let resource_bars = Rc::new(RefCell::new(ResourceBars::new(&character)));
 
         let mut next_button_id = 0;
 
@@ -332,7 +332,7 @@ impl NonCombatCharacterUi {
     pub fn on_character_stats_changed(&mut self) {
         self.stats_table.borrow_mut().rebuild();
 
-        *self.resource_bars.borrow_mut() = ResourceBars::new(&self.character, &self.font);
+        *self.resource_bars.borrow_mut() = ResourceBars::new(&self.character);
 
         self.equipment_section
             .borrow_mut()

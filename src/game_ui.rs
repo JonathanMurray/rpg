@@ -825,7 +825,7 @@ impl UserInterface {
         let mut changed_character = player_portraits_outcome.changed_character;
         self.character_sheet_toggle.draw(
             resources_mid_x - self.character_sheet_toggle.size().0 / 2.0,
-            screen_height() - 35.0,
+            screen_height() - 30.0,
         );
 
         let hovered_character_id = self.top_character_portraits.draw(0.0, 0.0);
@@ -3049,7 +3049,7 @@ fn build_character_ui(
     };
 
     let action_points_row = gui_ap_row(20.0);
-    let resource_bars = ResourceBars::new(character, big_font);
+    let resource_bars = ResourceBars::new(character);
 
     CharacterUi {
         tracked_action_buttons,
@@ -3132,12 +3132,11 @@ impl Drawable for ResourceBars {
 }
 
 impl ResourceBars {
-    pub fn new(character: &Character, font: &Font) -> Self {
+    pub fn new(character: &Character) -> Self {
         let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.health.current(),
             character.health.max(),
             COL_RED,
-            font.clone(),
             "<heart>",
         )));
 
@@ -3145,7 +3144,6 @@ impl ResourceBars {
             character.mana.current(),
             character.mana.max(),
             COL_BLUE,
-            font.clone(),
             "<mana>",
         )));
 
@@ -3153,7 +3151,6 @@ impl ResourceBars {
             character.stamina.current(),
             character.stamina.max(),
             COL_GREEN_1,
-            font.clone(),
             "<stamina>",
         )));
 

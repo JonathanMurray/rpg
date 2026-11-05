@@ -718,8 +718,8 @@ impl Drawable for PlayerCharacterPortrait {
 
         //self.text.draw(self.padding + x, self.padding + y);
 
-        let button_h = 25.0;
-        let button_text_vert_pad = 8.0;
+        let button_h = 30.0;
+        let button_text_vert_pad = 10.0;
 
         let button_y = y + h + 5.0;
         let has_taken_a_turn = self.character.has_taken_a_turn_this_round.get();
@@ -939,14 +939,14 @@ impl Log {
             LogStyle::RoundStart => {
                 let mut line = TextLine::new(text, 12, WHITE, Some(self.big_font.clone()))
                     .with_depth(BLACK, 1.0)
-                    .with_padding(3.0, 7.0);
+                    .with_padding(3.0, 3.0);
                 line.bg_color = Some(DARKBROWN.with_alpha(0.8));
                 line
             }
         };
 
         text_line.set_max_width(self.container.min_width.unwrap());
-        text_line.set_min_height(18.0);
+        text_line.set_forced_offset_y(11.0);
         if !details.is_empty() {
             text_line.hover_bg_color = Some(WHITE.with_alpha(0.2));
         }
@@ -958,7 +958,7 @@ impl Log {
         if !details.is_empty() {
             let details_container = Container {
                 layout_dir: LayoutDirection::Vertical,
-                margin: 0.0,
+                margin: 3.0,
                 style: Style {
                     bg_color: Some(BLACK),
                     padding: 5.0,
@@ -970,8 +970,10 @@ impl Log {
                     .map(|s| {
                         let mut text =
                             TextLine::new(s, font_size, WHITE, Some(self.simple_font.clone()));
-                        text.set_min_height(20.0);
-                        text.set_max_height(20.0);
+                        text.set_padding(3.0, 3.0);
+                        text.set_forced_offset_y(11.0);
+                        //text.set_min_height(20.0);
+                        //text.set_max_height(20.0);
                         Element::Text(text)
                     })
                     .collect(),
@@ -1451,8 +1453,10 @@ pub struct LabelledResourceBar {
 }
 
 impl LabelledResourceBar {
-    pub fn new(current: u32, max: u32, color: Color, font: Font, symbol: &'static str) -> Self {
+    pub fn new(current: u32, max: u32, color: Color, symbol: &'static str) -> Self {
         assert!(current <= max);
+
+        let font = BIG_FONT.get().unwrap().clone();
 
         let cell_h = 10.0;
         let max_w = 70.0;
@@ -1472,8 +1476,8 @@ impl LabelledResourceBar {
         let cloned_value_text = Rc::clone(&value_text);
         //let label_text = TextLine::new("|<heart>|", 16, WHITE, Some(font.clone()));
 
-        let mut symbol_text_line = TextLine::new(symbol.to_string(), 12, WHITE, Some(font.clone()));
-        symbol_text_line.set_max_height(8.0);
+        let symbol_text_line =
+            TextLine::new(format!(" |{}|", symbol), 12, WHITE, Some(font.clone()));
 
         let list = Container {
             layout_dir: LayoutDirection::Horizontal,

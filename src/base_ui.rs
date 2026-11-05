@@ -257,7 +257,8 @@ impl TabLink {
 pub struct TextLine {
     size: (f32, f32),
     string: String,
-    offset_y: f32,
+    forced_offset_y: Option<f32>,
+    measured_offset_y: f32,
     font_size: u16,
     color: Color,
     hover_color: Option<Color>,
@@ -293,7 +294,8 @@ impl TextLine {
         let mut this = Self {
             size: (0.0, 0.0),
             string: string.into(),
-            offset_y: font_size as f32 * 0.6,
+            forced_offset_y: None,
+            measured_offset_y: 0.0,
             font_size,
             color,
             bg_color: None,
@@ -323,6 +325,11 @@ impl TextLine {
     pub fn set_max_height(&mut self, max_height: f32) {
         self.max_height = max_height;
         self.size.1 = self.size.1.min(max_height);
+    }
+
+    pub fn set_forced_offset_y(&mut self, offset: f32) {
+        self.forced_offset_y = Some(offset);
+        self.measure();
     }
 
     pub fn set_min_width(&mut self, min_width: f32, right_align: bool) {
@@ -378,13 +385,18 @@ impl TextLine {
     fn measure(&mut self) {
         let dim =
             measure_text_with_font_tags(&self.string, self.font.as_ref(), self.font_size, 1.0);
+        self.measured_offset_y = dim.offset_y;
+
         self.size = (
             dim.width.max(0.0) + self.hor_padding * 2.0,
-            dim.offset_y.max(0.0) + self.vert_padding * 2.0,
+            self.offset_y().max(0.0) + self.vert_padding * 2.0,
         );
         self.size.1 = self.size.1.max(self.min_height).min(self.max_height);
         assert!(self.size.0.is_finite() && self.size.1.is_finite());
-        //self.offset_y = dim.offset_y;
+    }
+
+    fn offset_y(&self) -> f32 {
+        self.forced_offset_y.unwrap_or(self.measured_offset_y)
     }
 }
 
@@ -392,7 +404,9 @@ impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
         //draw_rectangle(x, y, self.size.0, self.size.1, MAGENTA);
 
-        let y0 = y + self.vert_padding;
+        let offset_y = self.offset_y();
+
+        let y0 = y + self.vert_padding + offset_y;
 
         let x0 = if self.right_align {
             let text_dimensions =
@@ -425,7 +439,7 @@ impl Drawable for TextLine {
             draw_text_with_font_tags(
                 &self.string,
                 x0 + depth_offset,
-                y0 + self.offset_y + depth_offset,
+                y0 + depth_offset,
                 params,
                 false,
             );
@@ -444,8 +458,7 @@ impl Drawable for TextLine {
             font: self.font.as_ref(),
             ..Default::default()
         };
-        draw_text_with_font_tags(&self.string, x0, y0 + self.offset_y, params, true);
-        //draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
+        draw_text_with_font_tags(&self.string, x0, y0, params, true);
 
         draw_debug(x, y, self.size.0, self.size.1);
 
@@ -479,6 +492,7 @@ impl Drawable for TextLine {
 }
 
 const FONT_SYMBOL_H: f32 = 16.0;
+const FONT_SYMBOL_Y_OFFSET: f32 = 13.0;
 const FONT_STATUS_W: f32 = 10.0;
 
 static TAGS: LazyLock<HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)>> =
@@ -537,7 +551,7 @@ pub fn measure_text_with_font_tags(
         if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
             h = h.max(FONT_SYMBOL_H);
-            let symbol_offset = 13.0; //13.0;
+            let symbol_offset = FONT_SYMBOL_Y_OFFSET; //13.0;
             if let Some(prev_offset_y) = offset_y {
                 offset_y = Some(prev_offset_y.max(symbol_offset));
             } else {
@@ -565,9 +579,6 @@ pub fn measure_text_with_font_tags(
                 }
 
                 w += dim.width;
-                if dim.height > h {
-                    h = dim.height;
-                }
                 h = h.max(dim.height);
             }
         }
@@ -587,6 +598,7 @@ pub fn draw_text_with_font_tags(
     params: TextParams<'_>,
     render_tags: bool,
 ) -> (f32, f32) {
+    let symbol_offset = FONT_SYMBOL_Y_OFFSET; //13.0;
     let mut x0 = x;
     let mut h: f32 = 0.0;
     let parts = line.split("|").filter(|p| !p.is_empty());
@@ -597,7 +609,7 @@ pub fn draw_text_with_font_tags(
                     draw_texture_ex(
                         texture.get().unwrap(),
                         x0,
-                        y - 13.0,
+                        y - symbol_offset,
                         WHITE,
                         DrawTextureParams {
                             rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
@@ -607,7 +619,7 @@ pub fn draw_text_with_font_tags(
                         },
                     );
                 } else {
-                    draw_texture(texture.get().unwrap(), x0, y - 13.0, WHITE);
+                    draw_texture(texture.get().unwrap(), x0, y - symbol_offset, WHITE);
                 }
             }
             x0 += symbol_w;

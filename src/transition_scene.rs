@@ -154,7 +154,7 @@ pub async fn run_transition_loop(
     {
         let mut children = vec![];
         for (char, growth) in &characters {
-            let resources_bars = ResourceBars::new(char, big_font);
+            let resources_bars = ResourceBars::new(char);
 
             let portrait = PlayerCharacterPortrait::new(
                 char,
