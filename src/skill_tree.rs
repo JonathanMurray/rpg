@@ -515,7 +515,7 @@ pub async fn run_editor() {
 
         if let Some((btn_id, pos)) = hovered_btn_id_pos {
             let btn = &skill_buttons.borrow()[&btn_id];
-            draw_button_tooltip(pos, &btn.tooltip(), true);
+            draw_button_tooltip(pos, &btn.tooltip());
         }
 
         for attribute in clicked_attributes.borrow_mut().drain(..) {

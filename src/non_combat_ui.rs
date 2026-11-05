@@ -360,7 +360,7 @@ impl NonCombatCharacterUi {
                 .iter()
                 .find(|btn| btn.id == id)
                 .unwrap();
-            draw_button_tooltip(btn_pos, &btn.tooltip(), true);
+            draw_button_tooltip(btn_pos, &btn.tooltip());
         }
     }
 

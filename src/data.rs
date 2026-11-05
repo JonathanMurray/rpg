@@ -1382,8 +1382,8 @@ pub const ENEMY_BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
 
-    description: "",
-    icon: IconId::Brace,
+    description: "Take reduced damage from one attack.",
+    icon: IconId::Block,
     action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 0,

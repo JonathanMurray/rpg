@@ -400,7 +400,7 @@ pub fn draw_tooltip(
                 line_y += empty_line_h;
                 0.0
             } else {
-                let w = draw_text_with_font_tags(line, text_x, line_y, params, true);
+                let (w, _h) = draw_text_with_font_tags(line, text_x, line_y, params, true);
 
                 if let Some(status) = status_icon {
                     draw_status_icon(
@@ -504,9 +504,12 @@ pub fn draw_keyword_tooltips_relative_to_rect(
         let pos_preference = if i == 0 {
             TooltipPositionPreference::RelativeToRect(rect, side_relative_to_parent_tooltip)
         } else {
-            // TODO only left if appropriate
-            TooltipPositionPreference::RelativeToRect(rect, Side::BottomLeft)
-            //TooltipPositionPreference::At((rect.x, rect.y + rect.h))
+            let side = if side_relative_to_parent_tooltip == Side::Left {
+                Side::BottomLeft
+            } else {
+                Side::BottomRight
+            };
+            TooltipPositionPreference::RelativeToRect(rect, side)
         };
         let description = keyword.description();
         let content_lines: Vec<&str> = description.split("\n").collect();

@@ -18,7 +18,9 @@ use crate::{
         draw_text_rounded, Align, Border, Container, ContainerScroll, Drawable, Element,
         LayoutDirection, Rectangle, Style, TextLine,
     },
-    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
+    core::{
+        Character, CharacterId, Characters, ConditionInfo, CoreGame, Goodness, MAX_ACTION_POINTS,
+    },
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
     resources::{
@@ -26,7 +28,10 @@ use crate::{
         PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE, SIMPLE_FONT, UI_RESOURCE_BAR_TEXTURE,
     },
     sounds::{SoundId, SoundPlayer},
-    util::{oscillate, oscillate_loop, oscillate_plateau, oscillate_square},
+    util::{
+        oscillate, oscillate_loop, oscillate_plateau, oscillate_square, COL_RED, COL_RED_BRIGHT,
+        COL_RED_BRIGHTER,
+    },
 };
 use crate::{
     tooltip::{draw_tooltip, Keyword, TooltipPositionPreference},
@@ -1035,6 +1040,23 @@ pub struct ActionPointsRow {
     recently_lost_animation: Option<ApLostAnimation>,
 }
 
+pub fn gui_ap_row(cell_size: f32) -> ActionPointsRow {
+    ActionPointsRow::new(
+        (cell_size, cell_size),
+        0.25,
+        Style {
+            bg_color: Some(BLACK),
+            border: Some(Border {
+                color: DARKGRAY,
+                inner_rounding: Some(3.0),
+                outer_rounding: Some((BLACK, 2.0)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+}
+
 impl ActionPointsRow {
     pub fn new(cell_size: (f32, f32), radius_factor: f32, style: Style) -> Self {
         Self {
@@ -1584,32 +1606,40 @@ pub fn character_defense_section(character: &Character) -> Element {
     });
 
     let mut defense_cells = vec![];
-    for (label, value, icon, tooltip_lines) in [
+    for (label, value, contribution_from_conditions, icon, tooltip_lines) in [
         (
             "Toughness",
             character.toughness(),
+            character.toughness_from_conditions(),
             "<toughness>",
             &["Protection against physical harm that can't be dodged."][..],
         ),
         (
             "Evasion",
             character.evasion(),
+            character.evasion_from_conditions(),
             "<evasion>",
             &["Protection against melee attacks and projectiles."][..],
         ),
         (
             "Will",
             character.will(),
+            character.will_from_conditions(),
             "<will>",
             &["Protection against non-physical harm."][..],
         ),
     ] {
         let label_line =
             TextLine::new(label, 16, LIGHTGRAY, Some(simple_font.clone())).with_depth(BLACK, 1.0);
+        let color = if contribution_from_conditions < 0 {
+            COL_RED
+        } else {
+            WHITE
+        };
         let value_line = TextLine::new(
             format!("|{}| {}", icon, value),
             12,
-            WHITE,
+            color,
             Some(big_font.clone()),
         )
         .with_depth(BLACK, 2.0);

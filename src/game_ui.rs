@@ -43,8 +43,8 @@ use crate::{
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
-        ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, LogStyle, PlayerPortraits,
-        TopCharacterPortraits,
+        gui_ap_row, ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, LogStyle,
+        PlayerPortraits, TopCharacterPortraits,
     },
     grid::{
         EffectData, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
@@ -52,8 +52,7 @@ use crate::{
     },
     init_fight_map::GameInitState,
     pathfind::{Elevation, Occupation, PathfindGrid, Surface, TerrainType},
-    resources::GameResources,
-    resources::{EffectId, StatusId, TerrainId, UI_BG_TEXTURE},
+    resources::{EffectId, GameResources, StatusId, TerrainId, UI_BG_TEXTURE},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
@@ -954,12 +953,7 @@ impl UserInterface {
                 .iter()
                 .find(|btn| btn.id == btn_hovered.id)
             {
-                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip(
-                    btn_hovered.hovered_pos.unwrap(),
-                    &btn.tooltip(),
-                    detailed_tooltip,
-                );
+                draw_button_tooltip(btn_hovered.hovered_pos.unwrap(), &btn.tooltip());
             }
         }
 
@@ -3018,7 +3012,7 @@ fn build_character_ui(
         attack_enhancement_buttons_for_character_sheet,
         ability_buttons_for_character_sheet,
         passive_buttons_for_character_sheet,
-        ConditionsList::new(simple_font.clone(), vec![]),
+        ConditionsList::new(vec![]),
         character_sheet_screen_pos,
         sound_player,
     );
@@ -3056,16 +3050,8 @@ fn build_character_ui(
         ..Default::default()
     };
 
+    let action_points_row = gui_ap_row(20.0);
     let resource_bars = ResourceBars::new(character, big_font);
-
-    let action_points_row = ActionPointsRow::new(
-        (20.0, 20.0),
-        0.25,
-        Style {
-            border: Some(Border::with_color(GRAY)),
-            ..Default::default()
-        },
-    );
 
     CharacterUi {
         tracked_action_buttons,

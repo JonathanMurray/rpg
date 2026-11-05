@@ -8,7 +8,7 @@ use std::{
 use macroquad::{
     color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{
-        is_mouse_button_pressed, mouse_position,
+        is_key_down, is_mouse_button_pressed, mouse_position,
         KeyCode::{self, D},
         MouseButton,
     },
@@ -538,7 +538,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
 
         ApplyEffect::LoseCondition { condition } => {
             let line = format!(
-                "  Lose: |<status>{:?}| |<keyword>{}|",
+                "  Lose |<status>{:?}| |<keyword>{}|",
                 condition.status_id(),
                 condition.name()
             );
@@ -1760,7 +1760,9 @@ pub struct ButtonHovered {
     pub context: Option<ButtonContext>,
 }
 
-pub fn draw_button_tooltip(button_position: (f32, f32), tooltip: &Tooltip, detailed: bool) {
+pub fn draw_button_tooltip(button_position: (f32, f32), tooltip: &Tooltip) {
+    let detailed = is_key_down(KeyCode::LeftAlt);
+
     let button_size = (64.0, 64.0);
 
     draw_tooltip(

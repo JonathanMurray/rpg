@@ -584,8 +584,9 @@ pub fn draw_text_with_font_tags(
     y: f32,
     params: TextParams<'_>,
     render_tags: bool,
-) -> f32 {
+) -> (f32, f32) {
     let mut x0 = x;
+    let mut h: f32 = 0.0;
     let parts = line.split("|").filter(|p| !p.is_empty());
     for mut part in parts {
         if let Some((symbol_w, texture)) = TAGS.get(part) {
@@ -664,6 +665,8 @@ pub fn draw_text_with_font_tags(
 
             let part_dimensions = draw_text_rounded(part, x0, y, params.clone());
 
+            h = h.max(part_dimensions.height);
+
             if depth {
                 draw_text_rounded(part, x0 + 1.0, y, params);
             }
@@ -676,7 +679,8 @@ pub fn draw_text_with_font_tags(
             x0 += part_dimensions.width;
         }
     }
-    x0 - x
+    let w = x0 - x;
+    (w, h)
 }
 
 fn consume_prefix_tag(tag: &str, part: &mut &str) -> bool {

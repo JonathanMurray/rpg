@@ -353,8 +353,7 @@ impl ActivityPopup {
         btn_x = first_btn_x; // step back to render tooltips in the right positions
         for btn in self.choice_buttons.values() {
             if self.hovered_choice_button_id == Some(btn.id) {
-                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip((btn_x, btn_y), &btn.tooltip(), detailed_tooltip);
+                draw_button_tooltip((btn_x, btn_y), &btn.tooltip());
             }
 
             btn_x += btn.size.0 + button_margin;

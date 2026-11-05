@@ -380,7 +380,7 @@ impl RewardSelectionUi {
                 .find(|btn| btn.action_button.id == btn_id)
                 .map(|reward_btn| &reward_btn.action_button)
                 .unwrap();
-            draw_button_tooltip(btn_pos, &reward_btn.tooltip(), true);
+            draw_button_tooltip(btn_pos, &reward_btn.tooltip());
         }
 
         self.bottom_panel.draw_tooltips();

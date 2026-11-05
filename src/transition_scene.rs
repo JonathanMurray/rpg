@@ -388,8 +388,7 @@ pub async fn run_transition_loop(
                     .unwrap();
                 //let tooltip = button_action_tooltip(&hovered.action);
                 let tooltip = btn.tooltip();
-                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip, detailed_tooltip);
+                draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip);
             }
 
             let text = "Continue";

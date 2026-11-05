@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{borrow::Cow, cell::Cell};
 
 use macroquad::{
     color::{BLACK, WHITE},
@@ -9,25 +9,24 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_rounded, Drawable},
+    base_ui::{draw_text_rounded, draw_text_with_font_tags, Drawable},
     core::ConditionInfo,
-    resources::draw_status_icon,
+    resources::{draw_status_icon, SIMPLE_FONT},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
+    util::COL_TEXT_REGULAR,
 };
 
 pub struct ConditionsList {
-    pub simple_font: Font,
     pub infos: Vec<ConditionInfo>,
     size: Cell<(f32, f32)>,
     hovered_tooltip: Cell<Option<(Rect, ConditionInfo)>>,
 }
 
 impl ConditionsList {
-    pub fn new(simple_font: Font, infos: Vec<ConditionInfo>) -> Self {
+    pub fn new(infos: Vec<ConditionInfo>) -> Self {
         // We need to start out with an accurate height, to prevent the parent container from "flickering" the first time it renders
         let approx_size = (1.0, infos.len() as f32 * CONDITIONS_LIST_LINE_H);
         Self {
-            simple_font,
             infos,
             size: Cell::new(approx_size),
             hovered_tooltip: Default::default(),
@@ -37,7 +36,7 @@ impl ConditionsList {
 
 impl Drawable for ConditionsList {
     fn draw(&self, x: f32, y: f32) {
-        let size = self.draw_conditions(x, y, &self.simple_font, &self.infos);
+        let size = self.draw_conditions(x, y, &self.infos);
         self.size.set(size);
     }
 
@@ -68,18 +67,13 @@ impl Drawable for ConditionsList {
 const CONDITIONS_LIST_LINE_H: f32 = 22.0;
 
 impl ConditionsList {
-    fn draw_conditions(
-        &self,
-        x: f32,
-        y: f32,
-        font: &Font,
-        condition_infos: &[ConditionInfo],
-    ) -> (f32, f32) {
+    fn draw_conditions(&self, x: f32, y: f32, condition_infos: &[ConditionInfo]) -> (f32, f32) {
+        let simple_font = SIMPLE_FONT.get().unwrap();
         self.hovered_tooltip.set(None);
         let text_params = TextParams {
-            font: Some(font),
+            font: Some(simple_font),
             font_size: 16,
-            color: WHITE,
+            color: COL_TEXT_REGULAR,
             ..Default::default()
         };
         let (mouse_x, mouse_y) = mouse_position();
@@ -106,23 +100,22 @@ impl ConditionsList {
 
             let x0 = x + status_w + margin;
 
-            let dimensions = draw_text_rounded(&format!("{}", info), x0, y0, text_params.clone());
+            let (text_w, text_h) = draw_text_with_font_tags(
+                &condition_info_str(info),
+                x0,
+                y0,
+                text_params.clone(),
+                true,
+            );
 
-            if (x..x0 + dimensions.width).contains(&mouse_x)
-                && (y0 - dimensions.height..y0).contains(&mouse_y)
-            {
+            if (x..x0 + text_w).contains(&mouse_x) && (y0 - text_h..y0).contains(&mouse_y) {
                 self.hovered_tooltip.set(Some((
-                    Rect::new(
-                        x,
-                        y0 - dimensions.height,
-                        dimensions.width + status_w + margin,
-                        dimensions.height,
-                    ),
+                    Rect::new(x, y0 - text_h, text_w + status_w + margin, text_h),
                     *info,
                 )));
             }
 
-            let w = dimensions.width + status_w + 2.0;
+            let w = text_w + status_w + 2.0;
 
             if w > max_w {
                 max_w = w;
@@ -131,4 +124,18 @@ impl ConditionsList {
 
         (max_w, y_offset)
     }
+}
+
+fn condition_info_str(info: &ConditionInfo) -> String {
+    let mut s = info.name.to_string();
+
+    if let Some(stacks) = info.stacks {
+        s.push_str(&format!(" x{stacks}"));
+    }
+    if let Some(remaining_rounds) = info.remaining_rounds {
+        let suffix = if remaining_rounds > 1 { "s" } else { "" };
+        s.push_str(&format!(" |<faded>({} round{})|", remaining_rounds, suffix));
+    }
+
+    s
 }

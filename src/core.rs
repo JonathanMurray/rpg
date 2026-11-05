@@ -1749,7 +1749,7 @@ impl CoreGame {
                         let area_target_outcomes = Self::perform_ability_area_effect(
                             Some(ability.id),
                             &format!("{} AoE", ability.name),
-                            &roll_instruction.as_ref().unwrap(),
+                            roll_instruction.as_ref(),
                             enhancements,
                             actor,
                             target.pos(),
@@ -1826,7 +1826,7 @@ impl CoreGame {
                         let outcomes = Self::perform_ability_area_effect(
                             Some(ability.id),
                             ability.name,
-                            roll_instruction.as_ref().unwrap(),
+                            roll_instruction.as_ref(),
                             enhancements,
                             actor,
                             target_pos,
@@ -1867,7 +1867,7 @@ impl CoreGame {
                     let outcomes = Self::perform_ability_area_effect(
                         Some(ability.id),
                         ability.name,
-                        roll_instruction.as_ref().unwrap(),
+                        roll_instruction.as_ref(),
                         enhancements,
                         actor,
                         target_pos,
@@ -1918,7 +1918,7 @@ impl CoreGame {
                     let outcomes = Self::perform_ability_area_effect(
                         Some(ability.id),
                         ability.name,
-                        roll_instruction.as_ref().unwrap(),
+                        roll_instruction.as_ref(),
                         enhancements,
                         actor,
                         target_pos,
@@ -1989,7 +1989,7 @@ impl CoreGame {
                         let outcomes = Self::perform_ability_area_effect(
                             Some(ability.id),
                             ability.name,
-                            roll_instruction.as_ref().unwrap(),
+                            roll_instruction.as_ref(),
                             enhancements,
                             actor,
                             actor.position.get(),
@@ -2128,7 +2128,7 @@ impl CoreGame {
     async fn perform_ability_area_effect(
         ability_id: Option<AbilityId>,
         label: &str,
-        roll_instruction: &RollInstruction,
+        roll_instruction: Option<&RollInstruction>,
         enhancements: &[&AbilityEnhancement],
         caster: &Rc<Character>,
         area_pos: Position,
@@ -2155,7 +2155,7 @@ impl CoreGame {
                 caster,
                 ability_id,
                 label,
-                Some(roll_instruction),
+                roll_instruction,
                 enhancements,
                 effect,
                 target,
@@ -3374,10 +3374,10 @@ impl CoreGame {
                 let area_target_outcomes = Box::pin(Self::perform_ability_area_effect(
                     None,
                     arrow.name,
-                    &RollInstruction::RollWithAttackModifier {
+                    Some(&RollInstruction::RollWithAttackModifier {
                         attack_modifier,
                         outgoing_bonuses: attack_bonus_contributors,
-                    },
+                    }),
                     &[],
                     attacker,
                     defender.pos(),
@@ -5329,20 +5329,6 @@ pub fn cond_description_with_populated_stacks(condition: Condition, stacks: u32)
         .replace("|<value>-x|", &format!("|<value>-{stacks}|"))
         .replace("|<value>+x|", &format!("|<value>+{stacks}|"))
         .replace("|<value>x|", &format!("|<value>{stacks}|"))
-}
-
-impl Display for ConditionInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)?;
-        if let Some(stacks) = self.stacks {
-            write!(f, " x {}", stacks)?;
-        }
-        if let Some(remaining_rounds) = self.remaining_rounds {
-            write!(f, " ({} remaining)", remaining_rounds)?;
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -7926,30 +7912,36 @@ impl Character {
     }
 
     pub fn evasion(&self) -> u32 {
-        let mut res = self.base_evasion();
-        res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
+        let mut res = self.base_evasion() as i32;
+        res += self.shield().map(|shield| shield.evasion).unwrap_or(0) as i32;
+        res += self.evasion_from_conditions();
+        res.max(0) as u32
+    }
+
+    pub fn evasion_from_conditions(&self) -> i32 {
+        let mut res: i32 = 0;
 
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Braced) {
-            res += BRACED_DEFENSE_BONUS;
+            res += BRACED_DEFENSE_BONUS as i32;
         }
 
         if conditions.has(&Condition::Distracted) {
-            res = res.saturating_sub(DISTRACTED_DEFENSE_PENALTY);
+            res -= DISTRACTED_DEFENSE_PENALTY as i32;
         }
         if self.has_condition(&Condition::Dazed) {
-            res = res.saturating_sub(DAZED_EVASION_PENALTY);
+            res -= DAZED_EVASION_PENALTY as i32;
         }
 
-        res = res.saturating_sub(conditions.get_stacks(&Condition::Encumbered));
+        res -= conditions.get_stacks(&Condition::Encumbered) as i32;
 
         if conditions.has(&Condition::Exposed) {
-            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+            res -= EXPOSED_DEFENSE_PENALTY as i32;
         }
 
         let weakened = conditions.get_stacks(&Condition::Weakened);
         if weakened > 0 {
-            res = res.saturating_sub(weakened)
+            res -= weakened as i32;
         }
 
         res
@@ -7979,31 +7971,34 @@ impl Character {
     }
 
     pub fn will(&self) -> u32 {
-        let mut res = self.intellect() * 2;
+        let mut res = self.intellect() as i32 * 2;
+        res += self.will_from_conditions();
+        res.max(0) as u32
+    }
+
+    pub fn will_from_conditions(&self) -> i32 {
+        let mut res: i32 = 0;
         let conditions = self.conditions.borrow();
-        /*
-        if conditions.has(&Condition::Inspired) {
-            res += INSPIRED_WILL_BONUS;
-        }
-         */
         if conditions.has(&Condition::Exposed) {
-            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+            res -= EXPOSED_DEFENSE_PENALTY as i32;
         }
-        res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
+        res -= conditions.get_stacks(&Condition::Weakened) as i32;
         res
     }
 
     pub fn toughness(&self) -> u32 {
-        let mut res = self.strength() * 2;
+        let mut res = self.strength() as i32 * 2;
+        res += self.toughness_from_conditions();
+        res.max(0) as u32
+    }
+
+    pub fn toughness_from_conditions(&self) -> i32 {
+        let mut res: i32 = 0;
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Exposed) {
-            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+            res -= EXPOSED_DEFENSE_PENALTY as i32;
         }
-        //if self.has_condition(&Condition::Poisoned) {
-        //res = res.saturating_sub(POISONED_TOUGHNESS_PENALTY);
-        //}
-        res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
-
+        res -= conditions.get_stacks(&Condition::Weakened) as i32;
         res
     }
 

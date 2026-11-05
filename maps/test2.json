@@ -450,10 +450,10 @@
       "name": null
     },
     {
-      "type_": "Lootgoblin",
+      "type_": "Alice",
       "pos": [
-        34,
-        7
+        25,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -461,10 +461,21 @@
       "name": null
     },
     {
-      "type_": "Alice",
+      "type_": "Clara",
       "pos": [
         25,
-        19
+        13
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        31,
+        16
       ],
       "health": null,
       "main_hand": null,

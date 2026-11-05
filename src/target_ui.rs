@@ -23,7 +23,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{
-        character_defense_section, portrait_element, ActionPointsRow, ResourceBar,
+        character_defense_section, gui_ap_row, portrait_element, ActionPointsRow, ResourceBar,
     },
     resources::{portrait_texture, PortraitId},
     util::{plus_minus, COL_GOLD, COL_RED},
@@ -94,15 +94,8 @@ impl TargetUi {
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
-            let mut action_points_row = ActionPointsRow::new(
-                (16.0, 16.0),
-                0.25,
-                Style {
-                    bg_color: Some(BLACK),
-                    border: Some(Border::with_color(WHITE)),
-                    ..Default::default()
-                },
-            );
+            let mut action_points_row = gui_ap_row(16.0);
+
             action_points_row.current_ap = char.action_points.current();
 
             let health_text = TextLine::new(
@@ -285,8 +278,7 @@ impl TargetUi {
             }
 
             if !char.condition_infos().is_empty() {
-                let conditions_list =
-                    ConditionsList::new(self.simple_font.clone(), char.condition_infos());
+                let conditions_list = ConditionsList::new(char.condition_infos());
 
                 rows.push(Element::Box(Box::new(conditions_list)));
             }
@@ -365,8 +357,7 @@ impl TargetUi {
 
         if let Some((id, pos)) = self.hovered_btn.borrow().as_ref() {
             let btn = self.buttons.get(id).unwrap();
-
-            draw_button_tooltip(*pos, &btn.borrow().tooltip(), true);
+            draw_button_tooltip(*pos, &btn.borrow().tooltip());
         }
     }
 
