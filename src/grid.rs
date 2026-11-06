@@ -53,9 +53,9 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityReach, AbilityTarget, AbilityVisualReaction,
         ActionReach, ActionTarget, AppliedEffect, ApplyCondition, ApplyEffect, AreaShape,
         AttackAction, AttackEnhancement, AttackEnhancementOnHitEffect, AudioVisuals, BaseAction,
-        Character, CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType,
-        Position, PushVector, SpellTravelAnimation, SpriteVariant, TargetAcquisition, TargetLine,
-        TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        Character, CharacterFacing, CircleEffect, ConcreteCircle, Condition, Goodness, HitType,
+        MovementType, Position, PushVector, SpellTravelAnimation, SpriteVariant, TargetAcquisition,
+        TargetLine, TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -163,6 +163,7 @@ enum AnticipationKind {
     ShieldAttack,
     Throw { color: Color },
     CastSpell { color: Color },
+    ConsumePotion { color: Color },
     Other,
     Move,
     Dash,
@@ -338,19 +339,13 @@ enum InterpolateShape {
 enum SpriteProperty {
     CharacterRotateForward,
     CharacterXOffsetCellW,
-    CharacterYOffsetCellW {
-        jump: bool,
-    },
+    CharacterYOffsetCellW { jump: bool },
     FlipX,
     WeaponRotation,
     WeaponXOffsetCellW,
     ShieldXOffsetCellW,
     ShieldYOffsetCellW,
-    ReplaceHandHeldWithSphere {
-        color: Color,
-        radius_cell_w: f32,
-        outline: bool,
-    },
+    ReplaceHandHeldWith(HeldObjectSpec),
     HideHandHeld,
     Hide,
     SinkIntoGroundRatio,
@@ -1189,7 +1184,7 @@ impl GameGrid {
 
                 aim_duration + effect_duration / 2.0
             }
-            AbilityAnimation::Throw(color) => {
+            AbilityAnimation::ThrowGrenade(color) => {
                 let target_pos = destination.unwrap();
 
                 let attacker_pos = self.active_char().pos();
@@ -1265,6 +1260,10 @@ impl GameGrid {
 
                 // The ability should resolve in the middle of the character's animation
                 duration / 2.0
+            }
+
+            AbilityAnimation::ConsumePotion => {
+                self.animate_character_consuming_potion(actor_id, ability, delay)
             }
 
             AbilityAnimation::CastSpell(kind) => {
@@ -1359,6 +1358,62 @@ impl GameGrid {
         projectile_duration
     }
 
+    fn animate_character_consuming_potion(
+        &mut self,
+        actor_id: CharacterId,
+        ability: &Ability,
+        delay: f32,
+    ) -> f32 {
+        let actor = self.characters.get(&actor_id).unwrap();
+        let consumption_duration = 0.5;
+        let animation_color = ability.audio_visuals.animation_color;
+
+        // Wiggle back and forth
+        let mut x_offsets = vec![];
+        for i in 0..10 {
+            let d = 0.05;
+            let val = if i % 2 == 0 { -d } else { d };
+            x_offsets.push(PropertyUpdate::linear(i as f32 / 10.0, val));
+        }
+
+        self.character_animations.push(CharacterAnimation::new(
+            actor.id(),
+            delay,
+            consumption_duration,
+            AnimationDetails::TransformSprite {
+                timelines: vec![
+                    (
+                        SpriteProperty::ReplaceHandHeldWith(self.potion_object(animation_color)),
+                        PropertyTimeline(vec![PropertyUpdate::linear(0.0, 1.0)]),
+                    ),
+                    (
+                        SpriteProperty::SpriteVariant(SpriteVariant::PreparingSpell),
+                        PropertyTimeline(vec![PropertyUpdate::linear(0.0, 1.0)]),
+                    ),
+                    (
+                        SpriteProperty::CharacterYOffsetCellW { jump: true },
+                        PropertyTimeline(vec![PropertyUpdate::linear(1.0, -0.2)]),
+                    ),
+                    (
+                        SpriteProperty::CharacterXOffsetCellW,
+                        PropertyTimeline(x_offsets),
+                    ),
+                    (
+                        SpriteProperty::CharacterRotateForward,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.2, -0.03 * PI),
+                            PropertyUpdate::linear(0.5, 0.1 * PI),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                ],
+            },
+        ));
+
+        // the result of the cast should start before we're done with all the recovery frames
+        consumption_duration - 0.2
+    }
+
     fn animate_character_casting_spell(
         &mut self,
         actor_id: CharacterId,
@@ -1387,11 +1442,13 @@ impl GameGrid {
             x_offsets.push(PropertyUpdate::linear(i as f32 / 10.0, val));
         }
 
+        /*
         let weapon_rotation = if actor.has_equipped_melee_weapon() {
             PI * 0.3
         } else {
             -PI * 0.3
         };
+         */
 
         self.character_animations.push(CharacterAnimation::new(
             actor.id(),
@@ -1740,11 +1797,16 @@ impl GameGrid {
                         ]),
                     ),
                     (
-                        SpriteProperty::ReplaceHandHeldWithSphere {
+                        SpriteProperty::ReplaceHandHeldWith(
+                            self.throwable_object(projectile_color),
+                        ),
+                        /*
+                         {
                             color: projectile_color,
                             radius_cell_w: 0.25,
                             outline: true,
                         },
+                         */
                         PropertyTimeline(vec![
                             PropertyUpdate::linear(0.0, 1.0),
                             // Hold it until it's been thrown
@@ -2101,6 +2163,54 @@ impl GameGrid {
         duration
     }
 
+    pub fn animate_circle_area_impact(
+        &mut self,
+        ability: Option<&Ability>,
+        circle: ConcreteCircle,
+        start_time: f32,
+        color: Color,
+    ) {
+        if matches!(
+            ability.map(|a| a.id),
+            Some(AbilityId::Inspire) | Some(AbilityId::Kill)
+        ) {
+            return;
+        }
+
+        if let Some(ability) = ability {
+            if let Some((effect_id, duration)) = ability.audio_visuals.character_target_effect {
+                self.animate_effect_at_pos(
+                    (circle.center.0 as f32 + 0.5, circle.center.1 as f32 + 0.5),
+                    duration,
+                    effect_id,
+                );
+            }
+        }
+
+        let area_duration = 1.5;
+        let cell_w = self.cell_w();
+        self.add_effect(
+            circle.center,
+            circle.center,
+            EffectData {
+                start_time,
+                end_time: start_time + area_duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Destination,
+                    EffectGraphics::Circle {
+                        radius: f32::from(circle.radius) * cell_w * 0.1,
+                        end_radius: Some(f32::from(circle.radius) * cell_w),
+                        //fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
+                        fill: Some(color.with_alpha(0.5)),
+                        //fill: Some(fill_color),
+                        stroke: None,
+                        fade: true,
+                    },
+                ),
+            },
+        );
+    }
+
     pub fn animate_ability_target_hit(
         &mut self,
         source_pos: Position,
@@ -2108,7 +2218,7 @@ impl GameGrid {
         audio_visuals: &AudioVisuals,
         start_time: f32,
     ) {
-        if let Some((effect_id, duration)) = audio_visuals.target_effect {
+        if let Some((effect_id, duration)) = audio_visuals.character_target_effect {
             self.animate_effect(target_id, duration, effect_id);
         }
 
@@ -2119,7 +2229,7 @@ impl GameGrid {
         if self.characters.get(&target_id).unwrap().is_being_pushed() {
             self.animate_effect(target_id, 0.5, EffectId::Poof);
         } else {
-            match audio_visuals.reaction {
+            match audio_visuals.target_reaction {
                 AbilityVisualReaction::ReelBack => {
                     self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
                 }
@@ -2861,9 +2971,9 @@ impl GameGrid {
 
         let (mut shadow_x, mut shadow_y) = (x, y);
 
-        let mut held_sphere = None;
+        let mut held_object = None;
         let mut sprite_variant = SpriteVariant::Idle;
-        let mut show_regular_hald_hend = true;
+        let mut show_regular_hand_held = true;
 
         let mut weapon_rotation_modifier = 0.0;
         let mut weapon_highlight = SpriteHighlight::Regular;
@@ -2944,23 +3054,15 @@ impl GameGrid {
                                     sprite_variant = *variant;
                                 }
                             }
-                            SpriteProperty::ReplaceHandHeldWithSphere {
-                                color,
-                                radius_cell_w,
-                                outline,
-                            } => {
+                            SpriteProperty::ReplaceHandHeldWith(spec) => {
                                 if value > 0.0 {
-                                    let outline = if *outline { Some((BLACK, 3.0)) } else { None };
-                                    held_sphere = Some(HeldSphere {
-                                        color: color.with_alpha(value),
-                                        outline,
-                                        radius: cell_w * radius_cell_w,
-                                        offset: (0.0, 0.0),
-                                    });
+                                    let mut obj = HeldObject::new(*spec, (0.0, 0.0), cell_w);
+                                    obj.color = obj.color.with_alpha(value);
+                                    held_object = Some(obj);
                                 }
                             }
                             SpriteProperty::HideHandHeld => {
-                                show_regular_hald_hend = false;
+                                show_regular_hand_held = false;
                             }
                             SpriteProperty::CharacterRotateForward => {
                                 params.rotation = if character.is_facing_east() {
@@ -3061,6 +3163,21 @@ impl GameGrid {
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
                 }
+                AnticipationKind::ConsumePotion { color } => {
+                    let rotation = PI * 0.01;
+                    params.rotation = oscillate(2.5, -rotation, rotation);
+                    stretch_h = Some(oscillate(0.5, 0.97, 1.0));
+                    dx = oscillate(0.5, -1.0, 1.0);
+
+                    sprite_variant = SpriteVariant::PreparingSpell;
+
+                    // Don't override if already controlleed from elsewhere
+                    if held_object.is_none() && show_regular_hand_held {
+                        let potion_y_offset = -0.3 * cell_w + oscillate(0.5, 0.0, -2.0);
+                        let spec = self.potion_object(color);
+                        held_object = Some(HeldObject::new(spec, (0.0, potion_y_offset), cell_w));
+                    }
+                }
                 AnticipationKind::CastSpell { color } => {
                     let rotation = PI * 0.01;
                     params.rotation = oscillate(2.5, -rotation, rotation);
@@ -3069,15 +3186,14 @@ impl GameGrid {
 
                     sprite_variant = SpriteVariant::PreparingSpell;
 
-                    // If we've just started configuring an ability, that may animate a sphere - we
-                    // should wait it out before we override it with this sphere
-                    if held_sphere.is_none() && show_regular_hald_hend {
+                    // Don't override if already controlleed from elsewhere
+                    if held_object.is_none() && show_regular_hand_held {
                         let angle = oscillate_loop(0.7, 0.0, PI * 2.0);
                         let (sin, cos) = angle.sin_cos();
                         let dist = cell_w * 0.3;
                         let mut sphere = self.spell_sphere(color);
                         sphere.offset = (cos * dist, sin * dist * 0.5);
-                        held_sphere = Some(sphere);
+                        held_object = Some(sphere);
                     }
                 }
                 AnticipationKind::Throw { color } => {
@@ -3085,12 +3201,8 @@ impl GameGrid {
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
                     dx = 0.0;
-                    held_sphere = Some(HeldSphere {
-                        color,
-                        outline: Some((BLACK, 3.0)),
-                        radius: cell_w / 4.0,
-                        offset: (0.0, 0.0),
-                    });
+                    let spec = self.throwable_object(color);
+                    held_object = Some(HeldObject::new(spec, (0.0, 0.0), cell_w));
                 }
                 AnticipationKind::Other => {
                     let rotation = PI * 0.005;
@@ -3219,9 +3331,9 @@ impl GameGrid {
                 character_params,
             );
 
-            if let Some(sphere) = held_sphere {
-                self.draw_held_sphere((x, y), sphere);
-            } else if show_regular_hald_hend {
+            if let Some(sphere) = held_object {
+                self.draw_held_object((x, y), sphere);
+            } else if show_regular_hand_held {
                 if !params.flip_x {
                     weapon_rotation_modifier *= -1.0;
                     weapon_offset.0 *= -1.0;
@@ -3257,24 +3369,53 @@ impl GameGrid {
         }
     }
 
-    fn spell_sphere(&self, spell_animation_color: Color) -> HeldSphere {
+    fn spell_sphere(&self, spell_animation_color: Color) -> HeldObject {
         let cell_w = self.cell_w();
-        HeldSphere {
+        HeldObject {
             color: spell_animation_color.with_alpha(0.7),
             outline: Some((BLACK.with_alpha(0.3), 2.0)),
-            radius: cell_w / 3.0,
             offset: (0.0, 0.0),
+            kind: HeldObjectKind::Circle {
+                radius: cell_w / 3.0,
+            },
         }
     }
 
-    fn draw_held_sphere(&self, pos: (f32, f32), sphere: HeldSphere) {
+    fn throwable_object(&self, color: Color) -> HeldObjectSpec {
+        HeldObjectSpec {
+            color,
+            outline: Some((BLACK, 3.0)),
+            kind: HeldObjectKind::Circle { radius: 0.25 },
+        }
+    }
+
+    fn potion_object(&self, color: Color) -> HeldObjectSpec {
+        HeldObjectSpec {
+            color,
+            outline: Some((BLACK.with_alpha(0.7), 2.0)),
+            kind: HeldObjectKind::Rectangle { size: (0.25, 0.5) },
+        }
+    }
+
+    fn draw_held_object(&self, pos: (f32, f32), obj: HeldObject) {
         let cell_w = self.cell_w();
         let (x, y) = pos;
-        let x0 = x + cell_w * 1.5 + sphere.offset.0;
-        let y0 = y + 2.0 * cell_w + sphere.offset.1;
-        draw_circle(x0, y0, sphere.radius, sphere.color);
-        if let Some((color, thickness)) = sphere.outline {
-            draw_circle_lines(x0, y0, sphere.radius, thickness, color);
+        let x0 = x + cell_w * 1.5 + obj.offset.0;
+        let y0 = y + 2.0 * cell_w + obj.offset.1;
+        match obj.kind {
+            HeldObjectKind::Circle { radius } => {
+                draw_circle(x0, y0, radius, obj.color);
+                if let Some((color, thickness)) = obj.outline {
+                    draw_circle_lines(x0, y0, radius, thickness, color);
+                }
+            }
+            HeldObjectKind::Rectangle { size: (w, h) } => {
+                let rect = Rect::new(x0 - w / 2.0, y0 - h / 2.0, w, h);
+                draw_rectangle(rect.x, rect.y, rect.w, rect.h, obj.color);
+                if let Some((color, thickness)) = obj.outline {
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, thickness, color);
+                }
+            }
         }
     }
 
@@ -4884,7 +5025,7 @@ impl GameGrid {
                     }
 
                     let kind = match ability.audio_visuals.animation {
-                        AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
+                        AbilityAnimation::ThrowGrenade(color) => AnticipationKind::Throw { color },
                         AbilityAnimation::SpinAttack => AnticipationKind::MeleeWeaponAttack,
                         AbilityAnimation::RangedWeaponAttackLine => {
                             AnticipationKind::RangedAttack { aiming }
@@ -4892,6 +5033,9 @@ impl GameGrid {
                         AbilityAnimation::MeleeWeaponAttack => AnticipationKind::MeleeWeaponAttack,
                         AbilityAnimation::ShieldAttack => AnticipationKind::ShieldAttack,
                         AbilityAnimation::CastSpell { .. } => AnticipationKind::CastSpell {
+                            color: ability.audio_visuals.animation_color,
+                        },
+                        AbilityAnimation::ConsumePotion => AnticipationKind::ConsumePotion {
                             color: ability.audio_visuals.animation_color,
                         },
                         AbilityAnimation::Dash => AnticipationKind::Dash,
@@ -7139,11 +7283,44 @@ pub enum NewState {
     ChoosingAction,
 }
 
-struct HeldSphere {
+#[derive(Debug, Copy, Clone)]
+struct HeldObjectSpec {
     color: Color,
-    radius: f32,
+    outline: Option<(Color, f32)>,
+    kind: HeldObjectKind,
+}
+
+#[derive(Debug, Clone)]
+struct HeldObject {
+    color: Color,
     outline: Option<(Color, f32)>,
     offset: (f32, f32),
+    kind: HeldObjectKind,
+}
+
+impl HeldObject {
+    fn new(spec: HeldObjectSpec, offset: (f32, f32), cell_w: f32) -> Self {
+        let kind = match spec.kind {
+            HeldObjectKind::Circle { radius } => HeldObjectKind::Circle {
+                radius: radius * cell_w,
+            },
+            HeldObjectKind::Rectangle { size } => HeldObjectKind::Rectangle {
+                size: (size.0 * cell_w, size.1 * cell_w),
+            },
+        };
+        Self {
+            color: spec.color,
+            outline: spec.outline,
+            offset,
+            kind,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum HeldObjectKind {
+    Circle { radius: f32 },
+    Rectangle { size: (f32, f32) },
 }
 
 #[derive(Debug)]

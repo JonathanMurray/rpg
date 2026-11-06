@@ -1340,11 +1340,17 @@ impl UserInterface {
                 if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
                     self.game_grid
                         .animate_started_configuring_ability(self.active_character_id, ability);
-                    if matches!(
-                        ability.audio_visuals.animation,
-                        AbilityAnimation::CastSpell { .. }
-                    ) {
-                        self.sound_player.play(SoundId::StartChannelingAbility);
+                    match ability.audio_visuals.animation {
+                        AbilityAnimation::CastSpell { .. } => {
+                            self.sound_player.play(SoundId::StartChannelingAbility);
+                        }
+                        AbilityAnimation::ConsumePotion => {
+                            self.sound_player.play(SoundId::OpenBottle);
+                        }
+                        AbilityAnimation::ThrowGrenade { .. } => {
+                            self.sound_player.play(SoundId::MetalTool);
+                        }
+                        _ => {}
                     }
                 }
 
@@ -1576,6 +1582,10 @@ impl UserInterface {
             }
             GameEvent::LogLine(line) => {
                 self.log.add(line, LogStyle::Regular);
+            }
+            GameEvent::CharacterWaterEvaporated { character_id } => {
+                self.game_grid
+                    .animate_effect(character_id, 0.5, EffectId::RisingSmoke);
             }
             GameEvent::CharacterReactedToAttacked { reactor } => {
                 self.animate_reaction(reactor);
@@ -1914,18 +1924,25 @@ impl UserInterface {
             step_idx,
             surface,
         );
-        if movement_type == MovementType::Falling {
-            self.game_grid
-                .animate_character_speaking(mover_id, 0.0, duration, "Aaahh");
-        }
-        if movement_type == MovementType::Dash || movement_type == MovementType::Falling {
-            self.sound_player.play(SoundId::Dash);
-        } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
-            if surface.map(|s| s.is_liquid()).unwrap_or(false) {
-                self.sound_player.play(SoundId::WalkWater);
-            } else {
-                self.sound_player.play(SoundId::Walk);
+        match movement_type {
+            MovementType::Falling => {
+                self.game_grid
+                    .animate_character_speaking(mover_id, 0.0, duration, "Aaahh");
+                self.sound_player.play(SoundId::ThrowGrenade);
             }
+            MovementType::Dash => {
+                self.sound_player.play(SoundId::Dash);
+            }
+            MovementType::Regular | MovementType::AbilityEngage => {
+                if step_idx % 2 == 0 {
+                    if surface.map(|s| s.is_liquid()).unwrap_or(false) {
+                        self.sound_player.play(SoundId::WalkWater);
+                    } else {
+                        self.sound_player.play(SoundId::Walk);
+                    }
+                }
+            }
+            MovementType::KnockedBack => {}
         }
     }
 
@@ -2040,11 +2057,7 @@ impl UserInterface {
                 line
             }
             AppliedEffect::LostCondition { condition } => {
-                format!(
-                    "lost: |<status>{:?}| |<keyword>{}|",
-                    condition.status_id(),
-                    condition.name()
-                )
+                format!("lost {}", condition.name_with_icon())
             }
             AppliedEffect::Dodged => "dodged".to_string(),
             AppliedEffect::WasPushed(_) => "was pushed".to_string(),
@@ -2079,39 +2092,10 @@ impl UserInterface {
         outcomes: &[DecoratedTargetOutcome],
         ability: Option<&Ability>,
     ) {
-        let area_duration = 1.5;
-
         let ability_id = ability.map(|a| a.id);
         if let Some(circle) = circle {
-            let mut show_area_circle = true;
-            if matches!(ability_id, Some(AbilityId::Inspire) | Some(AbilityId::Kill)) {
-                show_area_circle = false;
-            }
-            // TODO: This type of rendering code should be moved to grid along with the ability initation rendering code
-            if show_area_circle {
-                self.game_grid.add_effect(
-                    circle.center,
-                    circle.center,
-                    EffectData {
-                        start_time,
-                        end_time: start_time + area_duration,
-                        variant: EffectVariant::At(
-                            EffectPosition::Destination,
-                            EffectGraphics::Circle {
-                                radius: f32::from(circle.radius) * self.game_grid.cell_w() * 0.1,
-                                end_radius: Some(
-                                    f32::from(circle.radius) * self.game_grid.cell_w(),
-                                ),
-                                //fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
-                                fill: Some(animation_color.with_alpha(0.5)),
-                                //fill: Some(fill_color),
-                                stroke: None,
-                                fade: true,
-                            },
-                        ),
-                    },
-                );
-            }
+            self.game_grid
+                .animate_circle_area_impact(ability, circle, start_time, animation_color);
         }
 
         let mut delay = 0.0;

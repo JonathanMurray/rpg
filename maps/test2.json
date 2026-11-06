@@ -434,17 +434,41 @@
     "(17, 25)": "FireSurfaceSingleCell",
     "(19, 23)": "FireSurfaceSingleCell",
     "(20, 23)": "FireSurfaceSingleCell",
-    "(21, 25)": "FireSurfaceSingleCell"
+    "(21, 25)": "FireSurfaceSingleCell",
+    "(28, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(31, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(28, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
   },
   "control_points": {
     "(13, 10)": "Exit"
   },
   "characters": [
     {
-      "type_": "Clara",
+      "type_": "Bob",
       "pos": [
-        28,
-        19
+        31,
+        28
       ],
       "health": null,
       "main_hand": null,
@@ -454,19 +478,8 @@
     {
       "type_": "SkeletonLeader",
       "pos": [
-        28,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Lootgoblin",
-      "pos": [
-        16,
-        10
+        34,
+        31
       ],
       "health": null,
       "main_hand": null,

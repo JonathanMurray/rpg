@@ -24,8 +24,8 @@ use crate::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
-        Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, Party, WeaponType,
+        Ability, AbilityEnhancement, AttackEnhancement, BaseAction, ChangedEquipmentSignal,
+        Character, OnAttackedReaction, OnHitReaction, Party, WeaponType,
     },
     data::{
         natures_blessing, PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEALING_NOVA,
@@ -485,7 +485,7 @@ pub async fn run_victory_loop(
 
         let mut next_button_id = 0;
 
-        let equipment_changed: Vec<Rc<Cell<bool>>> = characters
+        let equipment_changed: Vec<Rc<ChangedEquipmentSignal>> = characters
             .iter()
             .map(|ch| ch.listen_to_changed_equipment())
             .collect();
@@ -510,8 +510,8 @@ pub async fn run_victory_loop(
             let elapsed = get_frame_time();
 
             let mut did_equipment_change = false;
-            for event in &equipment_changed {
-                if event.take() {
+            for queue in &equipment_changed {
+                if queue.read().is_some() {
                     did_equipment_change = true;
                 }
             }

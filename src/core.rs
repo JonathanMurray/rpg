@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 
 use std::cmp::Ordering;
@@ -196,7 +197,7 @@ impl CoreGame {
                                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                                     character: character.id(),
                                     applied_effect: AppliedEffect::GainedActionPoints(ap),
-                                    source: "Reaper",
+                                    source: "Reaper".into(),
                                 })
                                 .await;
                             }
@@ -204,22 +205,20 @@ impl CoreGame {
                                 self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                                     character: character.id(),
                                     applied_effect: AppliedEffect::GainedStamina(sta),
-                                    source: "Reaper",
+                                    source: "Reaper".into(),
                                 })
                                 .await;
                             }
                         }
                     }
 
-                    let healing_on_kill = character.healing_on_kill();
-                    if healing_on_kill > 0 {
-                        let amount =
-                            self.character_gain_health(character, healing_on_kill * num_killed);
+                    if let Some((amount, cause)) = character.healing_on_kill() {
+                        let amount = self.character_gain_health(character, amount * num_killed);
 
                         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
                             applied_effect: AppliedEffect::GainedHealth(amount),
-                            source: "on-kill effect",
+                            source: cause.into(),
                         })
                         .await;
                     }
@@ -244,8 +243,17 @@ impl CoreGame {
             for ch in self.characters.iter() {
                 for dmg_type in ch.recently_received_damage_types.borrow_mut().drain() {
                     if dmg_type == DamageType::Fire {
-                        self.perform_character_lose_condition(ch, Condition::Wet, "Fire")
+                        let water_evaporated = self
+                            .perform_character_lose_condition(ch, Condition::Wet, "Fire")
                             .await;
+
+                        if water_evaporated {
+                            self.ui_handle_event(GameEvent::CharacterWaterEvaporated {
+                                character_id: ch.id(),
+                            })
+                            .await;
+                        }
+
                         let frost_melted = self
                             .perform_character_lose_condition(ch, Condition::Frosty, "Fire")
                             .await;
@@ -362,7 +370,7 @@ impl CoreGame {
                         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
                             applied_effect: AppliedEffect::LostCondition { condition },
-                            source: "",
+                            source: "".into(),
                         })
                         .await;
                     }
@@ -888,7 +896,7 @@ impl CoreGame {
                     self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                         character: actor.id(),
                         applied_effect: AppliedEffect::GainedMana(amount),
-                        source: "Spell Finesse",
+                        source: "Spell Finesse".into(),
                     })
                     .await;
                     actor.lose_condition(Condition::SpellFinesse);
@@ -990,7 +998,7 @@ impl CoreGame {
         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
             applied_effect: AppliedEffect::LostActionPoints(amount),
-            source: "",
+            source: "".into(),
         })
         .await;
     }
@@ -1241,7 +1249,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: ch.id(),
                 applied_effect: AppliedEffect::LostCondition { condition },
-                source: reason,
+                source: reason.into(),
             })
             .await;
             true
@@ -1265,7 +1273,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
                 applied_effect: AppliedEffect::GainedCondition(apply_condition),
-                source,
+                source: source.into(),
             })
             .await;
         }
@@ -1497,7 +1505,11 @@ impl CoreGame {
                 if n > 0 {
                     let gained = receiver.health.gain(n);
                     actual_effect = Some(AppliedEffect::GainedHealth(gained));
-                    format!("  |{}| gained {} health", receiver.name_tag(), gained)
+                    format!(
+                        "  |{}| gained {} health |<heart>|",
+                        receiver.name_tag(),
+                        gained
+                    )
                 } else {
                     format!("  |{}| gained no health", receiver.name_tag())
                 }
@@ -1518,9 +1530,9 @@ impl CoreGame {
                 let mut line = "".to_string();
                 if did_clear {
                     line.push_str(&format!(
-                        "  |{}| lost |<keyword>{}|",
+                        "  |{}| lost {}",
                         receiver.name_tag(),
-                        condition.name()
+                        condition.name_with_icon()
                     ));
                     if prev_stacks > 0 {
                         line.push_str(&format!(" ({})", prev_stacks));
@@ -3467,7 +3479,7 @@ impl CoreGame {
                     self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                         character: attacker.id(),
                         applied_effect: AppliedEffect::Dodged,
-                        source: "Shield bash",
+                        source: "Shield bash".into(),
                     })
                     .await;
                 };
@@ -3493,7 +3505,7 @@ impl CoreGame {
         self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
             applied_effect: AppliedEffect::LostHealth(lost, source, damage_type),
-            source: source.name(),
+            source: source.name().into(),
         })
         .await;
     }
@@ -3540,7 +3552,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
                 applied_effect: applied,
-                source: name,
+                source: name.into(),
             })
             .await;
         }
@@ -3582,7 +3594,7 @@ impl CoreGame {
                     applied_effect: AppliedEffect::LostCondition {
                         condition: Condition::Bleeding,
                     },
-                    source: "",
+                    source: "".into(),
                 })
                 .await;
             }
@@ -3650,7 +3662,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
                 applied_effect: AppliedEffect::GainedHealth(gained),
-                source: "healing potion",
+                source: "healing potion".into(),
             })
             .await;
             if lost_condition {
@@ -3659,7 +3671,7 @@ impl CoreGame {
                     applied_effect: AppliedEffect::LostCondition {
                         condition: Condition::HealthPotionRecovering,
                     },
-                    source: "",
+                    source: "".into(),
                 })
                 .await;
             }
@@ -3937,7 +3949,7 @@ pub fn predict_ability(
     // PERFORMANCE NOTE: This is very inefficient. A single frame can take > 100ms due to calling this. Luckily, prediction happens infrequently
     // and there's currently not much animation in the game that is noticeably affected.
     // Exclude natural miss and natural crit in prediction
-    for unmodified_roll in 2..=19 {
+    for unmodified_roll in [2, 19] {
         let event = &pollster::FutureExt::block_on(CoreGame::perform_ability(
             caster,
             ability,
@@ -3997,15 +4009,13 @@ pub fn predict_ability(
                     }
                 }
 
-                // dbg!(expected_roll_outcome);
-
                 targets.insert(
                     target_id,
                     TargetPrediction {
                         damage: result.damage.map(|(dmg, dmg_type)| DamageInterval {
                             dmg_type,
                             min: dmg,
-                            max: 0, // filled in later
+                            max: dmg,
                         }),
                         is_buff: result.is_buff,
                         details,
@@ -4014,14 +4024,18 @@ pub fn predict_ability(
                     },
                 );
             } else if unmodified_roll == 19 {
-                if let Some((dmg, _dmg_type)) = result.damage {
-                    targets
-                        .get_mut(&target_id)
-                        .unwrap()
-                        .damage
-                        .as_mut()
-                        .unwrap()
-                        .max = dmg;
+                if let Some((dmg_amount, dmg_type)) = result.damage {
+                    let target_prediction = targets.get_mut(&target_id).unwrap();
+
+                    if let Some(damage) = target_prediction.damage.as_mut() {
+                        damage.max = dmg_amount;
+                    } else {
+                        target_prediction.damage = Some(DamageInterval {
+                            dmg_type,
+                            min: 0,
+                            max: dmg_amount,
+                        });
+                    }
                 }
             }
         }
@@ -4096,11 +4110,14 @@ pub fn predict_attack(
         if area_targets.is_empty() {
             if let Some((_name, _shape, outcomes)) = &event.circle_outcome {
                 for o in outcomes {
-                    let damage = o.outcome.damage().map(|(d, dmg_type)| DamageInterval {
-                        min: d,
-                        max: d,
-                        dmg_type,
-                    });
+                    let damage = o
+                        .outcome
+                        .actual_damage()
+                        .map(|(d, dmg_type)| DamageInterval {
+                            min: d,
+                            max: d,
+                            dmg_type,
+                        });
                     area_targets.push((o.target_id, damage));
                 }
             }
@@ -4317,6 +4334,9 @@ pub enum GameEvent {
     },
     ManyMoved(Vec<MovedEvent>),
     Moved(MovedEvent),
+    CharacterWaterEvaporated {
+        character_id: CharacterId,
+    },
     CharacterReactedToAttacked {
         reactor: CharacterId,
     },
@@ -4364,7 +4384,7 @@ pub enum GameEvent {
     CharacterEffectWasApplied {
         character: CharacterId,
         applied_effect: AppliedEffect,
-        source: &'static str,
+        source: Cow<'static, str>,
     },
     CharactersCollided {
         collisions: Vec<CollisionEvent>,
@@ -4486,7 +4506,7 @@ impl AbilityResolvedEvent {
             affected_targets.insert(
                 o.target_id,
                 TargetResult {
-                    damage: o.outcome.damage(),
+                    damage: o.outcome.actual_damage(),
                     is_buff: o.outcome.is_entirely_positive(),
                 },
             );
@@ -4497,7 +4517,7 @@ impl AbilityResolvedEvent {
                     damage: None,
                     is_buff: false,
                 });
-                entry.damage = match (entry.damage, o.outcome.damage()) {
+                entry.damage = match (entry.damage, o.outcome.actual_damage()) {
                     (None, None) => None,
                     (Some(d), None) => Some(d),
                     (None, Some(d)) => Some(d),
@@ -4593,7 +4613,7 @@ pub enum AbilityTargetOutcome {
 }
 
 impl AbilityTargetOutcome {
-    fn damage(&self) -> Option<(u32, DamageType)> {
+    fn actual_damage(&self) -> Option<(u32, DamageType)> {
         match self {
             AbilityTargetOutcome::HitTarget {
                 applied_effects, ..
@@ -4612,6 +4632,7 @@ impl AbilityTargetOutcome {
                 if dmg > 0 {
                     Some((dmg, dmg_type))
                 } else {
+                    // It's possible that damage was attempted but not inflicted, due to armor, etc
                     None
                 }
             }
@@ -5647,8 +5668,9 @@ pub enum AbilityAnimation {
     RangedWeaponAttackLine,
     SpinAttack,
     CastSpell(SpellTravelAnimation),
+    ConsumePotion,
     Dash,
-    Throw(Color),
+    ThrowGrenade(Color),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5674,9 +5696,9 @@ pub struct AudioVisuals {
     pub speech: &'static str,
     pub initiate_sound: Option<SoundId>,
     pub resolve_sound: Option<SoundId>,
-    pub target_effect: Option<(EffectId, f32)>,
+    pub character_target_effect: Option<(EffectId, f32)>,
     pub target_magic_sparks: Option<Color>,
-    pub reaction: AbilityVisualReaction,
+    pub target_reaction: AbilityVisualReaction,
 }
 
 #[derive(Debug, PartialEq)]
@@ -5694,9 +5716,9 @@ impl AudioVisuals {
             resolve_sound: None,
             charge_fx: None,
             speech: "",
-            target_effect: None,
+            character_target_effect: None,
             target_magic_sparks: None,
-            reaction: AbilityVisualReaction::ReelBack,
+            target_reaction: AbilityVisualReaction::ReelBack,
         }
     }
 }
@@ -6625,7 +6647,7 @@ pub struct Character {
     pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
     pub engagement_target: Cell<Option<CharacterId>>,
 
-    changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
+    changed_equipment_listeners: RefCell<Vec<Weak<ChangedEquipmentSignal>>>,
     recently_received_damage_types: RefCell<HashSet<DamageType>>,
 
     pub facing: Cell<CharacterFacing>,
@@ -7061,9 +7083,9 @@ impl Character {
         self.has_condition(&Condition::Dead)
     }
 
-    pub fn listen_to_changed_equipment(&self) -> Rc<Cell<bool>> {
-        let signal = Rc::new(Cell::new(false));
-        let weak = Rc::downgrade(&signal);
+    pub fn listen_to_changed_equipment(&self) -> Rc<ChangedEquipmentSignal> {
+        let signal = Rc::new(ChangedEquipmentSignal(Default::default()));
+        let weak: Weak<ChangedEquipmentSignal> = Rc::downgrade(&signal);
         self.changed_equipment_listeners.borrow_mut().push(weak);
         signal
     }
@@ -7289,14 +7311,14 @@ impl Character {
             .any(|entry| matches!(entry.get(), Some(EquipmentEntry::Consumable(..))))
     }
 
-    fn on_changed_equipment(&self) {
+    fn on_changed_equipment(&self, message: ChangedEquipmentMessage) {
         self.update_player_encumbrance();
 
         self.changed_equipment_listeners
             .borrow_mut()
             .retain(|weak| match weak.upgrade() {
                 Some(signal) => {
-                    signal.set(true);
+                    signal.write(message);
                     true
                 }
                 // No one is listening on the other end => remove the listener reference
@@ -7317,13 +7339,13 @@ impl Character {
             }
         }
 
-        self.on_changed_equipment();
+        self.on_changed_equipment(ChangedEquipmentMessage::AffectedEquipped);
     }
 
     pub fn set_shield(&self, shield: Shield) {
         assert!(self.can_equipment_fit(EquipmentEntry::Shield(shield), EquipmentSlotRole::OffHand));
         self.off_hand.set(Hand::with_shield(shield));
-        self.on_changed_equipment();
+        self.on_changed_equipment(ChangedEquipmentMessage::AffectedEquipped);
     }
 
     pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
@@ -7362,7 +7384,15 @@ impl Character {
             EquipmentSlotRole::PartyStash(i) => self.party_stash()[i].set(entry),
         }
 
-        self.on_changed_equipment();
+        let msg = if matches!(
+            slot_role,
+            EquipmentSlotRole::Inventory(..) | EquipmentSlotRole::PartyStash(..)
+        ) {
+            ChangedEquipmentMessage::OnlyAffectedInventory
+        } else {
+            ChangedEquipmentMessage::AffectedEquipped
+        };
+        self.on_changed_equipment(msg);
     }
 
     pub fn swap_equipment_slots(&self, from: EquipmentSlotRole, to: EquipmentSlotRole) {
@@ -7394,7 +7424,7 @@ impl Character {
         for slot in &self.inventory {
             if slot.get().is_none() {
                 slot.set(Some(entry));
-                self.on_changed_equipment();
+                self.on_changed_equipment(ChangedEquipmentMessage::OnlyAffectedInventory);
                 return true;
             }
         }
@@ -7418,7 +7448,7 @@ impl Character {
                 quantity: quantity - 1,
             }));
         }
-        self.on_changed_equipment();
+        self.on_changed_equipment(ChangedEquipmentMessage::OnlyAffectedInventory);
     }
 
     pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {
@@ -7538,10 +7568,21 @@ impl Character {
         matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
     }
 
-    pub fn healing_on_kill(&self) -> u32 {
+    pub fn healing_on_kill(&self) -> Option<(u32, String)> {
         let mut amount = 0;
-        self.for_equip_effects(|_name, equip| amount += equip.heal_on_kill);
-        amount
+        let mut causes = vec![];
+        self.for_equip_effects(|name, equip| {
+            if equip.heal_on_kill > 0 {
+                causes.push(name);
+                amount += equip.heal_on_kill
+            }
+        });
+        if amount > 0 {
+            let cause = causes.join(", ");
+            Some((amount, cause))
+        } else {
+            None
+        }
     }
 
     pub fn can_use_action(&self, action: BaseAction) -> bool {
@@ -8564,6 +8605,36 @@ fn are_flanking_target(attacker: Position, melee_engager: Position, target: Posi
             }
         }
     }
+}
+
+pub struct ChangedEquipmentSignal(RefCell<Vec<ChangedEquipmentMessage>>);
+
+impl ChangedEquipmentSignal {
+    fn write(&self, msg: ChangedEquipmentMessage) {
+        self.0.borrow_mut().push(msg);
+    }
+
+    pub fn read(&self) -> Option<ChangedEquipmentMessage> {
+        let mut result = None;
+        for msg in self.0.borrow_mut().drain(..) {
+            match msg {
+                ChangedEquipmentMessage::AffectedEquipped => result = Some(msg),
+                ChangedEquipmentMessage::OnlyAffectedInventory => {
+                    // Don't override another claim
+                    if result.is_none() {
+                        result = Some(msg);
+                    }
+                }
+            }
+        }
+        result
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ChangedEquipmentMessage {
+    AffectedEquipped,
+    OnlyAffectedInventory,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

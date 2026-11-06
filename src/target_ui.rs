@@ -79,6 +79,7 @@ impl TargetUi {
         if let Some(character) = &self.target {
             if character.is_dead() {
                 self.target = None;
+                *self.hovered_btn.borrow_mut() = None;
             }
         }
     }
@@ -377,7 +378,13 @@ impl TargetUi {
         }
 
         if let Some((id, pos)) = self.hovered_btn.borrow().as_ref() {
-            let btn = self.buttons.get(id).unwrap();
+            let btn = self.buttons.get(id).unwrap_or_else(|| {
+                panic!(
+                    "Missing button ID {}. Buttons: {:?}",
+                    id,
+                    &self.buttons.keys()
+                )
+            });
             draw_button_tooltip(*pos, &btn.borrow().tooltip());
         }
     }

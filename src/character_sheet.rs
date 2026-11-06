@@ -20,7 +20,10 @@ use macroquad::{
 
 use crate::base_ui::{draw_text_rounded, Border, Drawable};
 use crate::conditions_ui::ConditionsList;
-use crate::core::{ActionTarget, EquipmentEntry, EquipmentSlotRole};
+use crate::core::{
+    ActionTarget, ChangedEquipmentMessage, ChangedEquipmentSignal, EquipmentEntry,
+    EquipmentSlotRole,
+};
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection};
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
@@ -29,7 +32,7 @@ use crate::resources::{
     portrait_texture, BIG_FONT, PORTRAITS_TEXTURE, SIMPLE_FONT, UI_ARROW_TEXTURE,
     UI_SPELLBOOK_TEXTURE,
 };
-use crate::sounds::SoundPlayer;
+use crate::sounds::{SoundId, SoundPlayer};
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
 use crate::{
     action_button::ActionButton,
@@ -41,7 +44,7 @@ pub struct CharacterSheet {
     pub screen_position: Rc<RefCell<(f32, f32)>>,
     sheet_dragged_offset: Cell<Option<(f32, f32)>>,
 
-    equipment_changed: Rc<Cell<bool>>,
+    equipment_changed: Rc<ChangedEquipmentSignal>,
     equipment_section: Rc<RefCell<EquipmentSection>>,
     stats_table: Rc<RefCell<CharacterStatsTable>>,
 
@@ -50,6 +53,7 @@ pub struct CharacterSheet {
 
     pub drag: Rc<RefCell<Option<EquipmentDrag>>>,
     pub conditions_list: Rc<RefCell<ConditionsList>>,
+    sound_player: SoundPlayer,
 }
 
 pub const CHARACTER_SHEET_BG_COLOR: Color = Color::new(0.00, 0.3, 0.4, 1.00);
@@ -144,7 +148,7 @@ impl CharacterSheet {
             simple_font,
             &character,
             false,
-            sound_player,
+            sound_player.clone(),
         )));
 
         let equipment_column = Element::Container(Container {
@@ -219,6 +223,7 @@ impl CharacterSheet {
 
             drag: Default::default(),
             conditions_list,
+            sound_player,
         }
     }
 
@@ -227,8 +232,14 @@ impl CharacterSheet {
         ui_state: &mut UiState,
         is_active_character: bool,
     ) -> CharacterSheetOutcome {
-        if self.equipment_changed.take() {
+        if let Some(msg) = self.equipment_changed.read() {
+            dbg!(msg);
             println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER SHEET...");
+
+            if matches!(msg, ChangedEquipmentMessage::AffectedEquipped) {
+                self.sound_player.play(SoundId::MetalEquipment);
+            }
+
             self.equipment_section
                 .borrow_mut()
                 .repopulate_character_equipment();

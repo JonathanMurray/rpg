@@ -624,6 +624,7 @@ impl EquipmentSection {
                                     }
 
                                     self.sound_player.play(SoundId::DropEquipment);
+
                                     drag = None;
                                 }
                             }

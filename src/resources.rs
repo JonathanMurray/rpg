@@ -1614,6 +1614,8 @@ pub enum EffectId {
     MagicSpinUp,
     PurpleMagic,
     Raven,
+    FireBomb,
+    RisingSmoke,
 }
 
 impl FlipbookAnimation {
@@ -1628,11 +1630,15 @@ impl FlipbookAnimation {
             EffectId::MagicSpinUp => 6,
             EffectId::PurpleMagic => 7,
             EffectId::Raven => 8,
+            EffectId::FireBomb => 9,
+            EffectId::RisingSmoke => 10,
         };
         let source_size = (32.0, 32.0);
 
         let draw_size_cell_w = match effect {
             EffectId::PurpleMagic => 3.0,
+            EffectId::FireBomb => 3.0,
+            EffectId::RisingSmoke => 3.0,
             _ => 2.0,
         };
 

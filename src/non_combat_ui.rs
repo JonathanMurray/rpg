@@ -18,7 +18,7 @@ use crate::{
     },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
     character_sheet::build_spell_book,
-    core::{BaseAction, Character, HandType},
+    core::{BaseAction, ChangedEquipmentSignal, Character, HandType},
     equipment_ui::{EquipmentDrag, EquipmentSection},
     game_ui::{draw_rectangle_lines2, ResourceBars},
     resources::{EquipmentIconId, PortraitId},
@@ -84,7 +84,7 @@ const UI_HEIGHT: f32 = 290.0;
 pub struct NonCombatPartyUi {
     portrait_row: PortraitRow,
     bottom_panels: Vec<NonCombatCharacterUi>,
-    equipment_changed: Vec<Rc<Cell<bool>>>,
+    equipment_changed: Vec<Rc<ChangedEquipmentSignal>>,
 }
 
 impl NonCombatPartyUi {
@@ -126,7 +126,7 @@ impl NonCombatPartyUi {
     pub fn draw_and_handle_input(&mut self) {
         let mut equipment_changed = false;
         for event in &self.equipment_changed {
-            if event.take() {
+            if event.read().is_some() {
                 equipment_changed = true;
             }
         }

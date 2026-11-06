@@ -313,7 +313,7 @@ pub fn create_character(
             char
         }
         CharacterType::Clara => {
-            let char = make_high_clara(party.unwrap());
+            let char = make_test_mage(party.unwrap());
             char.position.set(pos);
             char
         }
@@ -661,7 +661,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
     // stackoverflow when trying to commit it
     test_fighter.learn_ability(shield_bash());
     test_fighter.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
-    test_fighter.learn_ability(&BRACE);
+    test_fighter.learn_ability(&SWEEP_ATTACK);
     // TODO
     //bob.learn_ability(&KILL);
     test_fighter.learn_ability(inspire());
@@ -721,17 +721,15 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
     });
 
     let alice = make_test_archer(&party);
-
     let bob = make_test_fighter(&party);
-
-    let clara = make_high_clara(&party);
+    let clara = make_test_mage(&party);
 
     let player_characters = vec![clara, alice, bob];
 
     (party, player_characters)
 }
 
-fn make_high_clara(party: &Rc<Party>) -> Character {
+fn make_test_mage(party: &Rc<Party>) -> Character {
     let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Test mage",
@@ -764,5 +762,6 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
+    clara.try_gain_equipment(EquipmentEntry::Consumable(TOXIC_GRENADE));
     clara
 }

@@ -29,7 +29,7 @@ use crate::{
     },
     sounds::SoundId,
     tooltip::Keyword,
-    util::{COL_GREEN_3, COL_RED},
+    util::{COL_BLUE, COL_GREEN_1, COL_GREEN_3, COL_RED},
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {
@@ -772,7 +772,7 @@ pub const LIQUID_FIRE: Consumable = Consumable {
     ability: &LIQUID_FIRE_ABILITY,
 };
 
-pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
+const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Liquid fire",
     AbilityTarget::PositionCircle {
@@ -799,7 +799,7 @@ pub const TOXIC_GRENADE: Consumable = Consumable {
     ability: &TOXIC_GRENADE_ABILITY,
 };
 
-pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
+const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Toxic grenade",
     AbilityTarget::Character {
@@ -840,10 +840,11 @@ const fn grenade_ability(
         audio_visuals: AudioVisuals {
             speech: "Hey, catch!",
             animation_color: color,
-            animation: AbilityAnimation::Throw(color),
-            // TODO: Throw sound effect
-            initiate_sound: Some(SoundId::ShootSpell),
+            animation: AbilityAnimation::ThrowGrenade(color),
+            initiate_sound: Some(SoundId::ThrowGrenade),
             resolve_sound: Some(SoundId::BottleSplash),
+            // TODO should depend on which grenade
+            character_target_effect: Some((EffectId::FireBomb, 0.5)),
             charge_fx: Some(AbilityChargeFx {
                 particle_shape: ParticleShape::Circle,
             }),
@@ -1453,7 +1454,7 @@ pub const BRACE: Ability = Ability {
             particle_shape: ParticleShape::Circle,
         }),
         // TODO
-        target_effect: Some((EffectId::Bonk, 0.3)),
+        character_target_effect: Some((EffectId::Bonk, 0.3)),
         ..AudioVisuals::default()
     },
 };
@@ -1571,7 +1572,7 @@ pub const SHACKLED_MIND: Ability = Ability {
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::Beam(BeamFxId::Chains)),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Debuff),
-        target_effect: Some((EffectId::PurpleMagic, 0.25)),
+        character_target_effect: Some((EffectId::PurpleMagic, 0.25)),
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Rect,
         }),
@@ -1825,7 +1826,7 @@ pub const HULDRA_INFECT: Ability = Ability {
             impact_time_ratio: 1.0,
         }),
         initiate_sound: Some(SoundId::ShootSpell),
-        resolve_sound: Some(SoundId::Debuff),
+        resolve_sound: Some(SoundId::Infect),
         charge_fx: None,
         ..AudioVisuals::default()
     },
@@ -1897,7 +1898,7 @@ pub static HULDRA_BLOOD_MAGIC: Ability = Ability {
         resolve_sound: Some(SoundId::Powerup),
         charge_fx: None,
         target_magic_sparks: Some(WHITE),
-        reaction: AbilityVisualReaction::Enjoy,
+        target_reaction: AbilityVisualReaction::Enjoy,
         ..AudioVisuals::default()
     },
 };
@@ -1970,9 +1971,9 @@ pub fn natures_blessing() -> &'static Ability {
                 initiate_sound: Some(SoundId::ShootSpell),
                 animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
                 target_magic_sparks: Some(WHITE),
-                target_effect: Some((EffectId::Raven, 0.5)),
+                character_target_effect: Some((EffectId::Raven, 0.5)),
                 resolve_sound: Some(SoundId::Heal),
-                reaction: AbilityVisualReaction::Enjoy,
+                target_reaction: AbilityVisualReaction::Enjoy,
                 ..AudioVisuals::default()
             },
         }
@@ -2076,7 +2077,7 @@ pub fn inspire() -> &'static Ability {
                 particle_shape: ParticleShape::Circle,
             }),
             target_magic_sparks: Some(WHITE),
-            reaction: AbilityVisualReaction::Enjoy,
+            target_reaction: AbilityVisualReaction::Enjoy,
             ..AudioVisuals::default()
         },
     })
@@ -2115,12 +2116,13 @@ pub const ENEMY_INSPIRE: Ability = Ability {
         environment_effect: None,
     },
     audio_visuals: AudioVisuals {
-        animation_color: GREEN,
-        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
-        initiate_sound: None,
-        resolve_sound: Some(SoundId::Powerup),
         charge_fx: None,
+        animation_color: GREEN,
+        initiate_sound: None,
+        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
+        resolve_sound: Some(SoundId::Powerup),
         target_magic_sparks: Some(WHITE),
+        target_reaction: AbilityVisualReaction::Enjoy,
         ..AudioVisuals::default()
     },
 };
@@ -2343,7 +2345,8 @@ pub const FIREBALL: Ability = Ability {
 pub const FIRE_BOLT: Ability = Ability {
     id: AbilityId::FireBolt,
     name: "Fire bolt",
-    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage to the first target hit, and |<value>4| |<fire>|fire damage in a small area.",
+    description: "Shoot a projectile that deals |<value>3| |<fire>|fire damage \
+    to the first target hit, and |<value>4| |<fire>|fire damage in a small area.",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -2365,22 +2368,25 @@ pub const FIRE_BOLT: Ability = Ability {
                 damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
                 ..SpellTargetEffect::default()
             }),
-            None
+            None,
         )),
     },
-    possible_enhancements: &[
-        &REACH,
-        &MASSIVE_RADIUS,
-        &FIREBALL_INFERNO,
-    ],
+    possible_enhancements: &[&REACH, &MASSIVE_RADIUS, &FIREBALL_INFERNO],
 
-    audio_visuals: AudioVisuals {animation_color: RED,
-    animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
-    initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::FireballHit),
-    charge_fx: Some(AbilityChargeFx {
-        particle_shape: ParticleShape::Circle,
-    }),..AudioVisuals::default()}
+    audio_visuals: AudioVisuals {
+        animation_color: RED,
+        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
+        initiate_sound: Some(SoundId::ShootSpell),
+        resolve_sound: Some(SoundId::FireballHit),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+        }),
+        // TODO: Not quite right - fire bomb should be reserved for grenade
+        // This one needs a more "regular" fire animation
+        // The "regular" fire animation can be used whenever someone takes damage from burning/fire surface also
+        character_target_effect: Some((EffectId::FireBomb, 0.5)),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const ICE_BOLT: Ability = Ability {
@@ -2412,8 +2418,7 @@ pub const ICE_BOLT: Ability = Ability {
         animation_color: SKYBLUE,
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
         initiate_sound: Some(SoundId::ShootSpell),
-        // TODO sound
-        resolve_sound: Some(SoundId::BottleSplash),
+        resolve_sound: Some(SoundId::NoisyCrash),
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
         }),
@@ -2527,7 +2532,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
         }),
-        target_effect: Some((EffectId::Zap, 0.5)),
+        character_target_effect: Some((EffectId::Zap, 0.5)),
         ..AudioVisuals::default()
     },
 };
@@ -2660,6 +2665,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
         AbilityId::HealthPotion,
         "Health potion",
         &[apply_condition_stacks(Condition::HealthPotionRecovering, 4)],
+        COL_RED,
     ),
 };
 
@@ -2671,6 +2677,7 @@ pub const MANA_POTION: Consumable = Consumable {
         AbilityId::ManaPotion,
         "Mana potion",
         &[ApplyEffect::GainMana(5)],
+        COL_BLUE,
     ),
 };
 
@@ -2678,6 +2685,7 @@ const fn potion_ability(
     id: AbilityId,
     name: &'static str,
     apply: &'static [ApplyEffect],
+    color: Color,
 ) -> Ability {
     Ability {
         id,
@@ -2705,12 +2713,13 @@ const fn potion_ability(
 
         audio_visuals: AudioVisuals {
             speech: "Ahh...",
-            animation_color: PURPLE,
-            animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
-            initiate_sound: None,
+            initiate_sound: Some(SoundId::Gulp),
+            animation_color: color,
+            animation: AbilityAnimation::ConsumePotion,
             resolve_sound: Some(SoundId::Powerup),
             charge_fx: None,
             target_magic_sparks: Some(WHITE),
+            target_reaction: AbilityVisualReaction::Enjoy,
             ..AudioVisuals::default()
         },
     }
@@ -2724,6 +2733,7 @@ pub const ADRENALIN_POTION: Consumable = Consumable {
         AbilityId::AdrenalinPotion,
         "Adrenaline potion    ",
         &[apply_condition_rounds(Condition::Adrenalin, 3)],
+        YELLOW,
     ),
 };
 
@@ -2735,6 +2745,7 @@ pub const ENERGY_POTION: Consumable = Consumable {
         AbilityId::EnergyPotion,
         "Energy potion",
         &[ApplyEffect::GainStamina(10)],
+        COL_GREEN_1,
     ),
 };
 
@@ -2746,6 +2757,7 @@ pub const ARCANE_POTION: Consumable = Consumable {
         AbilityId::ArcanePotion,
         "Arcane potion",
         &[apply_condition_stacks(Condition::ArcaneSurge, 5)],
+        PURPLE,
     ),
 };
 
