@@ -1,7 +1,8 @@
 use macroquad::{
     color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PURPLE, WHITE},
     input::{
-        is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
+        is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel,
+        KeyCode, MouseButton,
     },
     math::Rect,
     prelude::TextDimensions,
@@ -1412,14 +1413,21 @@ pub struct Checkbox {
     size: (f32, f32),
     sound_player: SoundPlayer,
     pub checked: Rc<Cell<bool>>,
+    hotkey: Option<KeyCode>,
 }
 
 impl Checkbox {
-    pub fn new(size: (f32, f32), sound_player: SoundPlayer, checked: Rc<Cell<bool>>) -> Self {
+    pub fn new(
+        size: (f32, f32),
+        sound_player: SoundPlayer,
+        checked: Rc<Cell<bool>>,
+        hotkey: Option<KeyCode>,
+    ) -> Self {
         Self {
             size,
             checked,
             sound_player,
+            hotkey,
         }
     }
 }
@@ -1427,10 +1435,18 @@ impl Checkbox {
 impl Drawable for Checkbox {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size;
-
         let hovered = Rect::new(x, y, w, h).contains(mouse_position().into());
 
+        let mut clicked = false;
+        if let Some(hotkey) = self.hotkey {
+            if is_key_pressed(hotkey) {
+                clicked = true;
+            }
+        }
         if is_mouse_button_pressed(MouseButton::Left) && hovered {
+            clicked = true;
+        }
+        if clicked {
             self.checked.set(!self.checked.get());
             self.sound_player.play(SoundId::ClickButton);
         }

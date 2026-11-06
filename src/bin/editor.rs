@@ -1187,7 +1187,7 @@ fn build_settings(
                         margin: 5.0,
                         children: vec![
                             Element::Text(TextLine::new(
-                                "Snap to grid",
+                                "Snap to grid |<faded>[S]|",
                                 16,
                                 WHITE,
                                 Some(simple_font.clone()),
@@ -1197,6 +1197,7 @@ fn build_settings(
                                 checkbox_size,
                                 sound_player.clone(),
                                 snap_to_grid,
+                                Some(KeyCode::S),
                             ))),
                         ],
                         ..Default::default()
@@ -1207,7 +1208,7 @@ fn build_settings(
                         margin: 5.0,
                         children: vec![
                             Element::Text(TextLine::new(
-                                "Show grid",
+                                "Show grid |<faded>[G]|",
                                 16,
                                 WHITE,
                                 Some(simple_font.clone()),
@@ -1217,6 +1218,7 @@ fn build_settings(
                                 checkbox_size,
                                 sound_player.clone(),
                                 show_grid,
+                                Some(KeyCode::G),
                             ))),
                         ],
                         ..Default::default()

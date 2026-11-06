@@ -730,7 +730,6 @@ impl UserInterface {
 
         let ui_x0 =
             (screen_width() / 2.0 - 350.0).min(screen_width() - self.log.width() - 5.0 - UI_WIDTH);
-        let ui_x1 = ui_x0 + UI_WIDTH;
 
         let resources_mid_x = ui_x0 + 90.0;
 

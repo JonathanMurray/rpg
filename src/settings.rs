@@ -2,6 +2,7 @@ use std::{cell::Cell, rc::Rc};
 
 use macroquad::{
     color::{Color, LIGHTGRAY, WHITE},
+    input::KeyCode,
     text::Font,
 };
 
@@ -48,6 +49,7 @@ pub fn build_settings(
                                 (16.0, 16.0),
                                 sound_player.clone(),
                                 sound_player.enabled.clone(),
+                                None,
                             ))),
                         ],
                         ..Default::default()
@@ -58,7 +60,7 @@ pub fn build_settings(
                         margin: 5.0,
                         children: vec![
                             Element::Text(TextLine::new(
-                                "Faster movement",
+                                "Faster movement |<faded>[F]|",
                                 16,
                                 WHITE,
                                 Some(simple_font.clone()),
@@ -67,6 +69,7 @@ pub fn build_settings(
                                 (16.0, 16.0),
                                 sound_player.clone(),
                                 faster_movement,
+                                Some(KeyCode::F),
                             ))),
                         ],
                         ..Default::default()
@@ -77,7 +80,7 @@ pub fn build_settings(
                         margin: 5.0,
                         children: vec![
                             Element::Text(TextLine::new(
-                                "Slow-motion",
+                                "Slow-motion |<faded>[S]|",
                                 16,
                                 WHITE,
                                 Some(simple_font.clone()),
@@ -86,6 +89,7 @@ pub fn build_settings(
                                 (16.0, 16.0),
                                 sound_player.clone(),
                                 slow_motion,
+                                Some(KeyCode::S),
                             ))),
                         ],
                         ..Default::default()
