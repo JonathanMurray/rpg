@@ -24,7 +24,9 @@ use crate::{
     },
     grid::ParticleShape,
     pathfind::Surface,
-    resources::{BeamFxId, EffectId, EquipmentIconId, IconId, SpriteId},
+    resources::{
+        BeamFxId, CharacterSpriteId, EffectId, EquipmentIconId, EquipmentSpriteId, IconId,
+    },
     sounds::SoundId,
     tooltip::Keyword,
     util::{COL_GREEN_3, COL_RED},
@@ -122,7 +124,7 @@ pub const BAD_DAGGER: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Dagger),
+    sprite: Some(EquipmentSpriteId::Dagger),
     icon: EquipmentIconId::Dagger,
     weight: 1,
 };
@@ -139,7 +141,7 @@ pub const DAGGER: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Dagger),
+    sprite: Some(EquipmentSpriteId::Dagger),
     icon: EquipmentIconId::Dagger,
     weight: 1,
 };
@@ -191,7 +193,7 @@ pub const BAD_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Sword),
+    sprite: Some(EquipmentSpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
 });
@@ -208,7 +210,7 @@ pub const ENSLAVED_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Sword),
+    sprite: Some(EquipmentSpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
 });
@@ -225,7 +227,7 @@ pub const ENSLAVED_RAPIER: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Rapier),
+    sprite: Some(EquipmentSpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
 });
@@ -242,7 +244,7 @@ pub const SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Sword),
+    sprite: Some(EquipmentSpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
 });
@@ -259,7 +261,7 @@ pub const MAGIC_SWORD: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: Some(AttackHitEffect::ApplySelf(ApplyEffect::GainMana(1))),
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::MagicSword),
+    sprite: Some(EquipmentSpriteId::MagicSword),
     icon: EquipmentIconId::MagicSword,
     weight: 2,
 };
@@ -295,7 +297,7 @@ pub const HUNGERING_BLADE: Weapon = Weapon {
         },
     ))),
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::HungeringBlade),
+    sprite: Some(EquipmentSpriteId::HungeringBlade),
     icon: EquipmentIconId::HungeringBlade,
     weight: 2,
 };
@@ -312,7 +314,7 @@ pub const ZERO_SWORD: LazyLock<Weapon> = LazyLock::new(|| Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Sword),
+    sprite: Some(EquipmentSpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
 });
@@ -329,7 +331,7 @@ pub const ZERO_BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
 };
@@ -358,7 +360,7 @@ pub const BAD_RAPIER: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Rapier),
+    sprite: Some(EquipmentSpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
 };
@@ -381,7 +383,7 @@ pub const SLASHING_RAPIER: Weapon = Weapon {
         },
     ))),
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Rapier),
+    sprite: Some(EquipmentSpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
 };
@@ -398,7 +400,7 @@ pub const RAPIER: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Rapier),
+    sprite: Some(EquipmentSpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
 };
@@ -432,7 +434,7 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Warhammer),
+    sprite: Some(EquipmentSpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
     weight: 5,
 };
@@ -449,7 +451,7 @@ pub const BOSS_AXE: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bossaxe),
+    sprite: Some(EquipmentSpriteId::Bossaxe),
     icon: EquipmentIconId::Undefined,
     weight: 5,
 };
@@ -466,7 +468,7 @@ pub const WAR_AXE: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Waraxe),
+    sprite: Some(EquipmentSpriteId::Waraxe),
     icon: EquipmentIconId::Waraxe,
     weight: 5,
 };
@@ -483,7 +485,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     bonus_melee_evasion: 3,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Warhammer),
+    sprite: Some(EquipmentSpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
     weight: 5,
 };
@@ -507,7 +509,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
         },
     ))),
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Warhammer),
+    sprite: Some(EquipmentSpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
     weight: 7,
 };
@@ -524,7 +526,7 @@ pub const STAFF: Weapon = Weapon {
     bonus_melee_evasion: 2,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Staff),
+    sprite: Some(EquipmentSpriteId::Staff),
     icon: EquipmentIconId::Staff,
     weight: 2,
 };
@@ -541,7 +543,7 @@ pub const BAD_BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
 };
@@ -558,7 +560,7 @@ pub const CHEAT_BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
 };
@@ -575,7 +577,7 @@ pub const BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
 };
@@ -592,7 +594,7 @@ pub const ARCANE_BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: Some(ApplyEffect::GainMana(1)),
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::ArcaneBow,
     weight: 2,
 };
@@ -609,7 +611,7 @@ pub const ELUSIVE_BOW: Weapon = Weapon {
     bonus_melee_evasion: 0,
     on_damage: None,
     on_kill_apply_self: None,
-    sprite: Some(SpriteId::Bow),
+    sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
 };
@@ -852,7 +854,7 @@ const fn grenade_ability(
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
-    sprite: Some(SpriteId::Shield),
+    sprite: Some(EquipmentSpriteId::Shield),
     icon: EquipmentIconId::SmallShield,
     evasion: 2,
     armor: 0,
@@ -994,7 +996,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
 
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
-    sprite: Some(SpriteId::Shield),
+    sprite: Some(EquipmentSpriteId::Shield),
     icon: EquipmentIconId::SmallShield,
     evasion: 3,
     armor: 0,
@@ -1005,7 +1007,7 @@ pub const SMALL_SHIELD: Shield = Shield {
 
 pub const SPIKE_SHIELD: Shield = Shield {
     name: "Spike shield",
-    sprite: Some(SpriteId::SpikeShield),
+    sprite: Some(EquipmentSpriteId::SpikeShield),
     icon: EquipmentIconId::SpikeShield,
     evasion: 3,
     armor: 0,
@@ -1016,7 +1018,7 @@ pub const SPIKE_SHIELD: Shield = Shield {
 
 pub const MEDIUM_SHIELD: Shield = Shield {
     name: "Medium shield",
-    sprite: Some(SpriteId::Shield),
+    sprite: Some(EquipmentSpriteId::Shield),
     icon: EquipmentIconId::MediumShield,
     evasion: 3,
     armor: 1,
@@ -1819,7 +1821,9 @@ pub const HULDRA_INFECT: Ability = Ability {
     },
     audio_visuals: AudioVisuals {
         animation_color: BROWN,
-        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
+        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::Line {
+            impact_time_ratio: 1.0,
+        }),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Debuff),
         charge_fx: None,
@@ -1862,7 +1866,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     },
 };
 
-pub static HULDRA_HEAL: Ability = Ability {
+pub static HULDRA_BLOOD_MAGIC: Ability = Ability {
     id: AbilityId::HuldraHeal,
     name: "Blood magic",
 
@@ -1893,6 +1897,7 @@ pub static HULDRA_HEAL: Ability = Ability {
         resolve_sound: Some(SoundId::Powerup),
         charge_fx: None,
         target_magic_sparks: Some(WHITE),
+        reaction: AbilityVisualReaction::Enjoy,
         ..AudioVisuals::default()
     },
 };

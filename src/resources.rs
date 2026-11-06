@@ -12,7 +12,7 @@ use macroquad::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::CoreGame,
+    core::{CoreGame, SpriteVariant},
     game_ui::UserInterface,
     game_ui_connection::GameUserInterfaceConnection,
     init_fight_map::GameInitState,
@@ -23,7 +23,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct GameResources {
-    pub sprites: HashMap<SpriteId, Sprite>,
+    pub sprites: HashMap<EquipmentSpriteId, Sprite>,
     pub simple_font: Font,
     pub big_font: Font,
     pub decorative_font: Font,
@@ -106,10 +106,7 @@ async fn load_font(path: &str) -> Font {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum SpriteId {
-    PinkMan,
-    AlsoWeirdOrangeMan,
-    WeirdOrangeMan,
+pub enum CharacterSpriteId {
     Alice,
     Bob,
     Clara,
@@ -123,7 +120,10 @@ pub enum SpriteId {
     Scoundrel,
     Pyromaniac,
     Ogre,
-    Magi,
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum EquipmentSpriteId {
     Warhammer,
     Waraxe,
     Bossaxe,
@@ -136,49 +136,33 @@ pub enum SpriteId {
     Dagger,
     Shield,
     SpikeShield,
+
     CharacterShadow,
 }
 
 #[derive(Clone)]
 pub struct Sprite {
     pub regular: Texture2D,
-    pub white_highlight: Texture2D,
-    pub red_highlight: Texture2D,
-    pub bright: Texture2D,
 }
 
-pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
+pub async fn load_all_sprites() -> HashMap<EquipmentSpriteId, Sprite> {
     let paths = vec![
-        (SpriteId::Alice, "alice.png"),
-        (SpriteId::Bob, "bob.png"),
-        (SpriteId::Clara, "clara.png"),
-        (SpriteId::Huldra, "huldra.png"),
-        (SpriteId::Skeleton, "skeleton.png"),
-        (SpriteId::SkeletonBoss, "skeleton_boss.png"),
-        (SpriteId::Enslaved, "enslaved.png"),
-        (SpriteId::Draug, "draug.png"),
-        (SpriteId::Lootgoblin, "lootgoblin.png"),
-        (SpriteId::Ghoul, "ghoul.png"),
-        (SpriteId::Scoundrel, "scoundrel.png"),
-        (SpriteId::Pyromaniac, "pyromaniac.png"),
-        (SpriteId::Ogre, "ogre.png"),
-        (SpriteId::Magi, "magi.png"),
-        (SpriteId::Warhammer, "warhammer.png"),
-        (SpriteId::Waraxe, "waraxe.png"),
-        (SpriteId::Bossaxe, "boss_axe.png"),
-        (SpriteId::Staff, "staff.png"),
-        (SpriteId::Bow, "bow.png"),
-        (SpriteId::Sword, "sword.png"),
-        (SpriteId::MagicSword, "magic_sword.png"),
-        (SpriteId::HungeringBlade, "hungering_blade.png"),
-        (SpriteId::Rapier, "rapier.png"),
-        (SpriteId::Dagger, "dagger.png"),
-        (SpriteId::Shield, "shield.png"),
-        (SpriteId::SpikeShield, "spiked_shield.png"),
-        (SpriteId::CharacterShadow, "character_shadow.png"),
+        (EquipmentSpriteId::Warhammer, "warhammer.png"),
+        (EquipmentSpriteId::Waraxe, "waraxe.png"),
+        (EquipmentSpriteId::Bossaxe, "boss_axe.png"),
+        (EquipmentSpriteId::Staff, "staff.png"),
+        (EquipmentSpriteId::Bow, "bow.png"),
+        (EquipmentSpriteId::Sword, "sword.png"),
+        (EquipmentSpriteId::MagicSword, "magic_sword.png"),
+        (EquipmentSpriteId::HungeringBlade, "hungering_blade.png"),
+        (EquipmentSpriteId::Rapier, "rapier.png"),
+        (EquipmentSpriteId::Dagger, "dagger.png"),
+        (EquipmentSpriteId::Shield, "shield.png"),
+        (EquipmentSpriteId::SpikeShield, "spiked_shield.png"),
+        (EquipmentSpriteId::CharacterShadow, "character_shadow.png"),
     ];
 
-    let paths: Vec<(SpriteId, String)> = paths
+    let paths: Vec<(EquipmentSpriteId, String)> = paths
         .iter()
         .map(|p| (p.0, format!("sprites/{}", p.1)))
         .collect();
@@ -201,40 +185,26 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
             bright.set_filter(FilterMode::Nearest);
             brighten(&bright, highlight_color);
 
-            (
-                id,
-                Sprite {
-                    regular: texture,
-                    white_highlight: white,
-                    red_highlight: red,
-                    bright,
-                },
-            )
+            (id, Sprite { regular: texture })
         })
         .collect()
 }
 
-pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
+pub fn character_sprite_height(sprite_id: CharacterSpriteId) -> u32 {
     match sprite_id {
-        SpriteId::Clara => 26,
-        SpriteId::Bob => 28,
-        SpriteId::Alice => 28,
-        SpriteId::Huldra => 26,
-        SpriteId::Skeleton => 26,
-        SpriteId::SkeletonBoss => 29,
-        SpriteId::Enslaved => 26,
-        SpriteId::Ogre => 26,
-        SpriteId::Magi => 25,
-        SpriteId::Ghoul => 24,
-        SpriteId::Scoundrel => 24,
-        SpriteId::Pyromaniac => 24,
-        SpriteId::Draug => 26,
-        SpriteId::Lootgoblin => 24,
-
-        // TODO:
-        SpriteId::PinkMan => 25,
-        SpriteId::AlsoWeirdOrangeMan => 25,
-        SpriteId::WeirdOrangeMan => 25,
+        CharacterSpriteId::Clara => 26,
+        CharacterSpriteId::Bob => 28,
+        CharacterSpriteId::Alice => 28,
+        CharacterSpriteId::Huldra => 26,
+        CharacterSpriteId::Skeleton => 26,
+        CharacterSpriteId::SkeletonBoss => 29,
+        CharacterSpriteId::Enslaved => 26,
+        CharacterSpriteId::Ogre => 26,
+        CharacterSpriteId::Ghoul => 24,
+        CharacterSpriteId::Scoundrel => 24,
+        CharacterSpriteId::Pyromaniac => 24,
+        CharacterSpriteId::Draug => 26,
+        CharacterSpriteId::Lootgoblin => 24,
 
         unhandled => panic!("undefined character sprite height: {:?}", unhandled),
     }
@@ -416,6 +386,56 @@ pub fn draw_portrait(pos: (f32, f32), portrait: PortraitId, dest_size: Option<(f
             ..Default::default()
         },
     );
+}
+
+pub fn draw_character_sprite(
+    screen_pos: (f32, f32),
+    sprite_id: CharacterSpriteId,
+    variant: SpriteVariant,
+    highlight: CharacterSpriteHighlight,
+    mut params: DrawTextureParams,
+) {
+    let texture = match highlight {
+        CharacterSpriteHighlight::Regular => &CHARACTERS_TEXTURE,
+        CharacterSpriteHighlight::Red => &CHARACTERS_RED_TEXTURE,
+        CharacterSpriteHighlight::Bright => &CHARACTERS_BRIGHT_TEXTURE,
+    }
+    .get()
+    .unwrap();
+
+    let source_size = 32.0;
+
+    let row_idx = match sprite_id {
+        CharacterSpriteId::Alice => 2,
+        CharacterSpriteId::Bob => 1,
+        CharacterSpriteId::Clara => 0,
+        CharacterSpriteId::Huldra => 9,
+        CharacterSpriteId::Skeleton => 3,
+        CharacterSpriteId::SkeletonBoss => 4,
+        CharacterSpriteId::Enslaved => 11,
+        CharacterSpriteId::Draug => 12,
+        CharacterSpriteId::Lootgoblin => 8,
+        CharacterSpriteId::Ghoul => 5,
+        CharacterSpriteId::Scoundrel => 6,
+        CharacterSpriteId::Pyromaniac => 7,
+        CharacterSpriteId::Ogre => 13,
+        unexpected => panic!("Unhandled character sprite id: {:?}", unexpected),
+    };
+
+    let col_idx = match variant {
+        SpriteVariant::Idle => 0,
+        SpriteVariant::PreparingSpell => 1,
+        SpriteVariant::ShootingSpell => 2,
+    };
+
+    let mut source = params
+        .source
+        .unwrap_or(Rect::new(0.0, 0.0, source_size, source_size));
+    source.y += row_idx as f32 * source_size;
+    source.x += col_idx as f32 * source_size;
+    params.source = Some(source);
+
+    draw_texture_ex(texture, screen_pos.0, screen_pos.1, WHITE, params);
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -1183,8 +1203,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
     (rotation, src_rect)
 }
 
-async fn load_sprites(paths: Vec<(SpriteId, impl AsRef<str>)>) -> HashMap<SpriteId, Texture2D> {
-    let mut textures: HashMap<SpriteId, Texture2D> = Default::default();
+async fn load_sprites(
+    paths: Vec<(EquipmentSpriteId, impl AsRef<str>)>,
+) -> HashMap<EquipmentSpriteId, Texture2D> {
+    let mut textures: HashMap<EquipmentSpriteId, Texture2D> = Default::default();
     for (id, path) in paths {
         textures.insert(id, load_and_init_texture(path.as_ref()).await);
     }
@@ -1333,7 +1355,40 @@ pub async fn load_and_init_static_resources() {
     load_and_init_texture_into("portraits.png", &PORTRAITS_TEXTURE).await;
     load_and_init_texture_into("fx_beam.png", &BEAM_FX).await;
 
+    load_and_init_character_sprites().await;
+
     load_static_fonts().await;
+}
+
+async fn load_and_init_character_sprites() {
+    let characters_texture = load_and_init_texture("sprites/characters.png").await;
+    let img = characters_texture.get_texture_data();
+    CHARACTERS_TEXTURE.set(characters_texture).unwrap();
+
+    let char_highlight_color = [201, 226, 118, 255];
+
+    let char_white_texture = Texture2D::from_image(&img);
+    char_white_texture.set_filter(FilterMode::Nearest);
+    replace_color(
+        &char_white_texture,
+        char_highlight_color,
+        [255, 255, 255, 255],
+    );
+    CHARACTERS_WHITE_TEXTURE.set(char_white_texture).unwrap();
+
+    let char_red_texture = Texture2D::from_image(&img);
+    char_red_texture.set_filter(FilterMode::Nearest);
+    replace_color(
+        &char_red_texture,
+        char_highlight_color,
+        [255, 100, 100, 255],
+    );
+    CHARACTERS_RED_TEXTURE.set(char_red_texture).unwrap();
+
+    let char_bright_texture = Texture2D::from_image(&img);
+    char_bright_texture.set_filter(FilterMode::Nearest);
+    brighten(&char_bright_texture, char_highlight_color);
+    CHARACTERS_BRIGHT_TEXTURE.set(char_bright_texture).unwrap();
 }
 
 pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -1746,6 +1801,10 @@ pub static ICONS_FADED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAITS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_WHITE_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_BRIGHT_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ARROW_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
@@ -1757,6 +1816,13 @@ pub static UI_ACTION_BUTTON_SMALL_TEXTURE: OnceLock<Texture2D> = OnceLock::new()
 pub static UI_ACTION_BUTTON_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ACTION_BUTTON_SMALL_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_SPELLBOOK_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+
+#[derive(Debug, Copy, Clone)]
+pub enum CharacterSpriteHighlight {
+    Regular,
+    Red,
+    Bright,
+}
 
 async fn load_and_init_ui_textures() {
     load_and_init_texture_into("ui/user_interface.png", &UI_BG_TEXTURE).await;

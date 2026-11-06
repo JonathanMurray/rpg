@@ -20,7 +20,8 @@ use crate::grid::{ControlPoint, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
 use crate::resources::{
-    BeamFxId, EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId,
+    BeamFxId, CharacterSpriteId, EffectId, EquipmentIconId, EquipmentSpriteId, IconId, PortraitId,
+    StatusId,
 };
 use crate::sounds::SoundId;
 use crate::tooltip::Keyword;
@@ -6575,6 +6576,13 @@ impl PushVector {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum SpriteVariant {
+    Idle,
+    PreparingSpell,
+    ShootingSpell,
+}
+
 #[derive(Clone)]
 pub struct Character {
     id: Cell<Option<CharacterId>>,
@@ -6590,7 +6598,7 @@ pub struct Character {
     pub portrait: PortraitId,
 
     pub hurt_sound: SoundId,
-    pub sprite: SpriteId,
+    pub sprite: CharacterSpriteId,
     pub kind: CharacterKind,
     pub position: Cell<Position>,
     pub base_attributes: Attributes,
@@ -6649,7 +6657,7 @@ impl Character {
         name: impl Into<String>,
         hurt_sound: SoundId,
         portrait: PortraitId,
-        sprite: SpriteId,
+        sprite: CharacterSpriteId,
         base_attributes: Attributes,
         position: Position,
     ) -> Self {
@@ -8772,7 +8780,7 @@ pub enum Circumstance {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Weapon {
     pub name: &'static str,
-    pub sprite: Option<SpriteId>,
+    pub sprite: Option<EquipmentSpriteId>,
     pub icon: EquipmentIconId,
     pub range: WeaponRange,
     pub action_point_cost: u32,
@@ -8813,7 +8821,7 @@ pub struct Arrow {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Trinket {
     pub name: &'static str,
-    pub sprite: Option<SpriteId>,
+    pub sprite: Option<EquipmentSpriteId>,
     pub icon: EquipmentIconId,
     pub equip: EquipEffect,
 }
@@ -8821,7 +8829,7 @@ pub struct Trinket {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Shield {
     pub name: &'static str,
-    pub sprite: Option<SpriteId>,
+    pub sprite: Option<EquipmentSpriteId>,
     pub icon: EquipmentIconId,
     pub evasion: u32,
     pub armor: u32,

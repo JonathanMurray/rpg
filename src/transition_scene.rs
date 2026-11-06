@@ -323,7 +323,7 @@ pub async fn run_transition_loop(
                 rows.insert(
                     0,
                     Element::Text(TextLine::new(
-                        "New character:",
+                        "New character",
                         24,
                         WHITE,
                         Some(big_font.clone()),

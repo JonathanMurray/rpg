@@ -54,8 +54,8 @@ use crate::{
         ActionReach, ActionTarget, AppliedEffect, ApplyCondition, ApplyEffect, AreaShape,
         AttackAction, AttackEnhancement, AttackEnhancementOnHitEffect, AudioVisuals, BaseAction,
         Character, CharacterFacing, CircleEffect, Condition, Goodness, HitType, MovementType,
-        Position, PushVector, SpellTravelAnimation, TargetAcquisition, TargetLine, TargetPoint,
-        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        Position, PushVector, SpellTravelAnimation, SpriteVariant, TargetAcquisition, TargetLine,
+        TargetPoint, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -69,10 +69,10 @@ use crate::{
         TraversalType, CELLS_PER_ENTITY,
     },
     resources::{
-        character_sprite_height, draw_beam_fx, draw_icon, draw_status_icon, draw_terrain,
-        draw_tiny_font, measure_tiny_font, BeamFxId, EffectId, FlipbookAnimation, IconId,
-        LiquidType, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WallOrientation,
-        WaterOrientation,
+        character_sprite_height, draw_beam_fx, draw_character_sprite, draw_icon, draw_status_icon,
+        draw_terrain, draw_tiny_font, measure_tiny_font, BeamFxId, CharacterSpriteHighlight,
+        CharacterSpriteId, EffectId, EquipmentSpriteId, FlipbookAnimation, IconId, LiquidType,
+        Sprite, StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation,
     },
     sounds::{SoundId, SoundPlayer},
     util::{
@@ -159,7 +159,8 @@ impl CharacterActionAnticipation {
 #[derive(Debug)]
 enum AnticipationKind {
     RangedAttack { aiming: bool },
-    MeleeAttack,
+    MeleeWeaponAttack,
+    ShieldAttack,
     Throw { color: Color },
     CastSpell { color: Color },
     Other,
@@ -353,6 +354,7 @@ enum SpriteProperty {
     HideHandHeld,
     Hide,
     SinkIntoGroundRatio,
+    SpriteVariant(SpriteVariant),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -511,7 +513,7 @@ pub struct GameGrid {
     pub surfaces: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     pub control_points: IndexMap<Position, ControlPoint>,
-    sprites: HashMap<SpriteId, Sprite>,
+    equipment_sprites: HashMap<EquipmentSpriteId, Sprite>,
     pub pathfind_grid: Rc<PathfindGrid>,
     pub characters: HashMap<CharacterId, Rc<Character>>,
 
@@ -546,7 +548,7 @@ impl GameGrid {
     pub fn new(
         selected_character_id: CharacterId,
         characters: HashMap<CharacterId, Rc<Character>>,
-        sprites: HashMap<SpriteId, Sprite>,
+        sprites: HashMap<EquipmentSpriteId, Sprite>,
         big_font: Font,
         simple_font: Font,
         tiny_font: Font,
@@ -573,7 +575,7 @@ impl GameGrid {
         let camera_y = grid_size_on_screen.1 / 2.0 - (screen_height() - UI_HEIGHT) / 2.0;
 
         let self_ = Self {
-            sprites,
+            equipment_sprites: sprites,
             pathfind_grid,
             //routes: Default::default(),
             dragging_camera_from: None,
@@ -1397,12 +1399,32 @@ impl GameGrid {
             casting_duration,
             AnimationDetails::TransformSprite {
                 timelines: vec![
+                    /*
                     (
                         SpriteProperty::WeaponRotation,
                         PropertyTimeline(vec![
                             PropertyUpdate::fixed(0.2),
                             PropertyUpdate::linear(0.7, weapon_rotation),
                             PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                     */
+                    (
+                        SpriteProperty::HideHandHeld,
+                        PropertyTimeline(vec![PropertyUpdate::linear(0.0, 1.0)]),
+                    ),
+                    (
+                        SpriteProperty::SpriteVariant(SpriteVariant::PreparingSpell),
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.0, 1.0),
+                            PropertyUpdate::linear(0.4, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::SpriteVariant(SpriteVariant::ShootingSpell),
+                        PropertyTimeline(vec![
+                            PropertyUpdate::fixed(0.4),
+                            PropertyUpdate::linear(0.4, 1.0),
                         ]),
                     ),
                     (
@@ -1425,7 +1447,7 @@ impl GameGrid {
             },
         ));
 
-        //
+        // the result of the cast should start before we're done with all the recovery frames
         casting_duration - 0.2
     }
 
@@ -2836,6 +2858,7 @@ impl GameGrid {
         let (mut shadow_x, mut shadow_y) = (x, y);
 
         let mut held_sphere = None;
+        let mut sprite_variant = SpriteVariant::Idle;
         let mut show_regular_hald_hend = true;
 
         let mut weapon_rotation_modifier = 0.0;
@@ -2909,6 +2932,11 @@ impl GameGrid {
                             SpriteProperty::SinkIntoGroundRatio => {
                                 character_crop_factor = (1.0, 1.0 - value);
                                 character_offset = (0.0, value * self.rect_w as f32);
+                            }
+                            SpriteProperty::SpriteVariant(variant) => {
+                                if value > 0.0 {
+                                    sprite_variant = *variant;
+                                }
                             }
                             SpriteProperty::ReplaceHandHeldWithSphere {
                                 color,
@@ -3005,9 +3033,14 @@ impl GameGrid {
                     stretch_w = Some(oscillate(0.8, 0.95, 1.0));
                     dx = 0.0;
                 }
-                AnticipationKind::MeleeAttack => {
+                AnticipationKind::MeleeWeaponAttack => {
                     let rotation = PI * 0.02;
                     weapon_rotation_modifier = oscillate(0.4, -rotation, rotation);
+                    y -= oscillate(0.3, 0.0, 1.0);
+                    dx = oscillate(0.6, -1.0, 1.0);
+                }
+                AnticipationKind::ShieldAttack => {
+                    shield_offset = (0.0, oscillate(0.4, -1.0, 1.0));
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
                 }
@@ -3016,6 +3049,8 @@ impl GameGrid {
                     params.rotation = oscillate(2.5, -rotation, rotation);
                     stretch_h = Some(oscillate(0.5, 0.97, 1.0));
                     dx = oscillate(0.5, -1.0, 1.0);
+
+                    sprite_variant = SpriteVariant::PreparingSpell;
 
                     // If we've just started configuring an ability, that may animate a sphere - we
                     // should wait it out before we override it with this sphere
@@ -3100,7 +3135,7 @@ impl GameGrid {
 
         if show_shadow {
             draw_texture_ex(
-                &self.sprites[&SpriteId::CharacterShadow].regular,
+                &self.equipment_sprites[&EquipmentSpriteId::CharacterShadow].regular,
                 shadow_x,
                 shadow_y,
                 WHITE,
@@ -3119,18 +3154,17 @@ impl GameGrid {
         }
 
         if show_sprite {
-            let sprite = &self.sprites[&character.sprite];
-            let texture = if self.target_effect_previews.contains_key(&character.id()) {
-                &sprite.red_highlight
+            let highlight = if self.target_effect_previews.contains_key(&character.id()) {
+                CharacterSpriteHighlight::Red
             } else if self.hovered_character.or(self.hovered_character_portrait)
                 == Some(character.id())
             {
                 // TODO: Use the bright version for something significant - like when hovering a valid target
                 // for a currently configured ability
                 //&sprite.white_highlight
-                &sprite.bright
+                CharacterSpriteHighlight::Bright
             } else {
-                &sprite.regular
+                CharacterSpriteHighlight::Regular
             };
 
             if let Some(stretch_w) = stretch_w {
@@ -3160,11 +3194,11 @@ impl GameGrid {
             character_params.dest_size.as_mut().unwrap().x *= character_crop_factor.0;
             character_params.dest_size.as_mut().unwrap().y *= character_crop_factor.1;
 
-            draw_texture_ex(
-                texture,
-                x + character_offset.0,
-                y + character_offset.1,
-                WHITE,
+            draw_character_sprite(
+                (x + character_offset.0, y + character_offset.1),
+                character.sprite,
+                sprite_variant,
+                highlight,
                 character_params,
             );
 
@@ -3180,7 +3214,7 @@ impl GameGrid {
                     if let Some(texture) = weapon.sprite {
                         let rotation = params.rotation + weapon_rotation_modifier;
                         draw_texture_ex(
-                            &self.sprites[&texture].regular,
+                            &self.equipment_sprites[&texture].regular,
                             x + weapon_offset.0,
                             y + weapon_offset.1 + 0.0,
                             WHITE,
@@ -3192,7 +3226,7 @@ impl GameGrid {
                 if let Some(shield) = character.shield() {
                     if let Some(texture) = shield.sprite {
                         draw_texture_ex(
-                            &self.sprites[&texture].regular,
+                            &self.equipment_sprites[&texture].regular,
                             x + shield_offset.0,
                             y + shield_offset.1,
                             WHITE,
@@ -4771,7 +4805,7 @@ impl GameGrid {
                 let kind = if character.has_equipped_ranged_weapon() {
                     AnticipationKind::RangedAttack { aiming }
                 } else {
-                    AnticipationKind::MeleeAttack
+                    AnticipationKind::MeleeWeaponAttack
                 };
                 CharacterActionAnticipation { facing, kind }
             };
@@ -4832,11 +4866,12 @@ impl GameGrid {
 
                     let kind = match ability.audio_visuals.animation {
                         AbilityAnimation::Throw(color) => AnticipationKind::Throw { color },
-                        AbilityAnimation::SpinAttack => AnticipationKind::MeleeAttack,
+                        AbilityAnimation::SpinAttack => AnticipationKind::MeleeWeaponAttack,
                         AbilityAnimation::RangedWeaponAttackLine => {
                             AnticipationKind::RangedAttack { aiming }
                         }
-                        AbilityAnimation::MeleeWeaponAttack => AnticipationKind::MeleeAttack,
+                        AbilityAnimation::MeleeWeaponAttack => AnticipationKind::MeleeWeaponAttack,
+                        AbilityAnimation::ShieldAttack => AnticipationKind::ShieldAttack,
                         AbilityAnimation::CastSpell { .. } => AnticipationKind::CastSpell {
                             color: ability.audio_visuals.animation_color,
                         },
@@ -6377,9 +6412,9 @@ impl GameGrid {
         &self,
         t: f32,
         grid_pos: (f32, f32),
-        sprite: &SpriteId,
-        weapon: &Option<SpriteId>,
-        shield: &Option<SpriteId>,
+        sprite: &CharacterSpriteId,
+        weapon: &Option<EquipmentSpriteId>,
+        shield: &Option<EquipmentSpriteId>,
         is_in_liquid: bool,
     ) {
         let cell_w = self.cell_w();
@@ -6432,17 +6467,27 @@ impl GameGrid {
         character_params.dest_size.as_mut().unwrap().x *= character_crop_factor.0;
         character_params.dest_size.as_mut().unwrap().y *= character_crop_factor.1;
 
+        draw_character_sprite(
+            (x + character_offset.0, y + character_offset.1),
+            *sprite,
+            SpriteVariant::Idle,
+            CharacterSpriteHighlight::Regular,
+            character_params,
+        );
+
+        /*
         draw_texture_ex(
-            &self.sprites[&sprite].regular,
+            &self.equipment_sprites[&sprite].regular,
             x + character_offset.0,
             y + character_offset.1,
             WHITE,
             character_params,
         );
+         */
 
         if let Some(sprite) = weapon {
             draw_texture_ex(
-                &self.sprites[&sprite].regular,
+                &self.equipment_sprites[&sprite].regular,
                 x,
                 y + cell_w,
                 WHITE,
@@ -6454,7 +6499,13 @@ impl GameGrid {
         }
 
         if let Some(sprite) = shield {
-            draw_texture_ex(&self.sprites[&sprite].regular, x, y + cell_w, WHITE, params);
+            draw_texture_ex(
+                &self.equipment_sprites[&sprite].regular,
+                x,
+                y + cell_w,
+                WHITE,
+                params,
+            );
         }
     }
 
@@ -7104,9 +7155,9 @@ pub enum EffectVariant {
         id: BeamFxId,
     },
     Corpse {
-        sprite: SpriteId,
-        weapon: Option<SpriteId>,
-        shield: Option<SpriteId>,
+        sprite: CharacterSpriteId,
+        weapon: Option<EquipmentSpriteId>,
+        shield: Option<EquipmentSpriteId>,
         is_in_liquid: bool,
     },
     Text(TextGraphics),

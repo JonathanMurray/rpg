@@ -439,10 +439,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Enslaved",
+      "type_": "Clara",
       "pos": [
-        22,
-        16
+        28,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -450,10 +450,10 @@
       "name": null
     },
     {
-      "type_": "Clara",
+      "type_": "SkeletonLeader",
       "pos": [
         28,
-        19
+        13
       ],
       "health": null,
       "main_hand": null,

@@ -16,7 +16,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, TargetAcquisition, TargetPoint,
         CENTER_MELEE_RANGE_SQUARED,
     },
-    data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
+    data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_BLOOD_MAGIC, HULDRA_INFECT},
     grid::ControlPoint,
     pathfind::{Path, PathfindGrid, TraversalType},
     util::CustomShuffle,
@@ -110,7 +110,7 @@ impl HuldraBehaviour {
             .enemies()
             .any(|char| char.health.current() < char.health.max() - 5);
 
-        let heal = BotAction::SingleFriendlyTarget(&HULDRA_HEAL);
+        let heal = BotAction::SingleFriendlyTarget(&HULDRA_BLOOD_MAGIC);
         let inflict_wounds = BotAction::SingleEnemyTarget(&HULDRA_INFECT);
         //let inflict_horrors = BotAction::SingleEnemyTarget(HULDRA_INFLICT_HORRORS);
 

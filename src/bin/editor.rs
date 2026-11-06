@@ -20,7 +20,7 @@ use macroquad::window::{screen_width, Conf};
 use rpg::base_ui::{
     draw_text_rounded, Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine,
 };
-use rpg::core::{Character, CharacterId, HandType, Party};
+use rpg::core::{Character, CharacterId, HandType, Party, SpriteVariant};
 
 use rpg::drawing::{draw_loading_text, draw_loading_text_progress};
 use rpg::game_ui::{draw_rectangle_lines2, UiState};
@@ -29,10 +29,13 @@ use rpg::grid::{ControlPoint, GameGrid};
 use rpg::init_fight_map::{FightId, GameInitState};
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::{Elevation, Occupation};
-use rpg::resources::{init_core_game, GameResources};
 use rpg::resources::{
-    load_and_init_static_resources, terrain_atlas_area, LiquidType, Sprite, SpriteId, TerrainId,
-    WallOrientation, WaterOrientation,
+    draw_character_sprite, init_core_game, CharacterSpriteHighlight, EquipmentSpriteId,
+    GameResources,
+};
+use rpg::resources::{
+    load_and_init_static_resources, terrain_atlas_area, CharacterSpriteId, LiquidType, Sprite,
+    TerrainId, WallOrientation, WaterOrientation,
 };
 use rpg::sounds::SoundPlayer;
 
@@ -633,7 +636,7 @@ fn draw_debug_text(file_text: &str, font: &Font, y: f32, font_size: u16) {
 
 struct Sidebar {
     terrain_atlas: Texture2D,
-    sprites: HashMap<SpriteId, Sprite>,
+    sprites: HashMap<EquipmentSpriteId, Sprite>,
     selected_section_idx: usize,
     selected_action_idx: Option<usize>,
     hovered: bool,
@@ -663,7 +666,7 @@ enum EditorAction {
 const ICON_W: f32 = 64.0;
 
 impl Sidebar {
-    fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Sprite>) -> Self {
+    fn new(terrain_atlas: Texture2D, sprites: HashMap<EquipmentSpriteId, Sprite>) -> Self {
         let backgrounds = [
             TerrainId::Floor,
             TerrainId::Floor2,
@@ -903,6 +906,17 @@ impl Sidebar {
                         self.draw_terrain_icon(x, y, terrain_id);
                     }
                     EditorAction::PlaceCharacter(char_type) => {
+                        draw_character_sprite(
+                            (x, y),
+                            char_type.sprite_id(),
+                            SpriteVariant::Idle,
+                            CharacterSpriteHighlight::Regular,
+                            DrawTextureParams {
+                                dest_size: Some((ICON_W, ICON_W).into()),
+                                ..Default::default()
+                            },
+                        );
+                        /*
                         draw_texture_ex(
                             &self.sprites[&char_type.sprite_id()].regular,
                             x,
@@ -913,6 +927,7 @@ impl Sidebar {
                                 ..Default::default()
                             },
                         );
+                         */
                         let text = format!("{:?}", char_type);
                         let font_size = 16;
                         let text_dim = measure_text(&text, None, font_size, 1.0);

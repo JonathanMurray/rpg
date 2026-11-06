@@ -17,7 +17,7 @@ use crate::{
         BRACE, CHAIN_MAIL, CHEAT_BOW, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE,
         DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
         ENERGY_POTION, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS,
-        FIRE_BOLT, HEALING_NOVA, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
+        FIRE_BOLT, HEALING_NOVA, HULDRA_BLOOD_MAGIC, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
         ICE_BOLT, INSPIRE_BLOODLUST, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
         LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
         SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH,
@@ -25,7 +25,7 @@ use crate::{
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
-    resources::{GameResources, PortraitId, SpriteId, TerrainId},
+    resources::{CharacterSpriteId, GameResources, PortraitId, TerrainId},
     sounds::{SoundId, SoundPlayer},
 };
 
@@ -218,22 +218,22 @@ pub enum CharacterType {
 }
 
 impl CharacterType {
-    pub fn sprite_id(&self) -> SpriteId {
+    pub fn sprite_id(&self) -> CharacterSpriteId {
         match self {
-            CharacterType::Bob => SpriteId::Bob,
-            CharacterType::Alice => SpriteId::Alice,
-            CharacterType::Clara => SpriteId::Clara,
-            CharacterType::Skeleton => SpriteId::Skeleton,
-            CharacterType::SkeletonLeader => SpriteId::Skeleton,
-            CharacterType::SkeletonBoss => SpriteId::SkeletonBoss,
-            CharacterType::Draug => SpriteId::Draug,
-            CharacterType::Lootgoblin => SpriteId::Lootgoblin,
-            CharacterType::Ogre => SpriteId::Ogre,
-            CharacterType::Huldra => SpriteId::Huldra,
-            CharacterType::Enslaved => SpriteId::Enslaved,
-            CharacterType::Ghoul1 => SpriteId::Pyromaniac,
-            CharacterType::Ghoul2 => SpriteId::Ghoul,
-            CharacterType::Scoundrel => SpriteId::Scoundrel,
+            CharacterType::Bob => CharacterSpriteId::Bob,
+            CharacterType::Alice => CharacterSpriteId::Alice,
+            CharacterType::Clara => CharacterSpriteId::Clara,
+            CharacterType::Skeleton => CharacterSpriteId::Skeleton,
+            CharacterType::SkeletonLeader => CharacterSpriteId::Skeleton,
+            CharacterType::SkeletonBoss => CharacterSpriteId::SkeletonBoss,
+            CharacterType::Draug => CharacterSpriteId::Draug,
+            CharacterType::Lootgoblin => CharacterSpriteId::Lootgoblin,
+            CharacterType::Ogre => CharacterSpriteId::Ogre,
+            CharacterType::Huldra => CharacterSpriteId::Huldra,
+            CharacterType::Enslaved => CharacterSpriteId::Enslaved,
+            CharacterType::Ghoul1 => CharacterSpriteId::Pyromaniac,
+            CharacterType::Ghoul2 => CharacterSpriteId::Ghoul,
+            CharacterType::Scoundrel => CharacterSpriteId::Scoundrel,
         }
     }
 }
@@ -458,7 +458,7 @@ pub fn create_character(
                 "Ogre",
                 SoundId::DamageOgre,
                 PortraitId::Ogre,
-                SpriteId::Ogre,
+                CharacterSpriteId::Ogre,
                 Attributes::new(9, 4, 3, 1),
                 pos,
             );
@@ -476,11 +476,11 @@ pub fn create_character(
                 "Huldra",
                 SoundId::DamageHuldra,
                 PortraitId::Huldra,
-                SpriteId::Huldra,
+                CharacterSpriteId::Huldra,
                 Attributes::new(2, 5, 9, 3),
                 pos,
             );
-            huldra.learn_ability(&HULDRA_HEAL);
+            huldra.learn_ability(&HULDRA_BLOOD_MAGIC);
             huldra.learn_ability(&HULDRA_INFECT);
             huldra.learn_passive(PassiveSkill::SwampDweller);
             huldra.armor_piece.set(Some(SHIRT));
@@ -494,7 +494,7 @@ pub fn create_character(
                 "Enslaved",
                 SoundId::DamageOgre,
                 PortraitId::Enslaved,
-                SpriteId::Enslaved,
+                CharacterSpriteId::Enslaved,
                 Attributes::new(5, 5, 2, 1),
                 pos,
             );
@@ -538,12 +538,12 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         stash: Default::default(),
     });
 
-    let alice = Character::new(
+    let mut alice = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Alice),
         "Ylva",
         SoundId::DamageFemale,
         PortraitId::Alice,
-        SpriteId::Alice,
+        CharacterSpriteId::Alice,
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
@@ -590,7 +590,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         "Gorm",
         SoundId::DamageBob,
         PortraitId::Bob,
-        SpriteId::Bob,
+        CharacterSpriteId::Bob,
         Attributes::new(5, 3, 3, 1),
         (2, 10),
     );
@@ -624,7 +624,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
         "Idun",
         SoundId::DamageFemale,
         PortraitId::Clara,
-        SpriteId::Clara,
+        CharacterSpriteId::Clara,
         Attributes::new(2, 2, 3, 7),
         (3, 10),
     );
@@ -647,7 +647,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
         "Test fighter",
         SoundId::DamageBob,
         PortraitId::Bob,
-        SpriteId::Bob,
+        CharacterSpriteId::Bob,
         Attributes::new(5, 3, 1, 1),
         (2, 10),
     );
@@ -676,12 +676,12 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
 }
 
 pub fn make_test_archer(party: &Rc<Party>) -> Character {
-    let test_archer = Character::new(
+    let mut test_archer = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Test archer",
         SoundId::DamageFemale,
         PortraitId::Alice,
-        SpriteId::Alice,
+        CharacterSpriteId::Alice,
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
@@ -737,7 +737,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
         "Test mage",
         SoundId::DamageFemale,
         PortraitId::Clara,
-        SpriteId::Clara,
+        CharacterSpriteId::Clara,
         Attributes::new(2, 2, 3, 7),
         (3, 10),
     );
@@ -759,7 +759,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     //clara.learn_ability(MIND_BLAST);
 
     // TODO
-    clara.learn_ability(&HULDRA_HEAL);
+    clara.learn_ability(&HULDRA_BLOOD_MAGIC);
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
