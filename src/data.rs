@@ -645,7 +645,7 @@ pub const COLD_ARROWS: Arrow = Arrow {
 
 pub const FIRE_ARROWS: Arrow = Arrow {
     name: "Fire arrows",
-    description: "Deals |<value>2| |<fire>|fire damage in an area and sets the ground on fire",
+    description: "Deals |<value>2| |<fire>|fire damage in an area and sets the ground on fire.",
     icon: EquipmentIconId::FireArrow,
     bonus_penetration: 0,
     on_damage_apply: None,
@@ -682,6 +682,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
 
 pub const ARCANE_RING: Trinket = Trinket {
     name: "Arcane ring",
+    description: "Gain |<value>+3| spell modifier",
     sprite: None,
     equip: EquipEffect {
         bonus_spell_modifier: 3,
@@ -693,6 +694,7 @@ pub const ARCANE_RING: Trinket = Trinket {
 pub const NECROTIC_BAND: Trinket = Trinket {
     name: "Necrotic band",
     sprite: None,
+    description: "Heal for |<value>2| after you kill a target.",
     equip: EquipEffect {
         heal_on_kill: 2,
         ..EquipEffect::default()
@@ -702,6 +704,8 @@ pub const NECROTIC_BAND: Trinket = Trinket {
 
 pub const HUNTERS_CHARM: Trinket = Trinket {
     name: "Hunter's charm",
+    description:
+        "Gain |<value>2| bonus movement per round, and |<value>1| |<stamina>| stamina regeneration.",
     sprite: None,
     equip: EquipEffect {
         bonus_move_speed: 2,
@@ -713,6 +717,7 @@ pub const HUNTERS_CHARM: Trinket = Trinket {
 
 pub const DRAUG_NECKLACE: Trinket = Trinket {
     name: "Draug necklace",
+    description: "Attack with advantage against |<keyword>Bleeding| targets.",
     sprite: None,
     equip: EquipEffect {
         // TODO: upon killing or critting a bleeding target, gain some health
@@ -724,6 +729,7 @@ pub const DRAUG_NECKLACE: Trinket = Trinket {
 
 pub const BATTLEMAGE_SIGIL: Trinket = Trinket {
     name: "Battle mage sigil",
+    description: "Attacking a target empowers your next spell.",
     sprite: None,
     equip: EquipEffect {
         on_attack_damage_apply_self: Some(apply_condition(Condition::ArcaneBlessing)),
@@ -734,6 +740,7 @@ pub const BATTLEMAGE_SIGIL: Trinket = Trinket {
 
 pub const ASSASSINS_VIAL: Trinket = Trinket {
     name: "Assassin's vial",
+    description: "Your attacks inflict |<keyword>Poisoned|.",
     sprite: None,
     equip: EquipEffect {
         on_attack_damage_apply: Some(apply_condition_rounds(Condition::Poisoned, 3)),
@@ -744,6 +751,7 @@ pub const ASSASSINS_VIAL: Trinket = Trinket {
 
 pub const SAPHIRE: Trinket = Trinket {
     name: "Saphire",
+    description: "After spending mana on spell enhancements, you regain |<value>1| mana. Can trigger once per turn.",
     sprite: None,
     equip: EquipEffect {
         start_of_turn_apply_self: Some(apply_condition_stacks(Condition::SpellFinesse, 1)),
@@ -754,6 +762,8 @@ pub const SAPHIRE: Trinket = Trinket {
 
 pub const RUBY: Trinket = Trinket {
     name: "Ruby",
+    description:
+        "If you start your turn adjacent to multiple enemies, you gain |<keyword>Bloodlust|.",
     sprite: None,
     equip: EquipEffect {
         start_of_turn_maybe_apply_self: Some((
@@ -775,6 +785,7 @@ pub const LIQUID_FIRE: Consumable = Consumable {
 const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Liquid fire",
+    "Deal |<value>2| |<fire>|fire damage in a small area, and set the ground on fire.",
     AbilityTarget::PositionCircle {
         range: Range::Tenths(135),
         circle_effect: CircleEffect::new(
@@ -802,6 +813,7 @@ pub const TOXIC_GRENADE: Consumable = Consumable {
 const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
     AbilityId::Grenade,
     "Toxic grenade",
+    "Deal |<value>3| damage to a target and inflict |<keyword>Poisoned|.",
     AbilityTarget::Character {
         acquisition: TargetAcquisition::Enemies,
         reach: AbilityReach::Range(Range::f32(13.5)),
@@ -820,14 +832,14 @@ const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
 const fn grenade_ability(
     id: AbilityId,
     name: &'static str,
+    description: &'static str,
     target: AbilityTarget,
     color: Color,
 ) -> Ability {
     Ability {
         id,
         name,
-
-        description: "",
+        description,
         icon: IconId::UseConsumable,
         action_point_cost: 2,
         mana_cost: 0,
@@ -916,7 +928,6 @@ pub fn shield_bash() -> &'static Ability {
             animation: AbilityAnimation::ShieldAttack,
             initiate_sound: None,
             resolve_sound: Some(SoundId::ShieldBash),
-            charge_fx: None,
             ..AudioVisuals::default()
         },
     })
@@ -956,7 +967,6 @@ pub const ENEMY_TACKLE: Ability = Ability {
         animation: AbilityAnimation::MeleeWeaponAttack,
         initiate_sound: None,
         resolve_sound: Some(SoundId::Explosion),
-        charge_fx: None,
         ..AudioVisuals::default()
     },
 };
@@ -990,7 +1000,6 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
         animation: AbilityAnimation::MeleeWeaponAttack,
         initiate_sound: None,
         resolve_sound: Some(SoundId::Explosion),
-        charge_fx: None,
         ..AudioVisuals::default()
     },
 };
@@ -1416,7 +1425,6 @@ pub const ENEMY_BRACE: Ability = Ability {
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
         initiate_sound: None,
         resolve_sound: Some(SoundId::BuffBrace),
-        charge_fx: None,
         ..AudioVisuals::default()
     },
 };
@@ -1515,7 +1523,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
 
-    description: "Attempt to |<keyword>Slow| and |<keyword>Expose| an enemy.",
+    description: "|<keyword>Slow| an enemy.",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
     mana_cost: 2,
@@ -1528,17 +1536,13 @@ pub const SHACKLED_MIND: Ability = Ability {
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Will),
-
-            on_hit: &[
-                apply_condition_rounds(Condition::Slowed, 1),
-                apply_condition_rounds(Condition::Exposed, 2),
-            ],
+            on_hit: &[apply_condition_rounds(Condition::Slowed, 2)],
             ..SpellTargetEffect::default()
         }),
         circle_effect: None,
         environment_effect: None,
     },
-    possible_enhancements: &[],
+    possible_enhancements: &[&SHACKLED_MIND_EXPOSE],
     /*
         Some(AbilityEnhancement {
             name: "Reach",
@@ -1578,6 +1582,19 @@ pub const SHACKLED_MIND: Ability = Ability {
         }),
         ..AudioVisuals::default()
     },
+};
+
+pub const SHACKLED_MIND_EXPOSE: AbilityEnhancement = AbilityEnhancement {
+    name: "Expose",
+    description: "Also |<keyword>Expose| the target.",
+    icon: IconId::ShackledMindExposed,
+    mana_cost: 1,
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
+        target_on_hit: &[apply_condition_rounds(Condition::Exposed, 2)],
+        ..SpellEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
 };
 
 pub const MIND_BLAST: Ability = Ability {
@@ -1719,10 +1736,11 @@ pub const DRAUG_HAUNT: Ability = Ability {
     },
     audio_visuals: AudioVisuals {
         animation_color: PURPLE,
-        animation: AbilityAnimation::MeleeWeaponAttack,
+        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Debuff),
-        charge_fx: None,
+        target_reaction: AbilityVisualReaction::Dislike,
+        character_target_effect: Some((EffectId::PurpleMagic, 0.5)),
         ..AudioVisuals::default()
     },
 };
@@ -1756,7 +1774,7 @@ pub const DRAUG_CLAW: Ability = Ability {
         animation: AbilityAnimation::MeleeWeaponAttack,
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Debuff),
-        charge_fx: None,
+        character_target_effect: Some((EffectId::Claws, 0.5)),
         ..AudioVisuals::default()
     },
 };
@@ -1790,7 +1808,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
         initiate_sound: None,
         resolve_sound: Some(SoundId::Laugh),
-        charge_fx: None,
+
         ..AudioVisuals::default()
     },
 };
@@ -1827,7 +1845,7 @@ pub const HULDRA_INFECT: Ability = Ability {
         }),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Infect),
-        charge_fx: None,
+
         ..AudioVisuals::default()
     },
 };
@@ -1862,7 +1880,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Debuff),
-        charge_fx: None,
+
         ..AudioVisuals::default()
     },
 };
@@ -1896,7 +1914,7 @@ pub static HULDRA_BLOOD_MAGIC: Ability = Ability {
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
         initiate_sound: Some(SoundId::ShootSpell),
         resolve_sound: Some(SoundId::Powerup),
-        charge_fx: None,
+
         target_magic_sparks: Some(WHITE),
         target_reaction: AbilityVisualReaction::Enjoy,
         ..AudioVisuals::default()
@@ -2024,7 +2042,7 @@ pub const HASTE: Ability = Ability {
 
 pub const INSPIRE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
     name: "Bloodlust",
-    description: "Also make targets more likely to score critical hits, for |<value>2| rounds.",
+    description: "Also increase targets' |<keyword>Critical hit| chance |<critical_hit>|, for |<value>2| rounds.",
     icon: IconId::Bloodlust,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -2116,7 +2134,6 @@ pub const ENEMY_INSPIRE: Ability = Ability {
         environment_effect: None,
     },
     audio_visuals: AudioVisuals {
-        charge_fx: None,
         animation_color: GREEN,
         initiate_sound: None,
         animation: AbilityAnimation::CastSpell(SpellTravelAnimation::None),
@@ -2166,7 +2183,8 @@ pub const HEALING_NOVA: Ability = Ability {
 pub const SPIKE_TRAP: Ability = Ability {
     id: AbilityId::Spikes,
     name: "Spike trap",
-    description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them.",
+    description: "Throw sharp |<keyword>spikes| on the ground, \
+    slowing and damaging anyone that steps over them.",
     icon: IconId::SpikeTrap,
     action_point_cost: 2,
     mana_cost: 0,
@@ -2185,22 +2203,22 @@ pub const SPIKE_TRAP: Ability = Ability {
                 ..SpellTargetEffect::default()
             }),
             Some(Surface::Spikes),
-        )
-        ,
+        ),
     },
-    audio_visuals: AudioVisuals {animation_color: GRAY,
-    animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
-    //TODO
-    initiate_sound: Some(SoundId::AttackMiss),
-    //TODO
-    resolve_sound: Some(SoundId::Crit),
-    charge_fx: None,..AudioVisuals::default()}
+    audio_visuals: AudioVisuals {
+        animation_color: GRAY,
+        animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
+        //TODO
+        initiate_sound: Some(SoundId::AttackMiss),
+        //TODO
+        resolve_sound: Some(SoundId::Crit),
+        ..AudioVisuals::default()
+    },
 };
 
 pub const DASH: Ability = Ability {
     id: AbilityId::Dash,
     name: "Dash",
-
     description:
         "Move swiftly in a straight line.\nDoes not trigger |<reaction>| opportunity attacks.",
     icon: IconId::Dash,
@@ -2218,7 +2236,6 @@ pub const DASH: Ability = Ability {
         animation: AbilityAnimation::Dash,
         initiate_sound: None,
         resolve_sound: None,
-        charge_fx: None,
         ..AudioVisuals::default()
     },
 };
@@ -2664,6 +2681,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
     ability: &potion_ability(
         AbilityId::HealthPotion,
         "Health potion",
+        "Heal |<value>12| health |<heart>| over |<value>4| rounds.",
         &[apply_condition_stacks(Condition::HealthPotionRecovering, 4)],
         COL_RED,
     ),
@@ -2676,6 +2694,7 @@ pub const MANA_POTION: Consumable = Consumable {
     ability: &potion_ability(
         AbilityId::ManaPotion,
         "Mana potion",
+        "Restore |<value>5| |<mana>| mana",
         &[ApplyEffect::GainMana(5)],
         COL_BLUE,
     ),
@@ -2684,6 +2703,7 @@ pub const MANA_POTION: Consumable = Consumable {
 const fn potion_ability(
     id: AbilityId,
     name: &'static str,
+    description: &'static str,
     apply: &'static [ApplyEffect],
     color: Color,
 ) -> Ability {
@@ -2691,7 +2711,7 @@ const fn potion_ability(
         id,
         name,
 
-        description: "",
+        description,
         icon: IconId::UseConsumable,
         action_point_cost: 1,
         mana_cost: 0,
@@ -2717,7 +2737,6 @@ const fn potion_ability(
             animation_color: color,
             animation: AbilityAnimation::ConsumePotion,
             resolve_sound: Some(SoundId::Powerup),
-            charge_fx: None,
             target_magic_sparks: Some(WHITE),
             target_reaction: AbilityVisualReaction::Enjoy,
             ..AudioVisuals::default()
@@ -2731,7 +2750,8 @@ pub const ADRENALIN_POTION: Consumable = Consumable {
     weight: 0,
     ability: &potion_ability(
         AbilityId::AdrenalinPotion,
-        "Adrenaline potion    ",
+        "Adrenaline potion",
+        "Gain |<keyword>Adrenalin| for |<value>3| rounds.",
         &[apply_condition_rounds(Condition::Adrenalin, 3)],
         YELLOW,
     ),
@@ -2744,6 +2764,7 @@ pub const ENERGY_POTION: Consumable = Consumable {
     ability: &potion_ability(
         AbilityId::EnergyPotion,
         "Energy potion",
+        "Restore |<value>10| |<stamina>| stamina",
         &[ApplyEffect::GainStamina(10)],
         COL_GREEN_1,
     ),
@@ -2756,6 +2777,7 @@ pub const ARCANE_POTION: Consumable = Consumable {
     ability: &potion_ability(
         AbilityId::ArcanePotion,
         "Arcane potion",
+        "Gain |<keyword>Arcane Surge|.",
         &[apply_condition_stacks(Condition::ArcaneSurge, 5)],
         PURPLE,
     ),

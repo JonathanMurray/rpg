@@ -24,16 +24,7 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     game_ui::draw_rectangle_lines2,
     game_ui_connection::DEBUG,
-    resources::{
-        draw_status_icon, IconId, StatusId, ALT_KEY_SYMBOL, AP_SYMBOL, BLUE_DICE_SYMBOL,
-        BOOT_SYMBOL, CHECKED_SYMBOL, CONFIRM_SYMBOL, ENHANCEMENT_SYMBOL, EVASION_SYMBOL,
-        FIRE_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, LEFT_CLICK_SYMBOL, LIGHTNING_SYMBOL,
-        LOSE_AP_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL,
-        RADIUS_SYMBOL, RANGE_SYMBOL, REACTION_SYMBOL, RED_DICE_SYMBOL, RIGHT_CLICK_SYMBOL,
-        SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL,
-        TARGET_SYMBOL, TOUGHNESS_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
-        WILL_SYMBOL,
-    },
+    resources::{draw_status_icon, IconId, StatusId, FONT_SYMBOL_TEXTURE},
     sounds::{SoundId, SoundPlayer},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
@@ -496,47 +487,49 @@ const FONT_SYMBOL_H: f32 = 16.0;
 const FONT_SYMBOL_Y_OFFSET: f32 = 13.0;
 const FONT_STATUS_W: f32 = 10.0;
 
-static TAGS: LazyLock<HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)>> =
-    LazyLock::new(|| {
-        let symbol_w = 16.0;
-        HashMap::from([
-            ("<unchecked>", (symbol_w, &UNCHECKED_SYMBOL)),
-            ("<checked>", (symbol_w, &CHECKED_SYMBOL)),
-            ("<blue_dice>", (symbol_w, &BLUE_DICE_SYMBOL)),
-            ("<red_dice>", (symbol_w, &RED_DICE_SYMBOL)),
-            ("<mixed_dice>", (symbol_w, &MIXED_DICE_SYMBOL)),
-            ("<shield>", (symbol_w, &SHIELD_SYMBOL)),
-            ("<alt_key>", (symbol_w, &ALT_KEY_SYMBOL)),
-            ("<warning>", (symbol_w, &WARNING_SYMBOL)),
-            ("<info>", (symbol_w, &INFO_SYMBOL)),
-            ("<ap>", (9.0, &AP_SYMBOL)),
-            ("<lose_ap>", (9.0, &LOSE_AP_SYMBOL)),
-            ("<heart>", (symbol_w, &HEART_SYMBOL)),
-            ("<boot>", (symbol_w, &BOOT_SYMBOL)),
-            ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
-            ("<toughness>", (symbol_w, &TOUGHNESS_SYMBOL)),
-            ("<evasion>", (symbol_w, &EVASION_SYMBOL)),
-            ("<will>", (symbol_w, &WILL_SYMBOL)),
-            ("<lightning>", (9.0, &LIGHTNING_SYMBOL)),
-            ("<fire>", (symbol_w, &FIRE_SYMBOL)),
-            ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
-            ("<single_target>", (symbol_w, &SINGLE_TARGET_SYMBOL)),
-            ("<multi_target>", (symbol_w, &MULTI_TARGET_SYMBOL)),
-            ("<range>", (symbol_w, &RANGE_SYMBOL)),
-            ("<radius>", (symbol_w, &RADIUS_SYMBOL)),
-            ("<confirm>", (symbol_w, &CONFIRM_SYMBOL)),
-            ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
-            ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
-            ("<mana>", (12.0, &MANA_SYMBOL)),
-            ("<mana_small>", (9.0, &MANA_SMALL_SYMBOL)),
-            ("<sword>", (12.0, &SWORD_SYMBOL)),
-            ("<target>", (symbol_w, &TARGET_SYMBOL)),
-            ("<reaction>", (8.0, &REACTION_SYMBOL)),
-            ("<enhancement>", (12.0, &ENHANCEMENT_SYMBOL)),
-            ("<right_click>", (12.0, &RIGHT_CLICK_SYMBOL)),
-            ("<left_click>", (12.0, &LEFT_CLICK_SYMBOL)),
-        ])
-    });
+pub static FONT_SYMBOLS: LazyLock<HashMap<&'static str, (f32, (u32, u32))>> = LazyLock::new(|| {
+    let symbol_w = 16.0;
+    HashMap::from([
+        ("<unchecked>", (symbol_w, (4, 0))),
+        ("<checked>", (symbol_w, (5, 0))),
+        ("<blue_dice>", (symbol_w, (0, 0))),
+        ("<red_dice>", (symbol_w, (3, 2))),
+        ("<mixed_dice>", (symbol_w, (5, 2))),
+        ("<shield>", (symbol_w, (1, 0))),
+        ("<alt_key>", (symbol_w, (2, 0))),
+        ("<warning>", (symbol_w, (3, 0))),
+        ("<info>", (symbol_w, (4, 1))),
+        ("<ap>", (9.0, (5, 1))),
+        ("<lose_ap>", (9.0, (6, 1))),
+        ("<heart>", (symbol_w, (0, 1))),
+        ("<boot>", (symbol_w, (1, 2))),
+        ("<helmet>", (symbol_w, (2, 3))),
+        ("<toughness>", (symbol_w, (1, 4))),
+        ("<evasion>", (symbol_w, (2, 4))),
+        ("<will>", (symbol_w, (3, 4))),
+        ("<lightning>", (9.0, (4, 4))),
+        ("<fire>", (symbol_w, (5, 4))),
+        ("<weight>", (symbol_w, (3, 3))),
+        ("<single_target>", (symbol_w, (4, 3))),
+        ("<multi_target>", (symbol_w, (5, 3))),
+        ("<range>", (symbol_w, (6, 3))),
+        ("<radius>", (symbol_w, (6, 2))),
+        ("<confirm>", (symbol_w, (3, 1))),
+        ("<stamina>", (symbol_w, (1, 1))),
+        ("<stamina_small>", (9.0, (1, 3))),
+        ("<mana>", (12.0, (2, 1))),
+        ("<mana_small>", (9.0, (0, 3))),
+        ("<sword>", (12.0, (0, 2))),
+        ("<target>", (symbol_w, (6, 4))),
+        ("<reaction>", (8.0, (0, 4))),
+        ("<enhancement>", (12.0, (0, 5))),
+        ("<right_click>", (12.0, (1, 5))),
+        ("<left_click>", (12.0, (2, 5))),
+        ("<weak_hit>", (12.0, (3, 5))),
+        ("<strong_hit>", (12.0, (4, 5))),
+        ("<critical_hit>", (12.0, (5, 5))),
+    ])
+});
 
 pub fn measure_text_with_font_tags(
     line: &str,
@@ -549,7 +542,7 @@ pub fn measure_text_with_font_tags(
     let mut h: f32 = 0.0;
     let mut offset_y: Option<f32> = None;
     for mut part in parts {
-        if let Some(&(symbol_w, _)) = TAGS.get(part) {
+        if let Some(&(symbol_w, _)) = FONT_SYMBOLS.get(part) {
             w += symbol_w;
             h = h.max(FONT_SYMBOL_H);
             let symbol_offset = FONT_SYMBOL_Y_OFFSET; //13.0;
@@ -592,6 +585,35 @@ pub fn measure_text_with_font_tags(
     }
 }
 
+pub fn draw_font_symbol(screen_pos: (f32, f32), symbol_index: (u32, u32), confirm_symbol: bool) {
+    let texture = FONT_SYMBOL_TEXTURE.get().unwrap();
+    let src_size = 16.0;
+    let (col, row) = symbol_index;
+    let mut source_rect = Rect::new(
+        col as f32 * src_size,
+        row as f32 * src_size,
+        src_size,
+        src_size,
+    );
+    let params = if confirm_symbol {
+        source_rect.y += 2.0;
+        source_rect.w = 13.0;
+        source_rect.h = 13.0;
+        DrawTextureParams {
+            rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
+            source: Some(source_rect),
+            pivot: Some((screen_pos.0 + 6.5, screen_pos.1 + 6.5).into()),
+            ..Default::default()
+        }
+    } else {
+        DrawTextureParams {
+            source: Some(source_rect),
+            ..Default::default()
+        }
+    };
+    draw_texture_ex(texture, screen_pos.0, screen_pos.1, WHITE, params);
+}
+
 pub fn draw_text_with_font_tags(
     line: &str,
     x: f32,
@@ -599,29 +621,17 @@ pub fn draw_text_with_font_tags(
     params: TextParams<'_>,
     render_tags: bool,
 ) -> (f32, f32) {
+    let x = x.round();
+    let y = y.round();
+
     let symbol_offset = FONT_SYMBOL_Y_OFFSET; //13.0;
     let mut x0 = x;
     let mut h: f32 = 0.0;
     let parts = line.split("|").filter(|p| !p.is_empty());
     for mut part in parts {
-        if let Some((symbol_w, texture)) = TAGS.get(part) {
+        if let Some((symbol_w, symbol_index)) = FONT_SYMBOLS.get(part) {
             if render_tags {
-                if part == "<confirm>" {
-                    draw_texture_ex(
-                        texture.get().unwrap(),
-                        x0,
-                        y - symbol_offset,
-                        WHITE,
-                        DrawTextureParams {
-                            rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
-                            source: Some(Rect::new(0.0, 2.0, 13.0, 13.0)),
-                            pivot: Some((x0 + 6.5, y - 13.0 + 6.5).into()),
-                            ..Default::default()
-                        },
-                    );
-                } else {
-                    draw_texture(texture.get().unwrap(), x0, y - symbol_offset, WHITE);
-                }
+                draw_font_symbol((x0, y - symbol_offset), *symbol_index, part == "<confirm>");
             }
             x0 += symbol_w;
         } else if consume_prefix_tag("<status>", &mut part) {

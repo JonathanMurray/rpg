@@ -21,8 +21,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, Align, Circle, Container, Drawable, Element,
-        LayoutDirection, SimpleTooltip, Style, TextLine,
+        draw_debug, draw_font_symbol, draw_text_rounded, Align, Circle, Container, Drawable,
+        Element, LayoutDirection, SimpleTooltip, Style, TextLine, FONT_SYMBOLS,
     },
     core::{
         Ability, AbilityDamage, AbilityEnhancement, AbilityReach, AbilityRollType, AbilityTarget,
@@ -38,9 +38,8 @@ use crate::{
     game_ui::draw_rectangle_lines2,
     pathfind::Surface,
     resources::{
-        draw_icon, IconId, ENHANCEMENT_SYMBOL, REACTION_SYMBOL, UI_ACTION_BUTTON_BG_TEXTURE,
-        UI_ACTION_BUTTON_SMALL_BG_TEXTURE, UI_ACTION_BUTTON_SMALL_TEXTURE,
-        UI_ACTION_BUTTON_TEXTURE,
+        draw_icon, IconId, UI_ACTION_BUTTON_BG_TEXTURE, UI_ACTION_BUTTON_SMALL_BG_TEXTURE,
+        UI_ACTION_BUTTON_SMALL_TEXTURE, UI_ACTION_BUTTON_TEXTURE,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
@@ -250,12 +249,12 @@ fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
     match effect {
         AttackHitEffect::ApplyTarget(apply_effect) => {
             t.technical_description
-                .push("|<trigger>|On damage:| |<single_target>| |<faded>(target)| ".to_string());
+                .push("|<trigger>On damage:| |<single_target>| |<faded>(target)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
         AttackHitEffect::ApplySelf(apply_effect) => {
             t.technical_description
-                .push("|<trigger>|On damage:| |<single_target>| |<faded>(self)| ".to_string());
+                .push("|<trigger>On damage:| |<single_target>| |<faded>(self)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
     }
@@ -1414,11 +1413,11 @@ impl Drawable for ActionButton {
         }
 
         if self.action_tooltip.action.is_reaction() {
-            let texture = REACTION_SYMBOL.get().unwrap();
-            draw_texture(texture, x + 2.0, y + 2.0, WHITE);
+            let (_, symbol_index) = FONT_SYMBOLS.get("<reaction>").unwrap();
+            draw_font_symbol((x + 2.0, y + 2.0), *symbol_index, false);
         } else if self.action_tooltip.action.is_enhancement() {
-            let texture = ENHANCEMENT_SYMBOL.get().unwrap();
-            draw_texture(texture, x + 4.0, y + 2.0, WHITE);
+            let (_, symbol_index) = FONT_SYMBOLS.get("<enhancement>").unwrap();
+            draw_font_symbol((x + 2.0, y + 2.0), *symbol_index, false);
         }
 
         self.style.draw_foreground(x, y, self.size);

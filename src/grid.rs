@@ -2233,6 +2233,9 @@ impl GameGrid {
                 AbilityVisualReaction::ReelBack => {
                     self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
                 }
+                AbilityVisualReaction::Dislike => {
+                    self.animate_character_shaking(target_id, start_time, 0.3);
+                }
                 AbilityVisualReaction::Enjoy => {
                     self.animate_character_shaking(target_id, start_time, 0.15);
                 }

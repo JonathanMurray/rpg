@@ -20,8 +20,8 @@ use crate::{
         FIRE_BOLT, HEALING_NOVA, HULDRA_BLOOD_MAGIC, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
         ICE_BOLT, INSPIRE_BLOODLUST, KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
         LIQUID_FIRE, LUNGE_ATTACK, MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE,
-        SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH,
-        TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW, ZERO_SWORD,
+        SHACKLED_MIND_EXPOSE, SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, SPIKE_TRAP, STAFF,
+        SWEEP_ATTACK_PUSH, TOXIC_GRENADE, WAR_AXE, WAR_HAMMER, ZERO_BOW, ZERO_SWORD,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Elevation, Occupation, PathfindGrid, Surface},
@@ -749,6 +749,7 @@ fn make_test_mage(party: &Rc<Party>) -> Character {
     clara.learn_ability_enhancement(&REACH);
     clara.learn_ability(&FIREBALL);
     clara.learn_ability(&SHACKLED_MIND);
+    clara.learn_ability_enhancement(&SHACKLED_MIND_EXPOSE);
     clara.learn_ability(&ICE_BOLT);
     clara.learn_ability_enhancement(&INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(&LIGHTNING_BOLT);

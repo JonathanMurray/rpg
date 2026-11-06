@@ -2350,19 +2350,19 @@ impl CoreGame {
                 detail_lines.push("  Miss |<faded>(natural 1)|".to_string());
                 return HitType::Miss;
             } else if unmodified_roll == 20 {
-                detail_lines.push("  Crit |<faded>(natural 20)|".to_string());
+                detail_lines.push("  Crit |<critical_hit>| |<faded>(natural 20)|".to_string());
                 return HitType::Critical;
             }
         }
 
         if final_result <= 5 {
-            detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
+            detail_lines.push("  Weak hit |<weak_hit>| |<faded>(5 or lower)|".to_string());
             HitType::Weak
         } else if final_result <= 15 {
             detail_lines.push("  Hit |<faded>(6-15)|".to_string());
             HitType::Regular
         } else {
-            detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
+            detail_lines.push("  Strong hit |<strong_hit>| |<faded>(16 or higher)|".to_string());
             HitType::Strong
         }
     }
@@ -2449,12 +2449,12 @@ impl CoreGame {
                         }
                         HitType::Regular => {}
                         HitType::Strong => {
-                            dmg_str.push_str(" +50% |<faded>(Strong)|");
+                            dmg_str.push_str(" +50% (|<strong_hit>|)");
                             multiplicative_bonus_dmg +=
                                 (dmg_calculation as f32 * 0.5).ceil() as i32;
                         }
                         HitType::Critical => {
-                            dmg_str.push_str(" +75% |<faded>(Crit)|");
+                            dmg_str.push_str(" +75% (|<critical_hit>|)");
                             multiplicative_bonus_dmg +=
                                 (dmg_calculation as f32 * 0.75).ceil() as i32;
                         }
@@ -2513,7 +2513,7 @@ impl CoreGame {
 
                 // If not ability, assume attack (e.g. effect from arrows)
                 let dmg_source = ability_id
-                    .map(|id| DamageSource::Ability(id))
+                    .map(|id| DamageSource::Ability(id, hit_type))
                     .unwrap_or_else(|| {
                         let attack_type = if caster.has_equipped_ranged_weapon() {
                             AttackType::Ranged
@@ -2746,6 +2746,8 @@ impl CoreGame {
             ActionPerformanceMode::SimulatedRoll(..) => None,
         };
 
+        let mut roll_advantage_reasons = vec![];
+
         let (mut attack_bonus, attack_bonus_contributors) = attack_roll_bonus(
             attacker,
             hand_type,
@@ -2755,6 +2757,15 @@ impl CoreGame {
             mode.pathfind_grid(),
         );
         attack_bonus.advantage += ability_roll_advantage;
+
+        if ability_roll_advantage != 0 {
+            roll_advantage_reasons.push("ability");
+        }
+        for (label, contributor) in &attack_bonus_contributors {
+            if contributor.advantage() != 0 {
+                roll_advantage_reasons.push(label);
+            }
+        }
 
         let base_evasion = defender.evasion();
 
@@ -2774,7 +2785,7 @@ impl CoreGame {
             if let Some(game) = game {
                 let reactor = game.characters.get(reactor);
                 detail_lines.push(format!(
-                    "|{}| reacted with {}",
+                    "|<reaction>| |{}| reacted with {}",
                     reactor.name_tag(),
                     reaction.name
                 ));
@@ -2821,13 +2832,16 @@ impl CoreGame {
             }
         }
 
-        let mut unmodified_roll: u32 = mode
+        let unmodified_roll: u32 = mode
             .simulated_roll()
             .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
 
         if game.is_some() {
-            if let Some(description) = roll_description(attack_bonus.advantage) {
-                detail_lines.push(description);
+            if !roll_advantage_reasons.is_empty() {
+                detail_lines.push(roll_description(
+                    attack_bonus.advantage,
+                    &roll_advantage_reasons,
+                ));
             }
         }
 
@@ -2918,7 +2932,8 @@ impl CoreGame {
                 dmg_str.push_str(&dmg.to_string());
             } else {
                 dmg_calculation = weapon.damage as i32;
-                dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, weapon.name));
+                dmg_str.push_str(&format!("{}", dmg_calculation));
+                //dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, weapon.name));
             }
 
             if let Some(e) = ability_attack_effect {
@@ -3020,9 +3035,7 @@ impl CoreGame {
             }
 
             if armor_value > 0 {
-                dmg_str.push_str(&format!(
-                    " -{armor_value} |<faded>(|<shield>|<faded>armor)|"
-                ));
+                dmg_str.push_str(&format!(" -{armor_value} |<faded>(|<shield>|<faded>)|"));
                 dmg_calculation -= armor_value as i32;
             }
 
@@ -3040,28 +3053,30 @@ impl CoreGame {
                 }
                 HitType::Weak => {
                     if let Some(source) = graze_improvement {
-                        dmg_str.push_str(&format!(" -25% |<faded>(weak, {})|", source));
+                        dmg_str.push_str(&format!(" -25% (|<weak_hit>|, {})", source));
                         dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
                     } else {
-                        dmg_str.push_str(" -50% |<faded>(weak)|");
+                        dmg_str.push_str(" -50% (|<weak_hit>|)");
                         dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
+                    detail_lines.push("  Weak hit |<weak_hit>| |<faded>(5 or lower)|".to_string());
                 }
                 HitType::Regular => {
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
                 HitType::Strong => {
-                    dmg_str.push_str(" +50% |<faded>(strong)|");
+                    dmg_str.push_str(" +50% (|<strong_hit>|)");
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
-                    detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
+                    detail_lines
+                        .push("  Strong hit |<strong_hit>| |<faded>(16 or higher)|".to_string());
                 }
                 HitType::Critical => {
                     if let Some(source) = crit_improvement {
-                        dmg_str.push_str(&format!(" +100% |<faded>(crit, {})|", source));
+                        dmg_str
+                            .push_str(&format!(" +100% (|<critical_hit>|, |<faded>{}|)", source));
                         dmg_calculation += (dmg_calculation as f32 * 1.0).ceil() as i32;
                     } else {
-                        dmg_str.push_str(" +75% |<faded>(crit)|");
+                        dmg_str.push_str(" +75% (|<critical_hit>|)");
                         dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
                     }
 
@@ -3070,7 +3085,7 @@ impl CoreGame {
                     } else {
                         "|<faded>(rolled 20)|".to_string()
                     };
-                    detail_lines.push(format!("  Critical Hit {}", explanation));
+                    detail_lines.push(format!("  Critical Hit |<critical_hit>| {}", explanation));
                 }
             }
 
@@ -3808,18 +3823,14 @@ pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) 
     }
 }
 
-fn roll_description(advantage: i32) -> Option<String> {
-    match advantage.cmp(&0) {
-        Ordering::Less => Some(format!(
-            "|<faded>Rolling {} dice with disadvantage...|",
-            advantage.abs() + 1
-        )),
-        Ordering::Equal => None,
-        Ordering::Greater => Some(format!(
-            "|<faded>Rolling {} dice with advantage...|",
-            advantage + 1
-        )),
-    }
+fn roll_description(advantage: i32, advantage_reasons: &[&str]) -> String {
+    let mut description = match advantage.cmp(&0) {
+        Ordering::Less => format!("Rolling {} dice with disadvantage...", advantage.abs() + 1),
+        Ordering::Equal => " Rolling 1 die...".to_string(),
+        Ordering::Greater => format!("Rolling {} dice with advantage...", advantage + 1),
+    };
+    description.push_str(&format!(" ({})", advantage_reasons.join(", ")));
+    format!("|<faded>{}|", description)
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -4418,7 +4429,7 @@ pub enum DamageSource {
         hit_type: HitType,
         attacker_pos: Position,
     },
-    Ability(AbilityId),
+    Ability(AbilityId, HitType),
     Unknown,
     Thorns,
 }
@@ -4596,6 +4607,18 @@ pub enum HitType {
     Regular,
     Strong,
     Critical,
+}
+
+impl HitType {
+    pub fn font_symbol(&self) -> Option<&'static str> {
+        match self {
+            HitType::Miss => None,
+            HitType::Regular => None,
+            HitType::Weak => Some("<weak_hit>"),
+            HitType::Strong => Some("<strong_hit>"),
+            HitType::Critical => Some("<critical_hit>"),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -5196,7 +5219,7 @@ impl Condition {
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn.",
             HealthPotionRecovering => "|<trigger>End of turn:| heal |<value>3| |<heart>|.",
             Ferocity => "|<value>+x| attack damage.",
-            Bloodlust => "|<value>20%| more likely to score a critical hit when attacking.",
+            Bloodlust => "|<value>20%| more likely to score a |<keyword>critical hit| |<critical_hit>| when attacking.",
             Wet => "Resistant: |<value>-25%| |<fire>||<faded>fire dmg|.\n|Vulnerable: |<value>+50%| |<lightning>||<faded>lightning dmg|.",
             Poisoned => "|<trigger>End of turn:| lose |<value>10%| of current health |<heart>|.",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
@@ -5704,6 +5727,7 @@ pub struct AudioVisuals {
 #[derive(Debug, PartialEq)]
 pub enum AbilityVisualReaction {
     ReelBack,
+    Dislike,
     Enjoy,
 }
 
@@ -8884,6 +8908,7 @@ pub struct Arrow {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Trinket {
     pub name: &'static str,
+    pub description: &'static str,
     pub sprite: Option<EquipmentSpriteId>,
     pub icon: EquipmentIconId,
     pub equip: EquipEffect,

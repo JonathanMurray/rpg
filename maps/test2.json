@@ -465,9 +465,9 @@
   },
   "characters": [
     {
-      "type_": "Bob",
+      "type_": "Ghoul1",
       "pos": [
-        31,
+        28,
         28
       ],
       "health": null,
@@ -476,9 +476,20 @@
       "name": null
     },
     {
-      "type_": "SkeletonLeader",
+      "type_": "Ghoul1",
       "pos": [
-        34,
+        21,
+        35
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        31,
         31
       ],
       "health": null,

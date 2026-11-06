@@ -312,6 +312,7 @@ pub enum IconId {
     Equip,
     UseConsumable,
     ShackledMind,
+    ShackledMindExposed,
     Haste,
     Smite,
     QuickStrike,
@@ -1540,6 +1541,7 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
         IconId::Equip => (1, 4),
         IconId::UseConsumable => (2, 4),
         IconId::ShackledMind => (9, 1),
+        IconId::ShackledMindExposed => (10, 1),
         IconId::Haste => (2, 2),
         IconId::Smite => (2, 8),
         IconId::QuickStrike => (3, 8),
@@ -1616,6 +1618,7 @@ pub enum EffectId {
     Raven,
     FireBomb,
     RisingSmoke,
+    Claws,
 }
 
 impl FlipbookAnimation {
@@ -1632,6 +1635,7 @@ impl FlipbookAnimation {
             EffectId::Raven => 8,
             EffectId::FireBomb => 9,
             EffectId::RisingSmoke => 10,
+            EffectId::Claws => 11,
         };
         let source_size = (32.0, 32.0);
 
@@ -1735,55 +1739,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
 
 async fn load_and_init_font_symbols() {
     let symbol_atlas = load_and_init_texture("font.png").await;
-    let img = symbol_atlas.get_texture_data();
-
-    let symbol = |x, y| {
-        let texture = Texture2D::from_image(&img.sub_image(Rect::new(
-            x as f32 * 16.0,
-            y as f32 * 16.0,
-            16.0,
-            16.0,
-        )));
-
-        texture.set_filter(FilterMode::Nearest);
-        texture
-    };
-
-    UNCHECKED_SYMBOL.get_or_init(|| symbol(4, 0));
-    CHECKED_SYMBOL.get_or_init(|| symbol(5, 0));
-    BLUE_DICE_SYMBOL.get_or_init(|| symbol(0, 0));
-    RED_DICE_SYMBOL.get_or_init(|| symbol(3, 2));
-    MIXED_DICE_SYMBOL.get_or_init(|| symbol(5, 2));
-    SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
-    ALT_KEY_SYMBOL.get_or_init(|| symbol(2, 0));
-    WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
-    INFO_SYMBOL.get_or_init(|| symbol(4, 1));
-    AP_SYMBOL.get_or_init(|| symbol(5, 1));
-    LOSE_AP_SYMBOL.get_or_init(|| symbol(6, 1));
-    HEART_SYMBOL.get_or_init(|| symbol(0, 1));
-    STAMINA_SYMBOL.get_or_init(|| symbol(1, 1));
-    STAMINA_SMALL_SYMBOL.get_or_init(|| symbol(1, 3));
-    MANA_SYMBOL.get_or_init(|| symbol(2, 1));
-    MANA_SMALL_SYMBOL.get_or_init(|| symbol(0, 3));
-    SWORD_SYMBOL.get_or_init(|| symbol(0, 2));
-    BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
-    HELMET_SYMBOL.get_or_init(|| symbol(2, 3));
-    TOUGHNESS_SYMBOL.get_or_init(|| symbol(1, 4));
-    EVASION_SYMBOL.get_or_init(|| symbol(2, 4));
-    WILL_SYMBOL.get_or_init(|| symbol(3, 4));
-    LIGHTNING_SYMBOL.get_or_init(|| symbol(4, 4));
-    FIRE_SYMBOL.get_or_init(|| symbol(5, 4));
-    WEIGHT_SYMBOL.get_or_init(|| symbol(3, 3));
-    SINGLE_TARGET_SYMBOL.get_or_init(|| symbol(4, 3));
-    MULTI_TARGET_SYMBOL.get_or_init(|| symbol(5, 3));
-    RANGE_SYMBOL.get_or_init(|| symbol(6, 3));
-    RADIUS_SYMBOL.get_or_init(|| symbol(6, 2));
-    CONFIRM_SYMBOL.get_or_init(|| symbol(3, 1));
-    TARGET_SYMBOL.get_or_init(|| symbol(6, 4));
-    REACTION_SYMBOL.get_or_init(|| symbol(0, 4));
-    ENHANCEMENT_SYMBOL.get_or_init(|| symbol(0, 5));
-    RIGHT_CLICK_SYMBOL.get_or_init(|| symbol(1, 5));
-    LEFT_CLICK_SYMBOL.get_or_init(|| symbol(2, 5));
+    FONT_SYMBOL_TEXTURE.set(symbol_atlas).unwrap();
 }
 
 async fn load_and_init_texture_into(path: &str, dst: &OnceLock<Texture2D>) {
@@ -1791,41 +1747,7 @@ async fn load_and_init_texture_into(path: &str, dst: &OnceLock<Texture2D>) {
     dst.get_or_init(|| texture);
 }
 
-pub static UNCHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static CHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static BLUE_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static RED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static MIXED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static INFO_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static AP_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static LOSE_AP_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static HEART_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static STAMINA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static STAMINA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static MANA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static MANA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static HELMET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static TOUGHNESS_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static EVASION_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static WILL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static LIGHTNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static FIRE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static WEIGHT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static SINGLE_TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static MULTI_TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static RANGE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static RADIUS_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static CONFIRM_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static REACTION_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static ENHANCEMENT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static RIGHT_CLICK_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
-pub static LEFT_CLICK_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static FONT_SYMBOL_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

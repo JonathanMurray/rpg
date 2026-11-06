@@ -2021,8 +2021,11 @@ impl UserInterface {
                 format!("gained {n} AP")
             }
             AppliedEffect::LostHealth(n, source, dmg_type) => match source {
-                DamageSource::Attack { .. } | DamageSource::Ability(..) => {
-                    format!("was hit for |<value>{}| {}", n, dmg_type.dmg_str())
+                DamageSource::Attack { hit_type, .. } => {
+                    Self::was_hit_for_str(n, dmg_type, hit_type)
+                }
+                DamageSource::Ability(_id, hit_type) => {
+                    Self::was_hit_for_str(n, dmg_type, hit_type)
                 }
                 DamageSource::KnockbackCollision { .. } => {
                     format!("took |<value>{}| collision damage", n)
@@ -2073,6 +2076,19 @@ impl UserInterface {
                     .add_with_details(line, detail_lines, LogStyle::Regular);
             }
         }
+    }
+
+    fn was_hit_for_str(damage_amount: u32, dmg_type: DamageType, hit_type: HitType) -> String {
+        let hit_type_suffix = hit_type
+            .font_symbol()
+            .map(|symbol| format!(" (|{symbol}|)"))
+            .unwrap_or("".to_string());
+        format!(
+            "was hit for |<value>{}| {}{}",
+            damage_amount,
+            dmg_type.dmg_str(),
+            hit_type_suffix
+        )
     }
 
     fn animate_reaction(&mut self, reactor: CharacterId) {
@@ -2351,16 +2367,16 @@ impl UserInterface {
             AppliedEffect::LostHealth(amount, source, _dmg_type) => {
                 let character = self.characters.get(ch_id);
                 if amount > 0 {
-                    if source == DamageSource::Condition(Condition::Burning) {
-                        self.sound_player.play_delayed(SoundId::Burning, start_time);
-                    }
                     self.sound_player
-                        .play_delayed(character.hurt_sound, start_time);
+                        .play_delayed(character.hurt_sound, start_time + 0.07);
                     let prev_health = self.characters.get(ch_id).health.current() + amount;
                     self.game_grid
                         .animate_character_health_change(ch_id, prev_health, 0.9);
 
                     match source {
+                        DamageSource::Condition(Condition::Burning) => {
+                            self.sound_player.play_delayed(SoundId::Burning, start_time);
+                        }
                         DamageSource::KnockbackCollision { move_direction } => {
                             if move_direction != (0, 0) {
                                 self.game_grid.animate_character_bumping_into_something(
@@ -2368,9 +2384,12 @@ impl UserInterface {
                                     start_time,
                                     move_direction,
                                 );
+                                self.sound_player
+                                    .play_delayed(SoundId::Collision, start_time);
                             } else {
                                 self.game_grid
                                     .animate_character_shaking(ch_id, start_time, 0.3);
+                                // No collision sound needed here. It's triggered anyway by whoever bumped into this character
                                 self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
                             }
                         }
@@ -2378,6 +2397,8 @@ impl UserInterface {
                             self.game_grid
                                 .animate_character_shaking(ch_id, start_time, 0.3);
                             self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
+                            self.sound_player
+                                .play_delayed(SoundId::Collision, start_time);
                         }
                         DamageSource::Attack {
                             attack_type,

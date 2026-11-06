@@ -1,11 +1,15 @@
 use std::{
+    borrow::Cow,
     cell::{Cell, RefCell},
     rc::Rc,
 };
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, RED, SKYBLUE, YELLOW},
-    input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
+    input::{
+        is_key_down, is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released,
+        MouseButton,
+    },
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, TextParams},
@@ -55,6 +59,13 @@ pub fn equipment_tooltip(entry: &EquipmentEntry) -> Tooltip {
 
 fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
     let mut t = Tooltip::new(stack.arrow.name);
+    t.description = Some(
+        format!(
+            "|<enhancement>| |<keyword>Enhancement| |<faded>(attack)|:\n{}",
+            stack.arrow.description
+        )
+        .into(),
+    );
     let penetration = stack.arrow.bonus_penetration;
     if penetration > 0 {
         t.technical_description
@@ -78,6 +89,7 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
 
 fn trinket_tooltip(trinket: &Trinket) -> Tooltip {
     let mut t = Tooltip::new(trinket.name);
+    t.description = Some(trinket.description.into());
     describe_equip_effect(trinket.equip, &mut t);
     t
 }
@@ -85,12 +97,14 @@ fn trinket_tooltip(trinket: &Trinket) -> Tooltip {
 fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let a = consumable.ability;
     let mut tooltip = ability_tooltip(a, None);
-    let line = format!(
-        "|<right_click>| |<trigger>Right-click| to use{} :",
-        consumable_cost_str(a.action_point_cost, a.stamina_cost, a.mana_cost,)
+    tooltip.description = Some(
+        format!(
+            "|<right_click>| |<trigger>Right-click| to use{} :\n{}",
+            consumable_cost_str(a.action_point_cost, a.stamina_cost, a.mana_cost,),
+            consumable.ability.description
+        )
+        .into(),
     );
-    tooltip.technical_description.insert(0, line);
-    tooltip.technical_description.insert(1, "".to_string());
     tooltip
 }
 
@@ -208,7 +222,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
     }
     if let Some(effect) = weapon.on_damage {
-        let mut line = "|<trigger>|On damage:| ".to_string();
+        let mut line = "|<trigger>On damage:| ".to_string();
         match effect {
             AttackHitEffect::ApplyTarget(..) => line.push_str("|<faded>(target)|"),
             AttackHitEffect::ApplySelf(..) => line.push_str("|<faded>(self)|"),
@@ -1013,11 +1027,22 @@ impl Drawable for EquipmentSlot {
             let rect = Rect::new(x, y, self.size.0, self.size.1);
             if let Some(content) = &self.content {
                 let tooltip = &content.tooltip;
+                let content_lines: Cow<[String]> = match content.equipment {
+                    EquipmentEntry::Weapon(..)
+                    | EquipmentEntry::Shield(..)
+                    | EquipmentEntry::Armor(..) => Cow::Borrowed(&tooltip.technical_description),
+                    EquipmentEntry::Arrows(..)
+                    | EquipmentEntry::Trinket(..)
+                    | EquipmentEntry::Consumable(..) => {
+                        let detailed = is_key_down(macroquad::input::KeyCode::LeftAlt);
+                        tooltip.content_lines(detailed).into()
+                    }
+                };
                 draw_tooltip(
                     TooltipPositionPreference::RelativeToRect(rect, Side::BottomRight),
                     &tooltip.header,
                     None,
-                    &tooltip.technical_description,
+                    &content_lines,
                     &tooltip.keywords,
                     None,
                     tooltip.icon,

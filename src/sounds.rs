@@ -59,6 +59,8 @@ impl SoundPlayer {
             (SoundId::DropEquipment, 1.0, vec!["click_3"]),
             (SoundId::Explosion, 0.4, vec!["explosion"]),
             (SoundId::ShieldBash, 1.5, vec!["fl_shield_bash.ogg"]),
+            // Close enough
+            (SoundId::Collision, 1.5, vec!["fl_shield_bash.ogg"]),
             (SoundId::SweepAttack, 1.3, vec!["fl_sweep_attack.ogg"]),
             (SoundId::FireballHit, 0.8, vec!["fl_fireball_hit.ogg"]),
             (SoundId::LightningHit, 0.25, vec!["fl_lightning_hit.ogg"]),
@@ -274,6 +276,7 @@ pub enum SoundId {
     DropEquipment,
     Explosion,
     ShieldBash,
+    Collision,
     SweepAttack,
     FireballHit,
     LightningHit,

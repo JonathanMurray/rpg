@@ -63,8 +63,8 @@ impl Keyword {
             ),
             Keyword::Advantage => "Advantage / Disadvantage".to_string(),
             Keyword::Pushed => "Pushed".to_string(),
-            Keyword::StrongWeak => "Strong / Weak hit".to_string(),
-            Keyword::Crit => "Crit".to_string(),
+            Keyword::StrongWeak => "Strong |<strong_hit>| / Weak |<weak_hit>| hit".to_string(),
+            Keyword::Crit => "Critical hit |<critical_hit>|".to_string(),
             Keyword::Flanked => "Flanked".to_string(),
             Keyword::SpikesSurface => "spikes (surface)".to_string(),
         }
@@ -81,7 +81,7 @@ impl Keyword {
             },
             Keyword::AttackEnhancement(enhancement) => format!("|<enhancement>| |<keyword>Enhancement| |<faded>(attack)|\n\n{}",  enhancement.description),
             Keyword::OnAttackedReaction(reaction) => format!("|<reaction>| |<keyword>Reaction| |<faded>(incoming attack)|\n\n{}", reaction.description),
-            Keyword::OpportunityAttack => "|<reaction>| |<keyword>Reaction|\n\nAttack an enemy that drops their guard".to_string(),
+            Keyword::OpportunityAttack => "|<reaction>| |<keyword>Reaction|\n\nAttack an enemy that drops their guard.".to_string(),
             Keyword::Advantage => "Roll extra |<mixed_dice>| dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
                 "|<range>| Distance: |<value>x| |<faded>(resisted by |<toughness>||<stat>Toughness|<faded>)|\n|<trigger>On collision:| take |<value>1| damage per remaining distance.".to_string()
@@ -92,9 +92,19 @@ impl Keyword {
             Keyword::Crit => {
                 "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| dice roll is |<value>20| (before modifiers).".to_string()
             }
-            Keyword::Flanked => "Critical hit chance increased by |<value>20%|".to_string(),
-            Keyword::SpikesSurface => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
+            Keyword::Flanked => "Critical hit chance increased by |<value>20%|.".to_string(),
+            Keyword::SpikesSurface => "|<value>50%| slower movement and |<value>1| damage per step.".to_string()
         }
+    }
+
+    fn name_with_symbol(&self) -> String {
+        let suffix = match self {
+            Keyword::Cond(condition, _) => format!(" |<status>{:?}|", condition.status_id()),
+            Keyword::StrongWeak => " |<strong_hit>| |<weak_hit>|".to_string(),
+            Keyword::Crit => " |<critical_hit>|".to_string(),
+            _ => "".to_string(),
+        };
+        format!("|<keyword>{}|{}", self.name(), suffix,)
     }
 
     fn icon(&self) -> Option<IconId> {
