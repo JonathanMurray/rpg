@@ -2181,6 +2181,10 @@ impl UserInterface {
             };
             let line = format!("|{}| escaped{}", actor_name_tag, with_gold);
 
+            if let Some(sound_id) = ability.audio_visuals.resolve_sound {
+                self.sound_player.play(sound_id);
+            }
+
             self.log.add(line, LogStyle::Regular);
             return;
         }
@@ -2381,12 +2385,14 @@ impl UserInterface {
                                     move_direction,
                                 );
                             } else {
-                                self.game_grid.animate_character_shaking(ch_id, start_time);
+                                self.game_grid
+                                    .animate_character_shaking(ch_id, start_time, 0.3);
                                 self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
                             }
                         }
                         DamageSource::Falling => {
-                            self.game_grid.animate_character_shaking(ch_id, start_time);
+                            self.game_grid
+                                .animate_character_shaking(ch_id, start_time, 0.3);
                             self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
                         }
                         DamageSource::Attack {
@@ -2409,7 +2415,8 @@ impl UserInterface {
                     if matches!(source, DamageSource::Attack { .. }) {
                         self.sound_player
                             .play_delayed(SoundId::ArmorAbsorbed, start_time);
-                        self.game_grid.animate_character_shaking(ch_id, start_time);
+                        self.game_grid
+                            .animate_character_shaking(ch_id, start_time, 0.3);
                         self.game_grid
                             .animate_effect(ch_id, 0.4, EffectId::ArmorClank);
                     }
@@ -2418,7 +2425,8 @@ impl UserInterface {
             AppliedEffect::Dodged => {
                 self.sound_player
                     .play_delayed(SoundId::AttackMiss, start_time);
-                self.game_grid.animate_character_shaking(ch_id, start_time);
+                self.game_grid
+                    .animate_character_shaking(ch_id, start_time, 0.3);
             }
             AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => match condition {
                 Condition::Ferocity => {

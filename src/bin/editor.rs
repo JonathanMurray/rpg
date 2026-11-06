@@ -30,8 +30,7 @@ use rpg::init_fight_map::{FightId, GameInitState};
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::{Elevation, Occupation};
 use rpg::resources::{
-    draw_character_sprite, init_core_game, CharacterSpriteHighlight, EquipmentSpriteId,
-    GameResources,
+    draw_character_sprite, init_core_game, EquipmentSpriteId, GameResources, SpriteHighlight,
 };
 use rpg::resources::{
     load_and_init_static_resources, terrain_atlas_area, CharacterSpriteId, LiquidType, Sprite,
@@ -910,7 +909,7 @@ impl Sidebar {
                             (x, y),
                             char_type.sprite_id(),
                             SpriteVariant::Idle,
-                            CharacterSpriteHighlight::Regular,
+                            SpriteHighlight::Regular,
                             DrawTextureParams {
                                 dest_size: Some((ICON_W, ICON_W).into()),
                                 ..Default::default()

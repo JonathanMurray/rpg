@@ -143,6 +143,20 @@ pub enum EquipmentSpriteId {
 #[derive(Clone)]
 pub struct Sprite {
     pub regular: Texture2D,
+    pub bright: Texture2D,
+    pub white: Texture2D,
+    pub red: Texture2D,
+}
+
+impl Sprite {
+    pub fn texture(&self, highlight: SpriteHighlight) -> &Texture2D {
+        match highlight {
+            SpriteHighlight::Regular => &self.regular,
+            SpriteHighlight::RedOutline => &self.red,
+            SpriteHighlight::WhiteOutline => &self.white,
+            SpriteHighlight::Bright => &self.bright,
+        }
+    }
 }
 
 pub async fn load_all_sprites() -> HashMap<EquipmentSpriteId, Sprite> {
@@ -170,22 +184,32 @@ pub async fn load_all_sprites() -> HashMap<EquipmentSpriteId, Sprite> {
 
     sprites
         .into_iter()
-        .map(|(id, texture)| {
-            let highlight_color = [201, 226, 118, 255];
+        .map(|(id, regular)| {
+            //let highlight_color = [201, 226, 118, 255];
+            let highlight_color = [34, 32, 52, 255];
 
-            let white = Texture2D::from_image(&texture.get_texture_data());
+            let img = regular.get_texture_data();
+            let white = Texture2D::from_image(&img);
             white.set_filter(FilterMode::Nearest);
             replace_color(&white, highlight_color, [255, 255, 255, 255]);
 
-            let red = Texture2D::from_image(&texture.get_texture_data());
+            let red = Texture2D::from_image(&img);
             red.set_filter(FilterMode::Nearest);
             replace_color(&red, highlight_color, [255, 100, 100, 255]);
 
-            let bright = Texture2D::from_image(&texture.get_texture_data());
+            let bright = Texture2D::from_image(&img);
             bright.set_filter(FilterMode::Nearest);
-            brighten(&bright, highlight_color);
+            brighten(&bright, None);
 
-            (id, Sprite { regular: texture })
+            (
+                id,
+                Sprite {
+                    regular,
+                    bright,
+                    red,
+                    white,
+                },
+            )
         })
         .collect()
 }
@@ -392,13 +416,14 @@ pub fn draw_character_sprite(
     screen_pos: (f32, f32),
     sprite_id: CharacterSpriteId,
     variant: SpriteVariant,
-    highlight: CharacterSpriteHighlight,
+    highlight: SpriteHighlight,
     mut params: DrawTextureParams,
 ) {
     let texture = match highlight {
-        CharacterSpriteHighlight::Regular => &CHARACTERS_TEXTURE,
-        CharacterSpriteHighlight::Red => &CHARACTERS_RED_TEXTURE,
-        CharacterSpriteHighlight::Bright => &CHARACTERS_BRIGHT_TEXTURE,
+        SpriteHighlight::Regular => &CHARACTERS_TEXTURE,
+        SpriteHighlight::RedOutline => &CHARACTERS_RED_OUTLINE_TEXTURE,
+        SpriteHighlight::WhiteOutline => &CHARACTERS_WHITE_OUTLINE_TEXTURE,
+        SpriteHighlight::Bright => &CHARACTERS_BRIGHT_TEXTURE,
     }
     .get()
     .unwrap();
@@ -419,7 +444,6 @@ pub fn draw_character_sprite(
         CharacterSpriteId::Scoundrel => 6,
         CharacterSpriteId::Pyromaniac => 7,
         CharacterSpriteId::Ogre => 13,
-        unexpected => panic!("Unhandled character sprite id: {:?}", unexpected),
     };
 
     let col_idx = match variant {
@@ -1263,10 +1287,10 @@ fn make_grayscale(texture: &Texture2D) {
     texture.update(&img);
 }
 
-fn brighten(texture: &Texture2D, highlight_color: [u8; 4]) {
+fn brighten(texture: &Texture2D, highlight_color: Option<[u8; 4]>) {
     let mut img = texture.get_texture_data();
     for pixel in img.get_image_data_mut() {
-        if pixel == &highlight_color {
+        if highlight_color == Some(*pixel) {
             *pixel = [255, 255, 255, 255];
         } else {
             for i in 0..3 {
@@ -1374,7 +1398,9 @@ async fn load_and_init_character_sprites() {
         char_highlight_color,
         [255, 255, 255, 255],
     );
-    CHARACTERS_WHITE_TEXTURE.set(char_white_texture).unwrap();
+    CHARACTERS_WHITE_OUTLINE_TEXTURE
+        .set(char_white_texture)
+        .unwrap();
 
     let char_red_texture = Texture2D::from_image(&img);
     char_red_texture.set_filter(FilterMode::Nearest);
@@ -1383,11 +1409,13 @@ async fn load_and_init_character_sprites() {
         char_highlight_color,
         [255, 100, 100, 255],
     );
-    CHARACTERS_RED_TEXTURE.set(char_red_texture).unwrap();
+    CHARACTERS_RED_OUTLINE_TEXTURE
+        .set(char_red_texture)
+        .unwrap();
 
     let char_bright_texture = Texture2D::from_image(&img);
     char_bright_texture.set_filter(FilterMode::Nearest);
-    brighten(&char_bright_texture, char_highlight_color);
+    brighten(&char_bright_texture, Some(char_highlight_color));
     CHARACTERS_BRIGHT_TEXTURE.set(char_bright_texture).unwrap();
 }
 
@@ -1585,6 +1613,7 @@ pub enum EffectId {
     Magic,
     MagicSpinUp,
     PurpleMagic,
+    Raven,
 }
 
 impl FlipbookAnimation {
@@ -1598,6 +1627,7 @@ impl FlipbookAnimation {
             EffectId::Magic => 5,
             EffectId::MagicSpinUp => 6,
             EffectId::PurpleMagic => 7,
+            EffectId::Raven => 8,
         };
         let source_size = (32.0, 32.0);
 
@@ -1802,8 +1832,8 @@ pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAITS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static CHARACTERS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
-pub static CHARACTERS_WHITE_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
-pub static CHARACTERS_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_WHITE_OUTLINE_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static CHARACTERS_RED_OUTLINE_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static CHARACTERS_BRIGHT_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
@@ -1818,9 +1848,10 @@ pub static UI_ACTION_BUTTON_SMALL_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::ne
 pub static UI_SPELLBOOK_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 #[derive(Debug, Copy, Clone)]
-pub enum CharacterSpriteHighlight {
+pub enum SpriteHighlight {
     Regular,
-    Red,
+    RedOutline,
+    WhiteOutline,
     Bright,
 }
 

@@ -908,6 +908,8 @@ impl CoreGame {
                     event.collect_enemies_hit(&mut enemies_hit);
                 }
 
+                dbg!((ability.id, &enemies_hit));
+
                 for enemy_id in &enemies_hit {
                     let victim = self.characters.get(*enemy_id);
                     if !victim.player_controlled() {
@@ -4463,23 +4465,13 @@ pub struct ConcreteCircle {
 impl AbilityResolvedEvent {
     fn collect_enemies_hit(&self, result: &mut Vec<CharacterId>) {
         if let Some(o) = &self.target_outcome {
-            if matches!(o.outcome.as_ref(), AbilityTargetOutcome::HitTarget { .. }) {
-                result.push(o.target_id);
-            }
-            if matches!(
-                o.outcome.as_ref(),
-                AbilityTargetOutcome::AttackedEnemy { .. }
-            ) {
+            if !o.outcome.is_entirely_positive() {
                 result.push(o.target_id);
             }
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
             for o in targets {
-                if matches!(
-                    o.outcome.as_ref(),
-                    AbilityTargetOutcome::HitTarget { .. }
-                        | AbilityTargetOutcome::AttackedEnemy(..)
-                ) {
+                if !o.outcome.is_entirely_positive() {
                     result.push(o.target_id);
                 }
             }
@@ -4495,7 +4487,7 @@ impl AbilityResolvedEvent {
                 o.target_id,
                 TargetResult {
                     damage: o.outcome.damage(),
-                    is_buff: o.outcome.is_positive(),
+                    is_buff: o.outcome.is_entirely_positive(),
                 },
             );
         }
@@ -4511,7 +4503,7 @@ impl AbilityResolvedEvent {
                     (None, Some(d)) => Some(d),
                     (Some((d1, dmg_type)), Some((d2, _dmg_type2))) => Some((d1 + d2, dmg_type)),
                 };
-                if o.outcome.is_positive() {
+                if o.outcome.is_entirely_positive() {
                     entry.is_buff = true;
                 }
             }
@@ -4636,7 +4628,7 @@ impl AbilityTargetOutcome {
         }
     }
 
-    pub fn is_positive(&self) -> bool {
+    pub fn is_entirely_positive(&self) -> bool {
         match self {
             AbilityTargetOutcome::HitTarget {
                 applied_effects, ..
@@ -5677,11 +5669,11 @@ pub struct AbilityChargeFx {
 #[derive(Debug, PartialEq)]
 pub struct AudioVisuals {
     pub animation_color: Color,
+    pub charge_fx: Option<AbilityChargeFx>,
     pub animation: AbilityAnimation,
+    pub speech: &'static str,
     pub initiate_sound: Option<SoundId>,
     pub resolve_sound: Option<SoundId>,
-    pub charge_fx: Option<AbilityChargeFx>,
-    pub speech: &'static str,
     pub target_effect: Option<(EffectId, f32)>,
     pub target_magic_sparks: Option<Color>,
     pub reaction: AbilityVisualReaction,

@@ -1964,13 +1964,14 @@ pub fn natures_blessing() -> &'static Ability {
 
             audio_visuals: AudioVisuals {
                 animation_color: DARKGRAY,
-                animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
-                initiate_sound: Some(SoundId::ShootSpell),
-                resolve_sound: Some(SoundId::Heal),
-                target_magic_sparks: Some(WHITE),
                 charge_fx: Some(AbilityChargeFx {
                     particle_shape: ParticleShape::Circle,
                 }),
+                initiate_sound: Some(SoundId::ShootSpell),
+                animation: AbilityAnimation::CastSpell(SpellTravelAnimation::StraightProjectile),
+                target_magic_sparks: Some(WHITE),
+                target_effect: Some((EffectId::Raven, 0.5)),
+                resolve_sound: Some(SoundId::Heal),
                 reaction: AbilityVisualReaction::Enjoy,
                 ..AudioVisuals::default()
             },
@@ -2435,9 +2436,9 @@ const fn apply_condition_rounds(condition: Condition, rounds: u32) -> ApplyEffec
 pub const ENEMY_BURNING_ARROW: Ability = Ability {
     id: AbilityId::EnemyBurningArrow,
     name: "Burning arrow",
-    description: "Deal |<value>3| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings.",
+    description: "Deal |<value>2| |<sword>| damage to an enemy and |<value>2| |<fire>|fire damage to its surroundings.",
     icon: IconId::Fireball,
-    action_point_cost: 4,
+    action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: None,
@@ -2447,7 +2448,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
         reach: AbilityReach::Range(Range::f32(12.5)),
         effect: AbilityTargetEffect::Spell(SpellTargetEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
             ..SpellTargetEffect::default()
         }),
         circle_effect: Some(CircleEffect::new(
@@ -2455,8 +2456,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
             TargetAcquisition::Any,
             AbilityTargetEffect::Spell(SpellTargetEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::Dynamic(2, DamageType::Fire)),
-
+                damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
                 ..SpellTargetEffect::default()
             }),
             None,

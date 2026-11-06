@@ -70,9 +70,9 @@ use crate::{
     },
     resources::{
         character_sprite_height, draw_beam_fx, draw_character_sprite, draw_icon, draw_status_icon,
-        draw_terrain, draw_tiny_font, measure_tiny_font, BeamFxId, CharacterSpriteHighlight,
-        CharacterSpriteId, EffectId, EquipmentSpriteId, FlipbookAnimation, IconId, LiquidType,
-        Sprite, StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation,
+        draw_terrain, draw_tiny_font, measure_tiny_font, BeamFxId, CharacterSpriteId, EffectId,
+        EquipmentSpriteId, FlipbookAnimation, IconId, LiquidType, Sprite, SpriteHighlight,
+        StatusId, TerrainId, TinyFontColor, WallOrientation, WaterOrientation,
     },
     sounds::{SoundId, SoundPlayer},
     util::{
@@ -1935,9 +1935,13 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_character_shaking(&mut self, character_id: CharacterId, start: f32) {
+    pub fn animate_character_shaking(
+        &mut self,
+        character_id: CharacterId,
+        start: f32,
+        amount: f32,
+    ) {
         let duration = 0.4;
-        let amount = 0.3;
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             start,
@@ -2120,7 +2124,7 @@ impl GameGrid {
                     self.animate_character_reeling_back_from_hit(source_pos, target_id, start_time);
                 }
                 AbilityVisualReaction::Enjoy => {
-                    self.animate_character_shaking(target_id, start_time);
+                    self.animate_character_shaking(target_id, start_time, 0.15);
                 }
             }
         }
@@ -2862,7 +2866,9 @@ impl GameGrid {
         let mut show_regular_hald_hend = true;
 
         let mut weapon_rotation_modifier = 0.0;
+        let mut weapon_highlight = SpriteHighlight::Regular;
         let mut shield_offset = (0.0, 0.0);
+        let mut shield_highlight = SpriteHighlight::Regular;
         let mut weapon_offset = (0.0, 0.0);
         let mut character_offset = (0.0, 0.0);
         let mut stretch_w = None;
@@ -3018,6 +3024,9 @@ impl GameGrid {
             }
             match anticipation.kind {
                 AnticipationKind::RangedAttack { aiming } => {
+                    if oscillate(1.4, 0.0, 1.0) > 0.4 {
+                        weapon_highlight = SpriteHighlight::Bright;
+                    }
                     weapon_rotation_modifier = -PI * 0.15;
                     if aiming {
                         if let Some(rot) = facing_rotation {
@@ -3034,12 +3043,20 @@ impl GameGrid {
                     dx = 0.0;
                 }
                 AnticipationKind::MeleeWeaponAttack => {
+                    if oscillate(1.4, 0.0, 1.0) > 0.4 {
+                        weapon_highlight = SpriteHighlight::Bright;
+                    }
                     let rotation = PI * 0.02;
                     weapon_rotation_modifier = oscillate(0.4, -rotation, rotation);
+
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
                 }
                 AnticipationKind::ShieldAttack => {
+                    if oscillate(1.4, 0.0, 1.0) > 0.4 {
+                        shield_highlight = SpriteHighlight::Bright;
+                    }
+
                     shield_offset = (0.0, oscillate(0.4, -1.0, 1.0));
                     y -= oscillate(0.3, 0.0, 1.0);
                     dx = oscillate(0.6, -1.0, 1.0);
@@ -3155,16 +3172,16 @@ impl GameGrid {
 
         if show_sprite {
             let highlight = if self.target_effect_previews.contains_key(&character.id()) {
-                CharacterSpriteHighlight::Red
+                SpriteHighlight::RedOutline
             } else if self.hovered_character.or(self.hovered_character_portrait)
                 == Some(character.id())
             {
                 // TODO: Use the bright version for something significant - like when hovering a valid target
                 // for a currently configured ability
                 //&sprite.white_highlight
-                CharacterSpriteHighlight::Bright
+                SpriteHighlight::Bright
             } else {
-                CharacterSpriteHighlight::Regular
+                SpriteHighlight::Regular
             };
 
             if let Some(stretch_w) = stretch_w {
@@ -3211,10 +3228,11 @@ impl GameGrid {
                 }
 
                 if let Some(weapon) = character.weapon(HandType::MainHand) {
-                    if let Some(texture) = weapon.sprite {
+                    if let Some(sprite_id) = weapon.sprite {
                         let rotation = params.rotation + weapon_rotation_modifier;
+                        let sprite = &self.equipment_sprites[&sprite_id];
                         draw_texture_ex(
-                            &self.equipment_sprites[&texture].regular,
+                            &sprite.texture(weapon_highlight),
                             x + weapon_offset.0,
                             y + weapon_offset.1 + 0.0,
                             WHITE,
@@ -3224,9 +3242,10 @@ impl GameGrid {
                 }
 
                 if let Some(shield) = character.shield() {
-                    if let Some(texture) = shield.sprite {
+                    if let Some(sprite_id) = shield.sprite {
+                        let sprite = &self.equipment_sprites[&sprite_id];
                         draw_texture_ex(
-                            &self.equipment_sprites[&texture].regular,
+                            sprite.texture(shield_highlight),
                             x + shield_offset.0,
                             y + shield_offset.1,
                             WHITE,
@@ -6471,7 +6490,7 @@ impl GameGrid {
             (x + character_offset.0, y + character_offset.1),
             *sprite,
             SpriteVariant::Idle,
-            CharacterSpriteHighlight::Regular,
+            SpriteHighlight::Regular,
             character_params,
         );
 

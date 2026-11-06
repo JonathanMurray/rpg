@@ -436,7 +436,9 @@
     "(20, 23)": "FireSurfaceSingleCell",
     "(21, 25)": "FireSurfaceSingleCell"
   },
-  "control_points": {},
+  "control_points": {
+    "(13, 10)": "Exit"
+  },
   "characters": [
     {
       "type_": "Clara",
@@ -454,6 +456,17 @@
       "pos": [
         28,
         13
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        16,
+        10
       ],
       "health": null,
       "main_hand": null,
