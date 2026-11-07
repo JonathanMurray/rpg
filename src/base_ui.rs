@@ -253,7 +253,7 @@ pub struct TextLine {
     measured_offset_y: f32,
     font_size: u16,
     color: Color,
-    hover_color: Option<Color>,
+    pub hover_color: Option<Color>,
     pub bg_color: Option<Color>,
     pub hover_bg_color: Option<Color>,
     min_height: f32,

@@ -1,13 +1,14 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use macroquad::{
-    color::{Color, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{
         is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
     },
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, TextParams},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
     window::{next_frame, screen_height, screen_width},
 };
 
@@ -24,10 +25,10 @@ use crate::{
     equipment_ui::EquipmentSlot,
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
-    resources::GameResources,
-    resources::UI_ARROW_TEXTURE,
+    resources::{load_and_init_texture, GameResources, UI_ARROW_TEXTURE},
     sounds::{SoundId, SoundPlayer},
     tooltip::handle_keyword_tooltip_end_of_frame,
+    util::{oscillate, oscillate_loop, rgb, COL_DARK, COL_TEXT_REGULAR},
 };
 
 pub struct CharacterGrowth {
@@ -339,12 +340,18 @@ pub async fn run_transition_loop(
             }));
         }
 
+        let bg_color = BLACK;
+
+        let very_dark = rgb(10, 10, 20);
+
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             style: Style {
+                bg_color: Some(very_dark.with_alpha(0.7)),
                 border: Some(Border {
                     color: DARKGRAY,
                     inner_rounding: Some(5.0),
+                    outer_rounding: Some((bg_color, 3.0)),
                     ..Default::default()
                 }),
                 padding: 80.0,
@@ -358,10 +365,53 @@ pub async fn run_transition_loop(
         };
         let container_size = container.size();
 
-        let mid_x = screen_width() / 2.0;
-        let mid_y = screen_height() / 2.0;
+        let mut continue_btn_hovered = false;
+
+        let bg_texture = load_and_init_texture("ui/ui_bg_2.png").await;
+        let wobbling_rect_texture = load_and_init_texture("ui/ui_wobbling_rectangle.png").await;
+
         let mut hovered_btn = None;
+
+        let bg_texture_draw_size = (256.0, 256.0);
+
+        // RENDER LOOP
         loop {
+            let mid_x = screen_width() / 2.0;
+            let mid_y = screen_height() / 2.0;
+
+            for i in 0..(screen_width() / bg_texture_draw_size.0).ceil() as u32 {
+                for j in 0..(screen_height() / bg_texture_draw_size.1).ceil() as u32 {
+                    draw_texture_ex(
+                        &bg_texture,
+                        i as f32 * bg_texture_draw_size.0,
+                        j as f32 * bg_texture_draw_size.1,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(bg_texture_draw_size.into()),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+
+            let wobbly_pad = 30.0;
+            let wobbly_rect_size = (
+                container_size.0 + wobbly_pad * 2.0,
+                container_size.1 + wobbly_pad * 2.0,
+            );
+            let wobbly_idx = oscillate_loop(1.0, 0.0, 2.99).floor() as u32;
+            draw_texture_ex(
+                &wobbling_rect_texture,
+                mid_x - wobbly_rect_size.0 / 2.0,
+                mid_y - wobbly_rect_size.1 / 2.0,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(wobbly_rect_size.into()),
+                    source: Some(Rect::new(wobbly_idx as f32 * 256.0, 0.0, 256.0, 256.0)),
+                    ..Default::default()
+                },
+            );
+
             let x = mid_x - container_size.0 / 2.0;
             let y = mid_y - container_size.1 / 2.0;
             container.draw(x, y);
@@ -391,39 +441,48 @@ pub async fn run_transition_loop(
                 draw_button_tooltip(hovered.hovered_pos.unwrap(), &tooltip);
             }
 
-            let text = "Continue";
-            let font_size = 30;
-            let margin = 25.0;
-            let padding = 15.0;
-            let text_dim = measure_text(text, Some(simple_font), font_size, 1.0);
-            let rect = Rect::new(
-                screen_width() - margin - text_dim.width - padding * 2.0,
-                screen_height() - margin - text_dim.height - padding * 2.0,
-                text_dim.width + padding * 2.0,
-                text_dim.height + padding * 2.0,
-            );
-            let rect_color = if rect.contains(mouse_position().into()) {
-                LIGHTGRAY
-            } else {
-                GRAY
-            };
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_rounded(
-                text,
-                rect.x + padding,
-                rect.y + padding + text_dim.offset_y,
-                TextParams {
-                    font: Some(simple_font),
-                    font_size,
-                    color: YELLOW,
+            let mut text = TextLine::new("Continue", 36, COL_TEXT_REGULAR, Some(big_font.clone()));
+            text.set_padding(12.0, 16.0);
+            text.hover_bg_color = Some(WHITE.with_alpha(0.15));
+            text.hover_color = Some(WHITE);
+            let btn = Container {
+                children: vec![Element::Text(text)],
+                style: Style {
+                    bg_color: Some(very_dark),
+                    border: Some(Border {
+                        color: GRAY.with_alpha(oscillate(2.0, 1.0, 0.2)),
+                        inner_rounding: Some(4.0),
+                        outer_rounding: Some((rgb(15, 77, 105), 2.0)),
+                        thickness: oscillate(2.0, 2.0, 7.0),
+                        double: Some((DARKGRAY, 4.0)),
+                        ..Default::default()
+                    }),
+                    padding: 4.0,
                     ..Default::default()
                 },
+                ..Default::default()
+            };
+
+            let margin = 80.0;
+            btn.draw(
+                screen_width() - margin - btn.size().0,
+                screen_height() - margin - btn.size().1,
             );
-            if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
-            {
-                break;
+
+            let hover = btn
+                .last_drawn_rectangle
+                .get()
+                .contains(mouse_position().into());
+
+            if hover && !continue_btn_hovered {
+                sound_player.play(SoundId::HoverButton);
             }
-            if is_key_pressed(KeyCode::Space) {
+            continue_btn_hovered = hover;
+
+            let continue_to_next_screen = (hover && is_mouse_button_pressed(MouseButton::Left))
+                || is_key_pressed(KeyCode::Space);
+
+            if continue_to_next_screen {
                 break;
             }
 

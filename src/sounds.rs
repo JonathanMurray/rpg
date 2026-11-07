@@ -203,7 +203,7 @@ impl SoundPlayer {
     }
 
     pub fn play(&self, sound_id: SoundId) {
-        dbg!((sound_id, self.time));
+        //dbg!((sound_id, self.time));
         if !self.enabled.get() {
             return;
         }
