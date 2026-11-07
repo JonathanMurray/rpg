@@ -478,19 +478,8 @@
     {
       "type_": "Ghoul1",
       "pos": [
-        7,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        11,
-        28
+        4,
+        29
       ],
       "health": null,
       "main_hand": null,
@@ -501,28 +490,6 @@
       "type_": "Ghoul2",
       "pos": [
         13,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        7,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        10,
         31
       ],
       "health": null,

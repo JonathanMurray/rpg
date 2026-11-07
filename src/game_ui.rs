@@ -2007,6 +2007,19 @@ impl UserInterface {
         applied_effect: AppliedEffect,
         detail_lines: &[String],
     ) {
+        let skip = match applied_effect {
+            AppliedEffect::LostActionPoints(n) => n == 0,
+            AppliedEffect::GainedActionPoints(n) => n == 0,
+            AppliedEffect::GainedHealth(n) => n == 0,
+            AppliedEffect::GainedStamina(n) => n == 0,
+            AppliedEffect::GainedMana(n) => n == 0,
+            _ => false,
+        };
+        if skip {
+            println!("Skipping {:?}. (Nothing to show)", applied_effect);
+            return;
+        }
+
         self.log_applied_effect(character, applied_effect, detail_lines);
         self.show_applied_effect(applied_effect, character, start_time);
     }
@@ -2022,7 +2035,7 @@ impl UserInterface {
         let verb_phrase = match applied_effect {
             AppliedEffect::LostActionPoints(n) => "".to_string(),
             AppliedEffect::GainedActionPoints(n) => {
-                format!("gained {n} AP")
+                format!("gained |<value>{n}| |<ap>| AP")
             }
             AppliedEffect::LostHealth {
                 damage: dmg,
@@ -2036,6 +2049,7 @@ impl UserInterface {
                 DamageSource::Ability(_id, hit_type) => {
                     Self::was_hit_for_str(dmg, dmg_type, hit_type)
                 }
+
                 DamageSource::Arrow(hit_type) => Self::was_hit_for_str(dmg, dmg_type, hit_type),
                 DamageSource::KnockbackCollision { .. } => {
                     format!("took |<value>{}| collision damage", dmg)
@@ -2044,10 +2058,10 @@ impl UserInterface {
                 _ => format!("lost |<value>{}| health", dmg),
             },
             AppliedEffect::GainedHealth(n) => {
-                format!("gained |<value>{}| health", n,)
+                format!("was healed for |<value>{}| |<heart>|", n,)
             }
-            AppliedEffect::GainedStamina(n) => format!("gained {n} stamina"),
-            AppliedEffect::GainedMana(n) => format!("gained {n} mana"),
+            AppliedEffect::GainedStamina(n) => format!("gained |<value>{n}| |<stamina>| stamina"),
+            AppliedEffect::GainedMana(n) => format!("gained |<value>{n}| |<mana>| mana"),
             AppliedEffect::GainedCondition(ApplyCondition {
                 condition,
                 stacks,
@@ -2365,7 +2379,8 @@ impl UserInterface {
                 self.game_grid.animate_character_lost_ap(ch_id, n);
             }
             AppliedEffect::GainedActionPoints(n) => {
-                self.sound_player.schedule(SoundId::GainedAP, start_time);
+                self.sound_player
+                    .schedule(SoundId::GainedResource, start_time);
             }
             AppliedEffect::LostHealth {
                 damage: dmg,
@@ -2446,11 +2461,16 @@ impl UserInterface {
                 self.game_grid
                     .animate_character_shaking(ch_id, start_time, 0.3);
             }
+            AppliedEffect::GainedMana { .. } => {
+                self.sound_player.play(SoundId::GainedResource);
+            }
+            AppliedEffect::GainedHealth { .. } => {
+                self.game_grid.animate_magic_sparks(ch_id, WHITE);
+            }
             AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => match condition {
                 Condition::Ferocity => {
                     self.sound_player.schedule(SoundId::Execute, start_time);
                 }
-
                 _ => {}
             },
             _ => {}

@@ -2568,9 +2568,7 @@ impl GameGrid {
                         TextEffectStyle::NegativeEffect
                     }
                     AppliedEffect::GainedActionPoints(n) => {
-                        for _ in 0..n {
-                            f.push_str("|<ap>|");
-                        }
+                        f.push_str(&format!("{n} |<ap>|"));
                         TextEffectStyle::PositiveEffect
                     }
                     AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => {
@@ -2591,9 +2589,7 @@ impl GameGrid {
                         TextEffectStyle::Heal
                     }
                     AppliedEffect::GainedStamina(n) => {
-                        for _ in 0..n {
-                            f.push_str("|<stamina>|");
-                        }
+                        f.push_str(&format!("{n} |<stamina>|"));
                         TextEffectStyle::PositiveEffect
                     }
                     AppliedEffect::GainedMana(n) => {
@@ -2674,16 +2670,16 @@ impl GameGrid {
         let mut background = false;
         let color = match style {
             TextEffectStyle::PositiveEffect => {
-                font = &self.simple_font;
-                font_size = 16;
+                font = &self.big_font;
+                font_size = 12;
                 rise_indefinitely = false;
                 background = true;
                 WHITE
                 //Color::new(0.8, 1.0, 0.8, 1.0)
             }
             TextEffectStyle::NegativeEffect => {
-                font = &self.simple_font;
-                font_size = 16;
+                font = &self.big_font;
+                font_size = 12;
                 rise_indefinitely = false;
                 background = true;
                 WHITE

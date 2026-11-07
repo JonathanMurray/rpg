@@ -559,7 +559,7 @@ pub const CHEAT_BOW: Weapon = Weapon {
     on_attacked_reaction: None,
     bonus_melee_evasion: 0,
     on_damage: None,
-    on_kill_apply_self: None,
+    on_kill_apply_self: Some(ApplyEffect::GainMana(1)),
     sprite: Some(EquipmentSpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,

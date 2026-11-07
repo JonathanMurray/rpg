@@ -696,13 +696,14 @@ pub fn make_test_archer(party: &Rc<Party>) -> Character {
         2,
     )));
     test_archer.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(&FIRE_ARROWS, 2)));
+    test_archer.health.lose(10);
 
     test_archer.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     test_archer.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     test_archer.try_gain_equipment(EquipmentEntry::Consumable(TOXIC_GRENADE));
     test_archer.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
 
-    test_archer.trinket.set(Some(BATTLEMAGE_SIGIL));
+    test_archer.trinket.set(Some(NECROTIC_BAND));
     test_archer.learn_ability(natures_blessing());
     test_archer.learn_ability_enhancement(&HEAL_ENERGIZE);
     test_archer.learn_attack_enhancement(CRIPPLING_SHOT);
@@ -710,7 +711,7 @@ pub fn make_test_archer(party: &Rc<Party>) -> Character {
     test_archer.learn_ability(inspire());
     test_archer.learn_ability_enhancement(&INSPIRE_BLOODLUST);
     test_archer.learn_ability(&INFLICT_WOUNDS);
-    test_archer.learn_passive(PassiveSkill::WeaponProficiency);
+    test_archer.learn_passive(PassiveSkill::Reaper);
 
     test_archer
 }

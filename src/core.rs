@@ -191,36 +191,23 @@ impl CoreGame {
                 if !killed_by_action.is_empty() {
                     let num_killed = killed_by_action.len() as u32;
                     let character = self.active_character();
-                    if let Some((sta, ap)) = character.maybe_gain_resources_from_reaper() {
-                        if sta + ap > 0 {
-                            if ap > 0 {
-                                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-                                    character: character.id(),
-                                    applied_effect: AppliedEffect::GainedActionPoints(ap),
-                                    source: "Reaper".into(),
-                                })
-                                .await;
-                            }
-                            if sta > 0 {
-                                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-                                    character: character.id(),
-                                    applied_effect: AppliedEffect::GainedStamina(sta),
-                                    source: "Reaper".into(),
-                                })
-                                .await;
-                            }
-                        }
+                    if let Some((sta, ap)) = character.reaper_resource_gains() {
+                        // Defer until after death animations
+                        character
+                            .deferred_on_kill_self_effects
+                            .borrow_mut()
+                            .push(("Reaper".into(), ApplyEffect::GainStamina(sta)));
+                        character
+                            .deferred_on_kill_self_effects
+                            .borrow_mut()
+                            .push(("Reaper".into(), ApplyEffect::GainActionPoints(ap)));
                     }
 
                     if let Some((amount, cause)) = character.healing_on_kill() {
-                        let amount = self.character_gain_health(character, amount * num_killed);
-
-                        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-                            character: character.id(),
-                            applied_effect: AppliedEffect::GainedHealth(amount),
-                            source: cause.into(),
-                        })
-                        .await;
+                        character
+                            .deferred_on_kill_self_effects
+                            .borrow_mut()
+                            .push((cause.into(), ApplyEffect::GainHealth(amount)));
                     }
                 }
             } else {
@@ -299,14 +286,14 @@ impl CoreGame {
             }
             let dead_character_ids = self.characters.remove_dead();
 
-            for dead_id in &dead_character_ids {
-                for ch in self.characters.iter() {
-                    ch.set_not_engaged_by(*dead_id);
-                    ch.set_not_engaging(*dead_id);
-                }
-            }
-
             if !dead_character_ids.is_empty() {
+                for dead_id in &dead_character_ids {
+                    for ch in self.characters.iter() {
+                        ch.set_not_engaged_by(*dead_id);
+                        ch.set_not_engaging(*dead_id);
+                    }
+                }
+
                 let new_active = if active_character_died {
                     Some(self.active_character_id)
                 } else {
@@ -321,6 +308,25 @@ impl CoreGame {
                     new_active,
                 })
                 .await;
+
+                for ch in self.characters.iter() {
+                    for (label, apply_effect) in
+                        ch.deferred_on_kill_self_effects.borrow_mut().drain(..)
+                    {
+                        dbg!(&label);
+                        let (applied, line) =
+                            self.do_apply_effect(apply_effect, Some(ch), None, ch);
+                        dbg!(line);
+                        if let Some(applied) = applied {
+                            self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                                character: ch.id(),
+                                applied_effect: applied,
+                                source: label,
+                            })
+                            .await;
+                        }
+                    }
+                }
             }
 
             // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
@@ -3187,31 +3193,14 @@ impl CoreGame {
                     }
 
                     if defender.is_dead() {
-                        for effect in [
-                            ability_attack_effect.and_then(|e| e.on_kill_apply_self),
-                            weapon.on_kill_apply_self,
-                        ]
-                        .iter()
-                        .flatten()
-                        {
-                            let (applied, log_line) =
-                                game.do_apply_effect(*effect, Some(attacker), None, attacker);
-                            if let Some(applied) = applied {
-                                applied_to_self.push(applied);
-                            }
-                            detail_lines.push(log_line);
-                        }
-
-                        for (name, enhancement) in enhancements {
-                            if let Some(effect) = enhancement.on_kill_apply_self {
-                                let (applied, log_line) =
-                                    game.do_apply_effect(effect, Some(attacker), None, attacker);
-                                if let Some(applied) = applied {
-                                    applied_to_self.push(applied);
-                                }
-                                detail_lines.push(format!("{} |<faded>({})|", log_line, name));
-                            }
-                        }
+                        // On-kill effects (gfx/sounds) are delayed until after the death animation
+                        let mut deferred = attacker.deferred_on_kill_self_effects.borrow_mut();
+                        collect_attack_on_kill_effects(
+                            enhancements,
+                            ability_attack_effect,
+                            weapon,
+                            &mut deferred,
+                        );
                     }
 
                     if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
@@ -3733,6 +3722,28 @@ impl CoreGame {
 
         self.ui_handle_event(GameEvent::CharacterEndedTheirTurn { gained_ap })
             .await;
+    }
+}
+
+fn collect_attack_on_kill_effects(
+    enhancements: &[(&'static str, AttackEnhancementEffect)],
+    ability_attack_effect: Option<&AbilityAttackEffect>,
+    weapon: Weapon,
+    result: &mut Vec<(Cow<'static, str>, ApplyEffect)>,
+) {
+    if let Some(e) = ability_attack_effect {
+        if let Some(e) = e.on_kill_apply_self {
+            result.push(("ability on-kill".into(), e));
+        }
+    }
+    if let Some(e) = weapon.on_kill_apply_self {
+        result.push((format!("{} on-kill", weapon.name).into(), e));
+    }
+
+    for (name, enhancement) in enhancements {
+        if let Some(effect) = enhancement.on_kill_apply_self {
+            result.push(((*name).into(), effect));
+        }
     }
 }
 
@@ -6718,6 +6729,7 @@ pub struct Character {
 
     changed_equipment_listeners: RefCell<Vec<Weak<ChangedEquipmentSignal>>>,
     recently_received_damage_types: RefCell<HashSet<DamageType>>,
+    deferred_on_kill_self_effects: RefCell<Vec<(Cow<'static, str>, ApplyEffect)>>,
 
     pub facing: Cell<CharacterFacing>,
     push_vector: Cell<Option<PushVector>>,
@@ -6809,6 +6821,7 @@ impl Character {
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
             recently_received_damage_types: Default::default(),
+            deferred_on_kill_self_effects: Default::default(),
             facing: Cell::new(CharacterFacing::West),
             push_vector: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
@@ -7026,12 +7039,13 @@ impl Character {
         self.remaining_movement.set(remaining + distance);
     }
 
-    fn maybe_gain_resources_from_reaper(&self) -> Option<(u32, u32)> {
+    fn reaper_resource_gains(&self) -> Option<(u32, u32)> {
         if self.knows_passive(PassiveSkill::Reaper) {
             let (sta, ap) = if self.has_condition(&Condition::ReaperApCooldown) {
                 (0, 0)
             } else {
-                (self.stamina.gain(2), self.action_points.gain(2))
+                (2, 2)
+                //(self.stamina.gain(2), self.action_points.gain(2))
             };
             self.receive_condition(Condition::ReaperApCooldown, None, None);
             Some((sta, ap))
