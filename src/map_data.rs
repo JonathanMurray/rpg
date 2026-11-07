@@ -686,7 +686,7 @@ pub fn make_test_archer(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    test_archer.set_weapon(HandType::MainHand, BOW);
+    test_archer.set_weapon(HandType::MainHand, CHEAT_BOW);
     test_archer.armor_piece.set(Some(SHIRT));
     test_archer
         .arrows

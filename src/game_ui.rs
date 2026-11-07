@@ -1636,7 +1636,7 @@ impl UserInterface {
                         .animate_initiating_ability(actor, &ability, destination);
 
                 if let Some(sound_id) = ability.audio_visuals.initiate_sound {
-                    self.sound_player.play_delayed(sound_id, delay);
+                    self.sound_player.schedule(sound_id, delay);
                 }
 
                 self.animation_stopwatch.set_to_at_least(duration);
@@ -1801,11 +1801,12 @@ impl UserInterface {
                     self.handle_effect_was_applied(
                         delay,
                         collision.character_id,
-                        AppliedEffect::LostHealth(
-                            collision.damage,
-                            damage_source,
-                            DamageType::Regular,
-                        ),
+                        AppliedEffect::LostHealth {
+                            damage: collision.damage,
+                            actual_lost: collision.actual_health_lost,
+                            source: damage_source,
+                            damage_type: DamageType::Regular,
+                        },
                         &[collision.description],
                     );
                     delay += 0.15;
@@ -1858,7 +1859,7 @@ impl UserInterface {
                 for ch_id in characters {
                     duration = self.game_grid.animate_character_spawn_from_ground(ch_id);
                 }
-                self.sound_player.play_delayed(SoundId::UndeadRise, 0.5);
+                self.sound_player.schedule(SoundId::UndeadRise, 0.5);
 
                 self.animation_stopwatch.set_to_at_least(duration);
             }
@@ -2023,18 +2024,24 @@ impl UserInterface {
             AppliedEffect::GainedActionPoints(n) => {
                 format!("gained {n} AP")
             }
-            AppliedEffect::LostHealth(n, source, dmg_type) => match source {
+            AppliedEffect::LostHealth {
+                damage: dmg,
+                source,
+                damage_type: dmg_type,
+                ..
+            } => match source {
                 DamageSource::Attack { hit_type, .. } => {
-                    Self::was_hit_for_str(n, dmg_type, hit_type)
+                    Self::was_hit_for_str(dmg, dmg_type, hit_type)
                 }
                 DamageSource::Ability(_id, hit_type) => {
-                    Self::was_hit_for_str(n, dmg_type, hit_type)
+                    Self::was_hit_for_str(dmg, dmg_type, hit_type)
                 }
+                DamageSource::Arrow(hit_type) => Self::was_hit_for_str(dmg, dmg_type, hit_type),
                 DamageSource::KnockbackCollision { .. } => {
-                    format!("took |<value>{}| collision damage", n)
+                    format!("took |<value>{}| collision damage", dmg)
                 }
-                DamageSource::Falling => format!("took |<value>{}| falling damage", n),
-                _ => format!("lost |<value>{}| health", n),
+                DamageSource::Falling => format!("took |<value>{}| falling damage", dmg),
+                _ => format!("lost |<value>{}| health", dmg),
             },
             AppliedEffect::GainedHealth(n) => {
                 format!("gained |<value>{}| health", n,)
@@ -2273,7 +2280,7 @@ impl UserInterface {
                 .animate_character_attacking(attacker, target, ranged, target_reaction);
 
         if ranged {
-            self.sound_player.play_delayed(SoundId::ShootArrow, delay);
+            self.sound_player.schedule(SoundId::ShootArrow, delay);
         }
 
         self.animation_stopwatch.set_to_at_least(duration);
@@ -2284,10 +2291,9 @@ impl UserInterface {
             AttackType::Melee => SoundId::MeleeAttack,
             AttackType::Ranged => SoundId::HitArrow,
         };
-        self.sound_player.play_delayed(sound, start_time);
+        self.sound_player.schedule(sound, start_time);
         if matches!(hit_type, HitType::Critical) {
-            self.sound_player
-                .play_delayed(SoundId::Crit, start_time + 0.02);
+            self.sound_player.schedule(SoundId::Crit, start_time + 0.02);
         }
     }
 
@@ -2304,10 +2310,6 @@ impl UserInterface {
 
         let attacker = self.characters.get(attacker_id);
 
-        if event.outcome.hit_type != HitType::Miss {
-            let attack_type = attacker.equipped_weapon_type().unwrap();
-            self.play_attack_hit_sound(attack_type, event.outcome.hit_type, start_time);
-        }
         if event.outcome.hit_type == HitType::Critical {
             self.game_grid
                 .add_text_effect(target, 0.0, TextEffect::CriticalHit);
@@ -2363,15 +2365,19 @@ impl UserInterface {
                 self.game_grid.animate_character_lost_ap(ch_id, n);
             }
             AppliedEffect::GainedActionPoints(n) => {
-                self.sound_player
-                    .play_delayed(SoundId::GainedAP, start_time);
+                self.sound_player.schedule(SoundId::GainedAP, start_time);
             }
-            AppliedEffect::LostHealth(amount, source, dmg_type) => {
+            AppliedEffect::LostHealth {
+                damage: dmg,
+                actual_lost,
+                source,
+                damage_type: dmg_type,
+            } => {
                 let character = self.characters.get(ch_id);
-                if amount > 0 {
+                if dmg > 0 {
                     self.sound_player
-                        .play_delayed(character.hurt_sound, start_time + 0.07);
-                    let prev_health = self.characters.get(ch_id).health.current() + amount;
+                        .schedule(character.hurt_sound, start_time + 0.07);
+                    let prev_health = self.characters.get(ch_id).health.current() + actual_lost;
                     self.game_grid
                         .animate_character_health_change(ch_id, prev_health, 0.9);
 
@@ -2381,10 +2387,10 @@ impl UserInterface {
 
                     match source {
                         DamageSource::Condition(Condition::Burning) => {
-                            self.sound_player.play_delayed(SoundId::Burning, start_time);
+                            self.sound_player.schedule(SoundId::Burning, start_time);
                         }
                         DamageSource::FireSurface => {
-                            self.sound_player.play_delayed(SoundId::Burning, start_time);
+                            self.sound_player.schedule(SoundId::Burning, start_time);
                         }
                         DamageSource::KnockbackCollision { move_direction } => {
                             if move_direction != (0, 0) {
@@ -2393,8 +2399,7 @@ impl UserInterface {
                                     start_time,
                                     move_direction,
                                 );
-                                self.sound_player
-                                    .play_delayed(SoundId::Collision, start_time);
+                                self.sound_player.schedule(SoundId::Collision, start_time);
                             } else {
                                 self.game_grid
                                     .animate_character_shaking(ch_id, start_time, 0.3);
@@ -2406,8 +2411,7 @@ impl UserInterface {
                             self.game_grid
                                 .animate_character_shaking(ch_id, start_time, 0.3);
                             self.game_grid.animate_effect(ch_id, 0.5, EffectId::Bonk);
-                            self.sound_player
-                                .play_delayed(SoundId::Collision, start_time);
+                            self.sound_player.schedule(SoundId::Collision, start_time);
                         }
                         DamageSource::Attack {
                             attack_type,
@@ -2419,6 +2423,7 @@ impl UserInterface {
                                 ch_id,
                                 start_time,
                             );
+                            dbg!("attack hit sound, from dmg source = attack");
                             self.play_attack_hit_sound(attack_type, hit_type, start_time);
                             self.game_grid.animate_effect(ch_id, 0.5, EffectId::Blood);
                         }
@@ -2428,7 +2433,7 @@ impl UserInterface {
                 } else {
                     if matches!(source, DamageSource::Attack { .. }) {
                         self.sound_player
-                            .play_delayed(SoundId::ArmorAbsorbed, start_time);
+                            .schedule(SoundId::ArmorAbsorbed, start_time);
                         self.game_grid
                             .animate_character_shaking(ch_id, start_time, 0.3);
                         self.game_grid
@@ -2437,14 +2442,13 @@ impl UserInterface {
                 }
             }
             AppliedEffect::Dodged => {
-                self.sound_player
-                    .play_delayed(SoundId::AttackMiss, start_time);
+                self.sound_player.schedule(SoundId::AttackMiss, start_time);
                 self.game_grid
                     .animate_character_shaking(ch_id, start_time, 0.3);
             }
             AppliedEffect::GainedCondition(ApplyCondition { condition, .. }) => match condition {
                 Condition::Ferocity => {
-                    self.sound_player.play_delayed(SoundId::Execute, start_time);
+                    self.sound_player.schedule(SoundId::Execute, start_time);
                 }
 
                 _ => {}

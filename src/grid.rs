@@ -2274,7 +2274,7 @@ impl GameGrid {
     }
 
     pub fn animate_character_lost_ap(&mut self, character_id: CharacterId, amount: u32) {
-        println!("animate char lost ap: {}, {}", character_id, amount);
+        //println!("animate char lost ap: {}, {}", character_id, amount);
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             0.0,
@@ -2582,8 +2582,8 @@ impl GameGrid {
                             TextEffectStyle::NegativeEffect
                         }
                     }
-                    AppliedEffect::LostHealth(n, ..) => {
-                        f.push_str(&format!("{}", n));
+                    AppliedEffect::LostHealth { damage: dmg, .. } => {
+                        f.push_str(&format!("{}", dmg));
                         TextEffectStyle::RegularHit
                     }
                     AppliedEffect::GainedHealth(n) => {

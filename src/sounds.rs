@@ -7,14 +7,13 @@ use std::{
 use macroquad::{
     audio::{load_sound, play_sound, stop_sound, PlaySoundParams, Sound},
     rand::ChooseRandom,
-    time::get_time,
 };
 
 #[derive(Clone)]
 pub struct SoundPlayer {
     sounds: Rc<HashMap<SoundId, SoundContainer>>,
     pub enabled: Rc<Cell<bool>>,
-    queued: Rc<RefCell<Vec<(SoundId, f64)>>>,
+    scheduled: Rc<RefCell<Vec<(SoundId, f64)>>>,
     time: f64,
 }
 
@@ -28,7 +27,7 @@ impl SoundPlayer {
         Self {
             sounds: Default::default(),
             enabled: Default::default(),
-            queued: Default::default(),
+            scheduled: Default::default(),
             time: 0.0,
         }
     }
@@ -194,13 +193,13 @@ impl SoundPlayer {
         Self {
             sounds: Rc::new(sounds_by_id),
             enabled: Rc::new(Cell::new(true)),
-            queued: Default::default(),
+            scheduled: Default::default(),
             time: 0.0,
         }
     }
 
     pub fn play(&self, sound_id: SoundId) {
-        //dbg!(sound_id);
+        dbg!((sound_id, self.time));
         if !self.enabled.get() {
             return;
         }
@@ -221,25 +220,36 @@ impl SoundPlayer {
         );
     }
 
-    pub fn play_delayed(&self, sound_id: SoundId, delay: f32) {
-        //dbg!((sound_id, delay));
+    pub fn schedule(&self, sound_id: SoundId, delay: f32) {
         if delay == 0.0 {
             self.play(sound_id);
         } else {
             let target_time = self.time + delay as f64;
-            self.queued.borrow_mut().push((sound_id, target_time));
+
+            let mut scheduled = self.scheduled.borrow_mut();
+            for (other_sound, other_target_time) in scheduled.iter() {
+                if sound_id == *other_sound {
+                    let dt = target_time - other_target_time;
+                    if dt.abs() < 0.1 {
+                        println!("Skipping sound '{:?}'. Found identical sound, scheduled at relative time {}", sound_id, dt);
+                        return;
+                    }
+                }
+            }
+
+            scheduled.push((sound_id, target_time));
         }
     }
 
     pub fn update(&mut self, elapsed: f32) {
         self.time += elapsed as f64;
-        let mut queued = self.queued.borrow_mut();
-        for (sound_id, target_time) in queued.iter() {
+        let mut scheduled = self.scheduled.borrow_mut();
+        for (sound_id, target_time) in scheduled.iter() {
             if self.time >= *target_time {
                 self.play(*sound_id);
             }
         }
-        queued.retain(|(_sound_id, target_time)| *target_time > self.time);
+        scheduled.retain(|(_sound_id, target_time)| *target_time > self.time);
     }
 
     pub fn play_looping(&self, sound_id: SoundId) {

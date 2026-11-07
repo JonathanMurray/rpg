@@ -465,10 +465,10 @@
   },
   "characters": [
     {
-      "type_": "Bob",
+      "type_": "Alice",
       "pos": [
-        7,
-        25
+        19,
+        31
       ],
       "health": null,
       "main_hand": null,
@@ -476,9 +476,20 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Ghoul1",
       "pos": [
         7,
+        13
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        11,
         28
       ],
       "health": null,
@@ -489,8 +500,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        10,
-        25
+        13,
+        31
       ],
       "health": null,
       "main_hand": null,
@@ -498,10 +509,10 @@
       "name": null
     },
     {
-      "type_": "SkeletonLeader",
+      "type_": "Ghoul2",
       "pos": [
         7,
-        22
+        31
       ],
       "health": null,
       "main_hand": null,
@@ -509,10 +520,10 @@
       "name": null
     },
     {
-      "type_": "SkeletonLeader",
+      "type_": "Bob",
       "pos": [
-        4,
-        25
+        10,
+        31
       ],
       "health": null,
       "main_hand": null,
