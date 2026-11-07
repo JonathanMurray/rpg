@@ -2108,7 +2108,6 @@ impl UserInterface {
         outcomes: &[DecoratedTargetOutcome],
         ability: Option<&Ability>,
     ) {
-        let ability_id = ability.map(|a| a.id);
         if let Some(circle) = circle {
             self.game_grid
                 .animate_circle_area_impact(ability, circle, start_time, animation_color);
@@ -2364,7 +2363,7 @@ impl UserInterface {
                 self.sound_player
                     .play_delayed(SoundId::GainedAP, start_time);
             }
-            AppliedEffect::LostHealth(amount, source, _dmg_type) => {
+            AppliedEffect::LostHealth(amount, source, dmg_type) => {
                 let character = self.characters.get(ch_id);
                 if amount > 0 {
                     self.sound_player
@@ -2373,8 +2372,15 @@ impl UserInterface {
                     self.game_grid
                         .animate_character_health_change(ch_id, prev_health, 0.9);
 
+                    if dmg_type == DamageType::Fire {
+                        self.game_grid.animate_effect(ch_id, 0.5, EffectId::Fire);
+                    }
+
                     match source {
                         DamageSource::Condition(Condition::Burning) => {
+                            self.sound_player.play_delayed(SoundId::Burning, start_time);
+                        }
+                        DamageSource::FireSurface => {
                             self.sound_player.play_delayed(SoundId::Burning, start_time);
                         }
                         DamageSource::KnockbackCollision { move_direction } => {
@@ -2437,9 +2443,7 @@ impl UserInterface {
                 Condition::Ferocity => {
                     self.sound_player.play_delayed(SoundId::Execute, start_time);
                 }
-                Condition::Burning => {
-                    self.sound_player.play_delayed(SoundId::Burning, start_time);
-                }
+
                 _ => {}
             },
             _ => {}

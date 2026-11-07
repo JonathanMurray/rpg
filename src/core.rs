@@ -5720,6 +5720,7 @@ pub struct AudioVisuals {
     pub initiate_sound: Option<SoundId>,
     pub resolve_sound: Option<SoundId>,
     pub character_target_effect: Option<(EffectId, f32)>,
+    pub circle_center_target_effect: Option<(EffectId, f32)>,
     pub target_magic_sparks: Option<Color>,
     pub target_reaction: AbilityVisualReaction,
 }
@@ -5741,6 +5742,7 @@ impl AudioVisuals {
             charge_fx: None,
             speech: "",
             character_target_effect: None,
+            circle_center_target_effect: None,
             target_magic_sparks: None,
             target_reaction: AbilityVisualReaction::ReelBack,
         }

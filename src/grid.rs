@@ -2178,7 +2178,7 @@ impl GameGrid {
         }
 
         if let Some(ability) = ability {
-            if let Some((effect_id, duration)) = ability.audio_visuals.character_target_effect {
+            if let Some((effect_id, duration)) = ability.audio_visuals.circle_center_target_effect {
                 self.animate_effect_at_pos(
                     (circle.center.0 as f32 + 0.5, circle.center.1 as f32 + 0.5),
                     duration,
@@ -4218,7 +4218,7 @@ impl GameGrid {
             };
             let committable_action: Option<CommittableAction> = match ui_state {
                 UiState::ConfiguringAction(configured_action) => match configured_action {
-                    // TODO what about ranged attack
+                    // TODO what about ranged attack icon
                     ConfiguredAction::Attack { .. } => {
                         Some(CommittableAction::new("Attack", IconId::MeleeAttack))
                     }
@@ -4229,6 +4229,9 @@ impl GameGrid {
                         } else {
                             let target_str = if num_targets == 1 {
                                 let char_id = self.target_effect_previews.keys().next().unwrap();
+                                // BUG: This panicked - haven't been able to reproduce.
+                                // Seemed like maybe an enemy that had already died somehow ended up with a
+                                // target effect preview, despite not existing in the characters data structure.
                                 self.characters[char_id].name.clone()
                             } else {
                                 format!("{} targets", num_targets)
@@ -4593,7 +4596,15 @@ impl GameGrid {
 
                     if pressed_left_mouse && !outcome.committed_action {
                         if self.active_character_id == hovered_id {
-                            if matches!(mouse_state, MouseState::RequiresPointTarget { .. }) {
+                            if matches!(
+                                mouse_state,
+                                MouseState::RequiresPointTarget {
+                                    kind: PointTargetKind::PositionCircle(..),
+                                    ..
+                                }
+                            ) {
+                                // TODO: If clicking active char while configuring line/projectile-targetting ability,
+                                // it should be treated as a regular aim
                                 println!("Clicked active char - treating as clicking ground, for point target");
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;

@@ -2398,10 +2398,7 @@ pub const FIRE_BOLT: Ability = Ability {
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
         }),
-        // TODO: Not quite right - fire bomb should be reserved for grenade
-        // This one needs a more "regular" fire animation
-        // The "regular" fire animation can be used whenever someone takes damage from burning/fire surface also
-        character_target_effect: Some((EffectId::FireBomb, 0.5)),
+        circle_center_target_effect: Some((EffectId::Fire, 0.5)),
         ..AudioVisuals::default()
     },
 };

@@ -496,6 +496,39 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        16,
+        31
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        28,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        31,
+        26
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

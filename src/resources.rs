@@ -1619,6 +1619,7 @@ pub enum EffectId {
     FireBomb,
     RisingSmoke,
     Claws,
+    Fire,
 }
 
 impl FlipbookAnimation {
@@ -1636,6 +1637,7 @@ impl FlipbookAnimation {
             EffectId::FireBomb => 9,
             EffectId::RisingSmoke => 10,
             EffectId::Claws => 11,
+            EffectId::Fire => 12,
         };
         let source_size = (32.0, 32.0);
 
@@ -1643,6 +1645,7 @@ impl FlipbookAnimation {
             EffectId::PurpleMagic => 3.0,
             EffectId::FireBomb => 3.0,
             EffectId::RisingSmoke => 3.0,
+            EffectId::Fire => 3.0,
             _ => 2.0,
         };
 
