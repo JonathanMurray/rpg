@@ -3889,6 +3889,7 @@ pub struct AttackPrediction {
     pub effective_armor_value: u32,
 }
 
+#[derive(Debug)]
 pub struct AbilityPrediction {
     pub targets: HashMap<CharacterId, TargetPrediction>,
 }

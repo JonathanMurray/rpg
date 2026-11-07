@@ -651,7 +651,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 1, 1),
         (2, 10),
     );
-    test_fighter.set_weapon(HandType::MainHand, *ZERO_SWORD);
+    test_fighter.set_weapon(HandType::MainHand, *SWORD);
     test_fighter.set_shield(SPIKE_SHIELD);
     test_fighter.armor_piece.set(Some(LEATHER_ARMOR));
     test_fighter.learn_passive(PassiveSkill::Reaper);
@@ -662,6 +662,7 @@ pub fn make_test_fighter(party: &Rc<Party>) -> Character {
     test_fighter.learn_ability(shield_bash());
     test_fighter.learn_ability_enhancement(&SHIELD_BASH_KNOCKBACK);
     test_fighter.learn_ability(&SWEEP_ATTACK);
+    test_fighter.learn_ability_enhancement(&SWEEP_ATTACK_PUSH);
     // TODO
     //bob.learn_ability(&KILL);
     test_fighter.learn_ability(inspire());

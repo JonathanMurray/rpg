@@ -1968,7 +1968,7 @@ pub fn natures_blessing() -> &'static Ability {
                     ApplyEffect::Condition(ApplyCondition {
                         condition: Condition::Protected,
                         stacks: Some(3),
-                        duration_rounds: Some(1),
+                        duration_rounds: Some(2),
                     }),
                     ApplyEffect::LoseCondition {
                         condition: Condition::Bleeding,

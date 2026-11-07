@@ -55,7 +55,10 @@ use crate::{
     pathfind::{Elevation, Occupation, PathfindGrid, Surface, TerrainType},
     resources::{EffectId, GameResources, StatusId, TerrainId, UI_BG_TEXTURE},
     settings::build_settings,
-    sounds::{SoundId, SoundPlayer},
+    sounds::{
+        SoundId::{self, React},
+        SoundPlayer,
+    },
     target_ui::TargetUi,
     tooltip::{
         handle_keyword_tooltip_end_of_frame, Keyword, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
@@ -1693,8 +1696,8 @@ impl UserInterface {
                     }
                 }
 
+                self.characters.remove_dead();
                 self.target_ui.clear_character_if_dead();
-
                 self.game_grid.remove_dead();
                 self.top_character_portraits.remove_dead();
 

@@ -879,6 +879,12 @@ impl GameGrid {
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
+        assert!(
+            self.characters.contains_key(&preview.character_id),
+            "{:?} not in {:?}",
+            preview,
+            self.characters
+        );
         self.target_effect_previews
             .insert(preview.character_id, preview);
     }
